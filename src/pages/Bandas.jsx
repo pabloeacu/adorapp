@@ -24,8 +24,8 @@ const dayLabels = {
 
 export const Bandas = () => {
   const { bands, members, orders, addBand, updateBand, deleteBand, getBandMembers } = useAppStore();
-  const user = useAuthStore((state) => state.user);
-  const isPastor = user?.role === 'pastor';
+  const { profile } = useAuthStore();
+  const isPastor = profile?.role === 'pastor';
 
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingBand, setEditingBand] = useState(null);
@@ -118,7 +118,7 @@ export const Bandas = () => {
             {activeBands.length} bandas activas
           </p>
         </div>
-        {isPastor && (
+        {(isPastor || isLeader) && (
           <Button icon={Plus} onClick={() => handleOpenModal()}>
             Crear Banda
           </Button>

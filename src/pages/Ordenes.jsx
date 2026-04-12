@@ -26,9 +26,9 @@ const statusConfig = {
 
 export const Ordenes = () => {
   const { orders, bands, songs, members, addOrder, updateOrder, deleteOrder, cloneOrder, getUnusedByBand, getSongById, getBandById, getMemberById } = useAppStore();
-  const user = useAuthStore((state) => state.user);
-  const isPastor = user?.role === 'pastor';
-  const isLeader = user?.role === 'leader';
+  const { profile } = useAuthStore();
+  const isPastor = profile?.role === 'pastor';
+  const isLeader = profile?.role === 'leader';
 
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [isDetailOpen, setIsDetailOpen] = useState(false);

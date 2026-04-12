@@ -1,6 +1,6 @@
 import React, { useState, useRef, useEffect, useCallback } from 'react';
 import { useLocation } from 'react-router-dom';
-import { Bell, Search, ChevronRight, User, Mail, Shield, Camera, X, RotateCcw, ZoomIn, ZoomOut, Check, Move } from 'lucide-react';
+import { Bell, Search, ChevronRight, User, Mail, Shield, Camera, X, RotateCcw, ZoomIn, ZoomOut, Check, Move, LogOut, Trash2 } from 'lucide-react';
 import { useAuthStore } from '../../stores/authStore';
 import { useAppStore } from '../../stores/appStore';
 import { Avatar } from '../ui/Avatar';
@@ -18,12 +18,13 @@ const pageTitles = {
 
 export const Header = () => {
   const location = useLocation();
-  const { user } = useAuthStore();
+  const { user, profile, logout } = useAuthStore();
   const { updateMember, members } = useAppStore();
   const [showProfile, setShowProfile] = useState(false);
   const [isEditing, setIsEditing] = useState(false);
   const [editName, setEditName] = useState('');
   const [showCropper, setShowCropper] = useState(false);
+  const [showPhotoOptions, setShowPhotoOptions] = useState(false);
   const [previewUrl, setPreviewUrl] = useState(null);
   const [userPhoto, setUserPhoto] = useState(null);
   const [zoom, setZoom] = useState(1);
@@ -35,8 +36,8 @@ export const Header = () => {
   const fileInputRef = useRef(null);
   const title = pageTitles[location.pathname] || 'AdorAPP';
 
-  const isPastor = user?.role === 'pastor';
-  const isLeader = user?.role === 'leader';
+  const isPastor = profile?.role === 'pastor';
+  const isLeader = profile?.role === 'leader';
 
   // Load saved photo on mount
   useEffect(() => {
@@ -70,7 +71,26 @@ export const Header = () => {
   };
 
   const handleCameraClick = () => {
+    if (userPhoto) {
+      setShowPhotoOptions(true);
+    } else {
+      fileInputRef.current?.click();
+    }
+  };
+
+  const handleReplacePhoto = () => {
+    setShowPhotoOptions(false);
     fileInputRef.current?.click();
+  };
+
+  const handleDeletePhoto = () => {
+    localStorage.removeItem('userPhoto');
+    setUserPhoto(null);
+    setShowPhotoOptions(false);
+    // Also delete from Supabase if exists
+    if (profile?.avatar_url) {
+      supabase.storage.from('avatars').remove([profile.avatar_url.split('/').pop()]);
+    }
   };
 
   const handleFileSelect = (e) => {
@@ -170,7 +190,42 @@ export const Header = () => {
     img.src = previewUrl;
   };
 
-  const handleSavePhoto = processAndSavePhoto;
+  const handleSavePhoto = () => {
+    // Upload original full image to Supabase Storage
+    const uploadOriginal = async () => {
+      try {
+        const file = fileInputRef.current?.files?.[0];
+        if (file) {
+          const fileName = `avatars/${user?.id}-${Date.now()}.png`;
+          const { data, error } = await supabase.storage
+            .from('avatars')
+            .upload(fileName, file, { upsert: true });
+
+          if (error) throw error;
+
+          const { data: { publicUrl } } = supabase.storage
+            .from('avatars')
+            .getPublicUrl(fileName);
+
+          // Save the full image URL
+          localStorage.setItem('userPhoto', publicUrl);
+          setUserPhoto(publicUrl);
+
+          // Also update in members table
+          await supabase
+            .from('members')
+            .update({ avatar_url: publicUrl })
+            .eq('user_id', user?.id);
+        }
+      } catch (err) {
+        console.error('Upload error:', err);
+      }
+      setShowCropper(false);
+      setPreviewUrl(null);
+    };
+
+    uploadOriginal();
+  };
 
   return (
     <>
@@ -193,15 +248,15 @@ export const Header = () => {
             onClick={() => setShowProfile(true)}
           >
             <div className="text-right hidden sm:block">
-              <p className="text-sm font-medium">{user?.name}</p>
+              <p className="text-sm font-medium">{profile?.name || user?.name}</p>
               <p className="text-xs text-gray-500 capitalize">
-                {user?.role === 'pastor' ? 'Pastor' : user?.role === 'leader' ? 'Líder' : 'Miembro'}
+                {profile?.role === 'pastor' ? 'Pastor' : profile?.role === 'leader' ? 'Líder' : 'Miembro'}
               </p>
             </div>
             {userPhoto ? (
               <img src={userPhoto} alt="Perfil" className="w-10 h-10 rounded-full object-cover" />
             ) : (
-              <Avatar name={user?.name} size="md" />
+              <Avatar name={profile?.name || user?.name} size="md" />
             )}
           </div>
         </div>
@@ -221,7 +276,7 @@ export const Header = () => {
               {userPhoto ? (
                 <img src={userPhoto} alt="Perfil" className="w-28 h-28 rounded-full object-cover border-4 border-neutral-700" />
               ) : (
-                <Avatar name={user?.name} size="xl" />
+                <Avatar name={profile?.name || user?.name} size="xl" />
               )}
               <button
                 onClick={handleCameraClick}
@@ -238,9 +293,9 @@ export const Header = () => {
                 className="hidden"
               />
             </div>
-            <h3 className="mt-4 text-xl font-semibold">{user?.name}</h3>
+            <h3 className="mt-4 text-xl font-semibold">{profile?.name || user?.name}</h3>
             <p className="text-gray-400 capitalize">
-              {user?.role === 'pastor' ? 'Pastor' : user?.role === 'leader' ? 'Líder' : 'Miembro'}
+              {profile?.role === 'pastor' ? 'Pastor' : profile?.role === 'leader' ? 'Líder' : 'Miembro'}
             </p>
           </div>
 
@@ -277,7 +332,7 @@ export const Header = () => {
                     </button>
                   </div>
                 ) : (
-                  <p className="font-medium">{user?.name}</p>
+                  <p className="font-medium">{profile?.name || user?.name}</p>
                 )}
               </div>
             </div>
@@ -299,7 +354,7 @@ export const Header = () => {
               <div className="flex-1">
                 <p className="text-xs text-gray-400">Rol en el sistema</p>
                 <p className="font-medium capitalize">
-                  {user?.role === 'pastor' ? 'Pastor' : user?.role === 'leader' ? 'Líder' : 'Miembro'}
+                  {profile?.role === 'pastor' ? 'Pastor' : profile?.role === 'leader' ? 'Líder' : 'Miembro'}
                 </p>
               </div>
             </div>
@@ -314,13 +369,47 @@ export const Header = () => {
           )}
 
           {/* Permission Note */}
-          {(isPastor || isLeader) && (
+          {(isPastor || isLeader) && !isEditing && (
             <div className="p-4 bg-green-500/10 border border-green-500/20 rounded-xl">
               <p className="text-sm text-green-300">
                 Puedes editar tu nombre directamente. Los cambios de instrumentos y otros datos deben ser realizados por un Pastor.
               </p>
             </div>
           )}
+
+          {/* Logout Button */}
+          <button
+            onClick={() => { logout(); window.location.href = '/login'; }}
+            className="w-full flex items-center justify-center gap-2 px-4 py-3 bg-neutral-800 hover:bg-neutral-700 rounded-xl text-gray-400 hover:text-white transition-colors"
+          >
+            <LogOut size={18} />
+            <span>Cerrar Sesión</span>
+          </button>
+        </div>
+      </Modal>
+
+      {/* Photo Options Modal */}
+      <Modal
+        isOpen={showPhotoOptions}
+        onClose={() => setShowPhotoOptions(false)}
+        title="Opciones de Foto"
+        size="sm"
+      >
+        <div className="space-y-3">
+          <button
+            onClick={handleReplacePhoto}
+            className="w-full flex items-center gap-3 px-4 py-3 bg-neutral-800 hover:bg-neutral-700 rounded-xl text-white transition-colors"
+          >
+            <Camera size={18} />
+            <span>Reemplazar foto</span>
+          </button>
+          <button
+            onClick={handleDeletePhoto}
+            className="w-full flex items-center gap-3 px-4 py-3 bg-red-500/20 hover:bg-red-500/30 rounded-xl text-red-400 transition-colors"
+          >
+            <Trash2 size={18} />
+            <span>Eliminar foto</span>
+          </button>
         </div>
       </Modal>
 

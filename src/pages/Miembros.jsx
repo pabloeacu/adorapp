@@ -21,9 +21,9 @@ const roleConfig = {
 
 export const Miembros = () => {
   const { members, addMember, updateMember, deleteMember, toggleMemberActive } = useAppStore();
-  const user = useAuthStore((state) => state.user);
-  const isPastor = user?.role === 'pastor';
-  const isLeader = user?.role === 'leader';
+  const { user, profile } = useAuthStore();
+  const isPastor = profile?.role === 'pastor';
+  const isLeader = profile?.role === 'leader';
 
   const [searchTerm, setSearchTerm] = useState('');
   const [filterRole, setFilterRole] = useState('all');

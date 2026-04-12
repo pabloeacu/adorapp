@@ -99,13 +99,13 @@ export const Login = () => {
 
           <div className="mt-6 pt-6 border-t border-neutral-800">
             <p className="text-xs text-gray-500 text-center">
-              Usa tus credenciales de Supabase Auth para iniciar sesión
+              Usa las credenciales que te proporcionaron tus pastores
             </p>
           </div>
         </div>
 
         <p className="text-xs text-gray-600 text-center mt-6">
-          © 2025 Centro de Avivamiento Familiar
+          © 2026 Centro de Avivamiento Familiar
         </p>
       </div>
     </div>

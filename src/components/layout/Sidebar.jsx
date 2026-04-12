@@ -69,7 +69,7 @@ export const Sidebar = () => {
           </div>
         </div>
         <button
-          onClick={logout}
+          onClick={() => { logout(); window.location.href = '/login'; }}
           className="mt-2 w-full flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-medium text-gray-400 hover:text-white hover:bg-neutral-800/50 transition-all duration-200"
         >
           <LogOut size={20} />
