@@ -26,6 +26,7 @@ export const Bandas = () => {
   const { bands, members, orders, addBand, updateBand, deleteBand, getBandMembers } = useAppStore();
   const { profile } = useAuthStore();
   const isPastor = profile?.role === 'pastor';
+  const isLeader = profile?.role === 'leader';
 
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingBand, setEditingBand] = useState(null);

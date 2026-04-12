@@ -3,6 +3,7 @@ import { useLocation } from 'react-router-dom';
 import { Bell, Search, ChevronRight, User, Mail, Shield, Camera, X, RotateCcw, ZoomIn, ZoomOut, Check, Move, LogOut, Trash2 } from 'lucide-react';
 import { useAuthStore } from '../../stores/authStore';
 import { useAppStore } from '../../stores/appStore';
+import { supabase } from '../../lib/supabase';
 import { Avatar } from '../ui/Avatar';
 import { Modal } from '../ui/Modal';
 import { Button } from '../ui/Button';

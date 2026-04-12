@@ -1,5 +1,5 @@
 import { create } from 'zustand';
-import { supabase } from '../lib/supabase';
+import { supabase, supabaseAdmin } from '../lib/supabase';
 import { v4 as uuidv4 } from 'uuid';
 
 // Musical key transposition table
@@ -188,10 +188,34 @@ export const useAppStore = create((set, get) => ({
   // Member CRUD
   addMember: async (member) => {
     try {
+      const memberId = uuidv4();
+      let userId = null;
+
+      // Create auth user if email and password are provided
+      if (member.email && member.password) {
+        const { data: authData, error: authError } = await supabaseAdmin.auth.admin.createUser({
+          email: member.email,
+          password: member.password,
+          email_confirm: true,
+          user_metadata: { name: member.name },
+        });
+
+        if (authError) {
+          console.error('Auth creation error:', authError);
+          // Continue anyway - the member record is still created
+        } else if (authData?.user) {
+          userId = authData.user.id;
+        }
+      }
+
       const newMember = {
         ...convertMemberToDB(member),
-        id: uuidv4(),
+        id: memberId,
+        user_id: userId,
       };
+
+      // Remove password from data before storing
+      delete newMember.password;
 
       const { data, error } = await supabase
         .from('members')
@@ -205,7 +229,8 @@ export const useAppStore = create((set, get) => ({
         members: [...state.members, convertMemberFromDB(data)],
       }));
 
-      return data;
+      // Return the created member along with the generated password
+      return { ...data, generatedPassword: member.password };
     } catch (err) {
       console.error('Error adding member:', err);
       set({ error: err.message });

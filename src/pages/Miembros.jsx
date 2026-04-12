@@ -44,6 +44,10 @@ export const Miembros = () => {
     password: '' // Password field for new members
   });
 
+  // State for showing password after member creation
+  const [showPasswordModal, setShowPasswordModal] = useState(false);
+  const [createdMemberData, setCreatedMemberData] = useState(null);
+
   const filteredMembers = useMemo(() => {
     return members.filter(member => {
       const matchesSearch = member.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
@@ -92,17 +96,27 @@ export const Miembros = () => {
     setEditingMember(null);
   };
 
-  const handleSubmit = (e) => {
+  const handleSubmit = async (e) => {
     e.preventDefault();
 
     if (!formData.name.trim()) return;
 
     if (editingMember) {
       updateMember(editingMember.id, formData);
+      handleCloseModal();
     } else {
-      addMember(formData);
+      // Creating a new member - show password modal after creation
+      const result = await addMember(formData);
+      if (result) {
+        setCreatedMemberData({
+          name: formData.name,
+          email: formData.email,
+          password: result.generatedPassword || formData.password
+        });
+        setShowPasswordModal(true);
+      }
+      handleCloseModal();
     }
-    handleCloseModal();
   };
 
   const toggleInstrument = (instrument) => {
@@ -517,13 +531,22 @@ export const Miembros = () => {
         footer={
           <>
             <Button variant="secondary" onClick={handleCloseModal}>Cancelar</Button>
-            <Button onClick={handleSubmit} disabled={!formData.name.trim()}>
+            <Button
+              onClick={handleSubmit}
+              disabled={!formData.name.trim() || (!editingMember && formData.email && !formData.password)}
+            >
               {editingMember ? 'Guardar Cambios' : 'Agregar Miembro'}
             </Button>
           </>
         }
       >
         <form onSubmit={handleSubmit} className="space-y-6">
+          {/* Only require password for new members with email */}
+          {!editingMember && formData.email && !formData.password && (
+            <div className="p-3 bg-yellow-500/10 border border-yellow-500/30 rounded-lg text-sm text-yellow-300">
+              ⚠️ El miembro necesita una contraseña para poder iniciar sesión.
+            </div>
+          )}
           <Input
             label="Nombre Completo"
             placeholder="Nombre del miembro"
@@ -617,6 +640,72 @@ export const Miembros = () => {
             </div>
           </div>
         </form>
+      </Modal>
+
+      {/* Password Modal - Shows after successful member creation */}
+      <Modal
+        isOpen={showPasswordModal}
+        onClose={() => {
+          setShowPasswordModal(false);
+          setCreatedMemberData(null);
+        }}
+        title="Miembro Creado Exitosamente"
+        size="md"
+      >
+        <div className="space-y-4">
+          <div className="flex items-center justify-center">
+            <div className="w-16 h-16 bg-green-500/20 rounded-full flex items-center justify-center">
+              <Check size={32} className="text-green-400" />
+            </div>
+          </div>
+
+          <div className="text-center">
+            <p className="text-lg font-semibold">{createdMemberData?.name}</p>
+            <p className="text-gray-400">ha sido agregado al sistema</p>
+          </div>
+
+          <div className="bg-neutral-800/50 rounded-xl p-4 space-y-3">
+            <div className="flex items-center gap-3">
+              <Mail size={18} className="text-gray-400" />
+              <div className="flex-1">
+                <p className="text-xs text-gray-400">Email</p>
+                <p className="font-medium">{createdMemberData?.email}</p>
+              </div>
+            </div>
+            <div className="flex items-center gap-3">
+              <Key size={18} className="text-purple-400" />
+              <div className="flex-1">
+                <p className="text-xs text-gray-400">Contraseña</p>
+                <p className="font-medium font-mono bg-neutral-900 px-3 py-2 rounded-lg">
+                  {createdMemberData?.password || 'N/A'}
+                </p>
+              </div>
+              <button
+                onClick={() => navigator.clipboard.writeText(createdMemberData?.password)}
+                className="p-2 bg-neutral-700 hover:bg-neutral-600 rounded-lg transition-colors"
+                title="Copiar contraseña"
+              >
+                <Check size={16} />
+              </button>
+            </div>
+          </div>
+
+          <div className="bg-yellow-500/10 border border-yellow-500/30 rounded-xl p-4">
+            <p className="text-sm text-yellow-300">
+              ⚠️ <strong>Importante:</strong> Compartí estas credenciales con el nuevo miembro de forma segura. La contraseña no se puede recuperar después de cerrar este mensaje.
+            </p>
+          </div>
+
+          <Button
+            onClick={() => {
+              setShowPasswordModal(false);
+              setCreatedMemberData(null);
+            }}
+            className="w-full"
+          >
+            Entendido
+          </Button>
+        </div>
       </Modal>
     </div>
   );
