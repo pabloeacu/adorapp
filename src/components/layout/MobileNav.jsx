@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { NavLink, useLocation } from 'react-router-dom';
 import {
   LayoutDashboard,
@@ -12,9 +12,7 @@ import {
   X,
   ChevronRight
 } from 'lucide-react';
-import { useState } from 'react';
 import { useAuthStore } from '../../stores/authStore';
-import { supabase } from '../../lib/supabase';
 
 const navItems = [
   { path: '/', icon: LayoutDashboard, label: 'Inicio' },
@@ -29,18 +27,54 @@ export const MobileNav = () => {
   const [profileOpen, setProfileOpen] = useState(false);
   const location = useLocation();
   const { profile, logout } = useAuthStore();
+  const profileSheetRef = useRef(null);
 
-  const handleLogout = async () => {
+  const handleLogout = async (e) => {
+    e.stopPropagation();
     setProfileOpen(false);
     await logout();
     window.location.href = '/login';
   };
 
-  const handleChangePhoto = () => {
+  const handleChangePhoto = (e) => {
+    e.stopPropagation();
     setProfileOpen(false);
-    // Trigger photo upload in Header
     window.dispatchEvent(new CustomEvent('openPhotoUpload'));
   };
+
+  const handleEditProfile = (e) => {
+    e.stopPropagation();
+    setProfileOpen(false);
+    window.dispatchEvent(new CustomEvent('openEditProfile'));
+  };
+
+  const handleCameraClick = (e) => {
+    e.stopPropagation();
+    window.dispatchEvent(new CustomEvent('openPhotoUpload'));
+  };
+
+  // Close on escape key
+  useEffect(() => {
+    const handleEscape = (e) => {
+      if (e.key === 'Escape' && profileOpen) {
+        setProfileOpen(false);
+      }
+    };
+    window.addEventListener('keydown', handleEscape);
+    return () => window.removeEventListener('keydown', handleEscape);
+  }, [profileOpen]);
+
+  // Prevent scroll when profile is open
+  useEffect(() => {
+    if (profileOpen) {
+      document.body.style.overflow = 'hidden';
+    } else {
+      document.body.style.overflow = '';
+    }
+    return () => {
+      document.body.style.overflow = '';
+    };
+  }, [profileOpen]);
 
   return (
     <>
@@ -55,7 +89,10 @@ export const MobileNav = () => {
 
           {/* Profile Button */}
           <button
-            onClick={() => setProfileOpen(!profileOpen)}
+            onClick={(e) => {
+              e.stopPropagation();
+              setProfileOpen(!profileOpen);
+            }}
             className="flex items-center gap-2 p-1 rounded-full hover:bg-neutral-800 transition-colors"
           >
             {profile?.photo_url ? (
@@ -77,18 +114,36 @@ export const MobileNav = () => {
       {profileOpen && (
         <div
           className="lg:hidden fixed inset-0 z-50 bg-black/80 backdrop-blur-sm animate-fade-in"
-          onClick={() => setProfileOpen(false)}
+          style={{ display: 'block' }}
+          onClick={(e) => {
+            // Only close if clicking the overlay itself
+            if (e.target === e.currentTarget) {
+              setProfileOpen(false);
+            }
+          }}
         >
           <div
-            className="absolute bottom-0 left-0 right-0 bg-neutral-900 rounded-t-3xl pb-safe animate-slide-up"
-            style={{ paddingBottom: 'env(safe-area-inset-bottom)' }}
+            ref={profileSheetRef}
+            className="absolute bottom-0 left-0 right-0 bg-neutral-900 rounded-t-3xl animate-slide-up"
+            style={{
+              paddingBottom: 'calc(env(safe-area-inset-bottom) + 20px)',
+              touchAction: 'none'
+            }}
             onClick={(e) => e.stopPropagation()}
           >
+            {/* Handle Bar */}
+            <div className="flex justify-center pt-3 pb-2">
+              <div className="w-10 h-1 bg-neutral-700 rounded-full" />
+            </div>
+
             {/* Header */}
             <div className="flex items-center justify-between px-5 py-4 border-b border-neutral-800">
               <h2 className="text-white font-semibold text-lg">Mi Perfil</h2>
               <button
-                onClick={() => setProfileOpen(false)}
+                onClick={(e) => {
+                  e.stopPropagation();
+                  setProfileOpen(false);
+                }}
                 className="p-2 rounded-full hover:bg-neutral-800 transition-colors"
               >
                 <X size={20} className="text-neutral-400" />
@@ -111,8 +166,8 @@ export const MobileNav = () => {
                     </div>
                   )}
                   <button
-                    onClick={handleChangePhoto}
-                    className="absolute -bottom-1 -right-1 w-7 h-7 rounded-full bg-white flex items-center justify-center shadow-lg hover:bg-neutral-100 transition-colors"
+                    onClick={handleCameraClick}
+                    className="absolute -bottom-1 -right-1 w-7 h-7 rounded-full bg-white flex items-center justify-center shadow-lg hover:bg-neutral-100 transition-colors active:scale-95"
                   >
                     <Camera size={14} className="text-black" />
                   </button>
@@ -126,11 +181,8 @@ export const MobileNav = () => {
               {/* Menu Options */}
               <div className="space-y-1">
                 <button
-                  onClick={() => {
-                    setProfileOpen(false);
-                    window.dispatchEvent(new CustomEvent('openPhotoUpload'));
-                  }}
-                  className="w-full flex items-center gap-4 px-4 py-4 rounded-xl hover:bg-neutral-800 transition-colors"
+                  onClick={handleChangePhoto}
+                  className="w-full flex items-center gap-4 px-4 py-4 rounded-xl hover:bg-neutral-800 transition-colors active:bg-neutral-700"
                 >
                   <Camera size={20} className="text-neutral-400" />
                   <span className="flex-1 text-left text-white">Cambiar foto de perfil</span>
@@ -138,11 +190,8 @@ export const MobileNav = () => {
                 </button>
 
                 <button
-                  onClick={() => {
-                    setProfileOpen(false);
-                    window.dispatchEvent(new CustomEvent('openEditProfile'));
-                  }}
-                  className="w-full flex items-center gap-4 px-4 py-4 rounded-xl hover:bg-neutral-800 transition-colors"
+                  onClick={handleEditProfile}
+                  className="w-full flex items-center gap-4 px-4 py-4 rounded-xl hover:bg-neutral-800 transition-colors active:bg-neutral-700"
                 >
                   <Settings size={20} className="text-neutral-400" />
                   <span className="flex-1 text-left text-white">Editar datos del perfil</span>
@@ -153,7 +202,7 @@ export const MobileNav = () => {
 
                 <button
                   onClick={handleLogout}
-                  className="w-full flex items-center gap-4 px-4 py-4 rounded-xl hover:bg-red-500/10 transition-colors"
+                  className="w-full flex items-center gap-4 px-4 py-4 rounded-xl hover:bg-red-500/10 transition-colors active:bg-red-500/20"
                 >
                   <LogOut size={20} className="text-red-500" />
                   <span className="flex-1 text-left text-red-500 font-medium">Cerrar Sesión</span>
@@ -170,7 +219,11 @@ export const MobileNav = () => {
           className="lg:hidden fixed inset-0 z-50 bg-black/98 backdrop-blur-xl animate-fade-in"
           onClick={() => setMenuOpen(false)}
         >
-          <div className="flex flex-col h-full pt-20 pb-safe">
+          <div
+            className="flex flex-col h-full pt-20"
+            style={{ paddingBottom: 'env(safe-area-inset-bottom)' }}
+            onClick={(e) => e.stopPropagation()}
+          >
             <div className="flex items-center justify-between px-5 mb-6">
               <div className="flex items-center gap-3">
                 {profile?.photo_url ? (
