@@ -32,6 +32,17 @@ export default {
           '100%': { opacity: '1', transform: 'scale(1)' },
         },
       },
+      spacing: {
+        'safe-area-top': 'env(safe-area-inset-top)',
+        'safe-area-bottom': 'env(safe-area-inset-bottom)',
+      },
+      padding: {
+        'safe-area-top': 'env(safe-area-inset-top)',
+        'safe-area-bottom': 'env(safe-area-inset-bottom)',
+      },
+      minHeight: {
+        'screen-nav': 'calc(100vh - 56px - 56px)',
+      },
     },
   },
   plugins: [],
