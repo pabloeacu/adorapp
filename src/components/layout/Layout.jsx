@@ -13,7 +13,7 @@ export const Layout = () => {
   }
 
   return (
-    <div className="min-h-screen bg-black text-white">
+    <div className="w-full h-full min-h-screen min-h [-webkit-fill-available] bg-black text-white flex flex-col">
       {/* Mobile Navigation */}
       <MobileNav />
 
@@ -27,25 +27,22 @@ export const Layout = () => {
         <Header />
       </div>
 
-      {/* Main Content */}
-      <div className="lg:left-64 pt-14 lg:pt-0 pb-20 lg:pb-0 min-h-screen">
-        {/* Desktop Content Wrapper */}
+      {/* Main Content - Full height mobile */}
+      <div className="flex-1 lg:pl-64 flex flex-col lg:pt-0 overflow-hidden">
+        {/* Desktop Content */}
         <div className="hidden lg:block h-screen pt-16">
           <main className="p-6 h-[calc(100vh-64px)] overflow-y-auto">
             <Outlet />
           </main>
         </div>
 
-        {/* Mobile Content Wrapper */}
-        <div className="lg:hidden min-h-[calc(100vh-56px-56px)]">
-          <main className="p-4 pb-2">
+        {/* Mobile Content - Full screen */}
+        <div className="lg:hidden flex-1 overflow-y-auto overflow-x-hidden pb-16 pt-14">
+          <main className="p-4">
             <Outlet />
           </main>
         </div>
       </div>
-
-      {/* Mobile Bottom Safe Area Spacer */}
-      <div className="lg:hidden h-safe-area-bottom" />
     </div>
   );
 };

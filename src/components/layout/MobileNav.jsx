@@ -29,7 +29,10 @@ export const MobileNav = () => {
   return (
     <>
       {/* Mobile Header */}
-      <div className="lg:hidden fixed top-0 left-0 right-0 z-40 bg-black/95 backdrop-blur-lg border-b border-neutral-800 safe-area-top">
+      <div
+        className="lg:hidden fixed top-0 left-0 right-0 z-40 bg-black/95 backdrop-blur-lg border-b border-neutral-800"
+        style={{ paddingTop: 'env(safe-area-inset-top)' }}
+      >
         <div className="flex items-center justify-between px-4 h-14">
           <img src="/logo.png" alt="AdorAPP" className="w-8 h-8 rounded-lg object-contain" />
           <span className="text-white font-semibold text-sm">AdorAPP</span>
@@ -74,7 +77,10 @@ export const MobileNav = () => {
       )}
 
       {/* Bottom Tab Bar */}
-      <div className="lg:hidden fixed bottom-0 left-0 right-0 z-40 bg-black/95 backdrop-blur-lg border-t border-neutral-800 safe-area-bottom">
+      <div
+        className="lg:hidden fixed bottom-0 left-0 right-0 z-40 bg-black/95 backdrop-blur-lg border-t border-neutral-800"
+        style={{ paddingBottom: 'env(safe-area-inset-bottom)' }}
+      >
         <div className="flex items-center justify-around h-16 px-2">
           {navItems.map(({ path, icon: Icon, label }) => {
             const isActive = location.pathname === path;
