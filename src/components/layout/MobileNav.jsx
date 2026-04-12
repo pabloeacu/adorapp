@@ -6,10 +6,15 @@ import {
   Music2,
   Users,
   UserCircle,
-  Menu,
-  X
+  LogOut,
+  Camera,
+  Settings,
+  X,
+  ChevronRight
 } from 'lucide-react';
 import { useState } from 'react';
+import { useAuthStore } from '../../stores/authStore';
+import { supabase } from '../../lib/supabase';
 
 const navItems = [
   { path: '/', icon: LayoutDashboard, label: 'Inicio' },
@@ -21,10 +26,21 @@ const navItems = [
 
 export const MobileNav = () => {
   const [menuOpen, setMenuOpen] = useState(false);
+  const [profileOpen, setProfileOpen] = useState(false);
   const location = useLocation();
+  const { profile, logout } = useAuthStore();
 
-  // Get current active index
-  const currentIndex = navItems.findIndex(item => item.path === location.pathname);
+  const handleLogout = async () => {
+    setProfileOpen(false);
+    await logout();
+    window.location.href = '/login';
+  };
+
+  const handleChangePhoto = () => {
+    setProfileOpen(false);
+    // Trigger photo upload in Header
+    window.dispatchEvent(new CustomEvent('openPhotoUpload'));
+  };
 
   return (
     <>
@@ -36,14 +52,117 @@ export const MobileNav = () => {
         <div className="flex items-center justify-between px-4 h-14">
           <img src="/logo.png" alt="AdorAPP" className="w-8 h-8 rounded-lg object-contain" />
           <span className="text-white font-semibold text-sm">AdorAPP</span>
+
+          {/* Profile Button */}
           <button
-            onClick={() => setMenuOpen(!menuOpen)}
-            className="p-2 rounded-lg hover:bg-neutral-800 transition-colors"
+            onClick={() => setProfileOpen(!profileOpen)}
+            className="flex items-center gap-2 p-1 rounded-full hover:bg-neutral-800 transition-colors"
           >
-            {menuOpen ? <X size={24} className="text-white" /> : <Menu size={24} className="text-white" />}
+            {profile?.photo_url ? (
+              <img
+                src={profile.photo_url}
+                alt={profile.name}
+                className="w-8 h-8 rounded-full object-cover border-2 border-neutral-700"
+              />
+            ) : (
+              <div className="w-8 h-8 rounded-full bg-neutral-800 flex items-center justify-center">
+                <UserCircle size={20} className="text-neutral-400" />
+              </div>
+            )}
           </button>
         </div>
       </div>
+
+      {/* Profile Menu Overlay */}
+      {profileOpen && (
+        <div
+          className="lg:hidden fixed inset-0 z-50 bg-black/80 backdrop-blur-sm animate-fade-in"
+          onClick={() => setProfileOpen(false)}
+        >
+          <div
+            className="absolute bottom-0 left-0 right-0 bg-neutral-900 rounded-t-3xl pb-safe animate-slide-up"
+            style={{ paddingBottom: 'env(safe-area-inset-bottom)' }}
+            onClick={(e) => e.stopPropagation()}
+          >
+            {/* Header */}
+            <div className="flex items-center justify-between px-5 py-4 border-b border-neutral-800">
+              <h2 className="text-white font-semibold text-lg">Mi Perfil</h2>
+              <button
+                onClick={() => setProfileOpen(false)}
+                className="p-2 rounded-full hover:bg-neutral-800 transition-colors"
+              >
+                <X size={20} className="text-neutral-400" />
+              </button>
+            </div>
+
+            {/* Profile Info */}
+            <div className="p-5">
+              <div className="flex items-center gap-4 mb-6">
+                <div className="relative">
+                  {profile?.photo_url ? (
+                    <img
+                      src={profile.photo_url}
+                      alt={profile.name}
+                      className="w-16 h-16 rounded-full object-cover border-2 border-neutral-700"
+                    />
+                  ) : (
+                    <div className="w-16 h-16 rounded-full bg-neutral-800 flex items-center justify-center border-2 border-neutral-700">
+                      <UserCircle size={32} className="text-neutral-500" />
+                    </div>
+                  )}
+                  <button
+                    onClick={handleChangePhoto}
+                    className="absolute -bottom-1 -right-1 w-7 h-7 rounded-full bg-white flex items-center justify-center shadow-lg hover:bg-neutral-100 transition-colors"
+                  >
+                    <Camera size={14} className="text-black" />
+                  </button>
+                </div>
+                <div className="flex-1">
+                  <h3 className="text-white font-semibold text-lg">{profile?.name || 'Usuario'}</h3>
+                  <p className="text-neutral-400 text-sm capitalize">{profile?.role || 'Miembro'}</p>
+                </div>
+              </div>
+
+              {/* Menu Options */}
+              <div className="space-y-1">
+                <button
+                  onClick={() => {
+                    setProfileOpen(false);
+                    window.dispatchEvent(new CustomEvent('openPhotoUpload'));
+                  }}
+                  className="w-full flex items-center gap-4 px-4 py-4 rounded-xl hover:bg-neutral-800 transition-colors"
+                >
+                  <Camera size={20} className="text-neutral-400" />
+                  <span className="flex-1 text-left text-white">Cambiar foto de perfil</span>
+                  <ChevronRight size={18} className="text-neutral-600" />
+                </button>
+
+                <button
+                  onClick={() => {
+                    setProfileOpen(false);
+                    window.dispatchEvent(new CustomEvent('openEditProfile'));
+                  }}
+                  className="w-full flex items-center gap-4 px-4 py-4 rounded-xl hover:bg-neutral-800 transition-colors"
+                >
+                  <Settings size={20} className="text-neutral-400" />
+                  <span className="flex-1 text-left text-white">Editar datos del perfil</span>
+                  <ChevronRight size={18} className="text-neutral-600" />
+                </button>
+
+                <div className="h-px bg-neutral-800 my-2" />
+
+                <button
+                  onClick={handleLogout}
+                  className="w-full flex items-center gap-4 px-4 py-4 rounded-xl hover:bg-red-500/10 transition-colors"
+                >
+                  <LogOut size={20} className="text-red-500" />
+                  <span className="flex-1 text-left text-red-500 font-medium">Cerrar Sesión</span>
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Full Screen Menu Overlay */}
       {menuOpen && (
@@ -52,6 +171,32 @@ export const MobileNav = () => {
           onClick={() => setMenuOpen(false)}
         >
           <div className="flex flex-col h-full pt-20 pb-safe">
+            <div className="flex items-center justify-between px-5 mb-6">
+              <div className="flex items-center gap-3">
+                {profile?.photo_url ? (
+                  <img
+                    src={profile.photo_url}
+                    alt={profile.name}
+                    className="w-10 h-10 rounded-full object-cover"
+                  />
+                ) : (
+                  <div className="w-10 h-10 rounded-full bg-neutral-800 flex items-center justify-center">
+                    <UserCircle size={20} className="text-neutral-500" />
+                  </div>
+                )}
+                <div>
+                  <p className="text-white font-medium">{profile?.name || 'Usuario'}</p>
+                  <p className="text-neutral-500 text-sm capitalize">{profile?.role || 'Miembro'}</p>
+                </div>
+              </div>
+              <button
+                onClick={() => setMenuOpen(false)}
+                className="p-2 rounded-full hover:bg-neutral-800 transition-colors"
+              >
+                <X size={24} className="text-white" />
+              </button>
+            </div>
+
             <nav className="flex-1 px-4 space-y-2">
               {navItems.map(({ path, icon: Icon, label }) => {
                 const isActive = location.pathname === path;

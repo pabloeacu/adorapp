@@ -48,6 +48,27 @@ export const Header = () => {
     }
   }, []);
 
+  // Listen for events from MobileNav
+  useEffect(() => {
+    const handleOpenPhotoUpload = () => {
+      setShowProfile(true);
+    };
+
+    const handleOpenEditProfile = () => {
+      setEditName(profile?.name || user?.name || '');
+      setIsEditing(true);
+      setShowProfile(true);
+    };
+
+    window.addEventListener('openPhotoUpload', handleOpenPhotoUpload);
+    window.addEventListener('openEditProfile', handleOpenEditProfile);
+
+    return () => {
+      window.removeEventListener('openPhotoUpload', handleOpenPhotoUpload);
+      window.removeEventListener('openEditProfile', handleOpenEditProfile);
+    };
+  }, [profile, user]);
+
   const handleEditProfile = () => {
     setEditName(user?.name || '');
     setIsEditing(true);
