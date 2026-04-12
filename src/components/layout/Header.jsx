@@ -94,15 +94,33 @@ export const Header = () => {
     }
   };
 
-  const handleFileSelect = (e) => {
+  const handleFileSelect = async (e) => {
     const file = e.target.files?.[0];
-    if (file) {
+    if (!file) return;
+
+    // Validate file type
+    if (!file.type.startsWith('image/')) {
+      alert('Por favor selecciona una imagen válida.');
+      return;
+    }
+
+    // Validate file size (max 5MB)
+    if (file.size > 5 * 1024 * 1024) {
+      alert('La imagen es muy grande. Máximo 5MB.');
+      return;
+    }
+
+    try {
+      // Show loading state in preview
       const url = URL.createObjectURL(file);
       setPreviewUrl(url);
       setShowCropper(true);
       setZoom(1);
       setRotation(0);
       setPosition({ x: 0, y: 0 });
+    } catch (err) {
+      console.error('Error selecting file:', err);
+      alert('Error al seleccionar la imagen.');
     }
   };
 
@@ -138,129 +156,67 @@ export const Header = () => {
     }
   }, [isDragging, handleMouseMove, handleMouseUp]);
 
-  const processAndSavePhoto = () => {
-    // Create a canvas to process the image
-    const canvas = document.createElement('canvas');
-    const ctx = canvas.getContext('2d');
-    const img = new Image();
-
-    img.onload = async () => {
-      // Set canvas size for circular crop
-      const size = 400;
-      canvas.width = size;
-      canvas.height = size;
-
-      // Clear canvas with transparency
-      ctx.clearRect(0, 0, size, size);
-
-      // Save context state
-      ctx.save();
-
-      // Move to center
-      ctx.translate(size / 2, size / 2);
-
-      // Apply rotation
-      ctx.rotate((rotation * Math.PI) / 180);
-
-      // Apply zoom
-      ctx.scale(zoom, zoom);
-
-      // Draw image centered
-      ctx.drawImage(img, -img.width / 2 + position.x / zoom, -img.height / 2 + position.y / zoom, img.width, img.height);
-
-      ctx.restore();
-
-      // Create circular mask
-      ctx.globalCompositeOperation = 'destination-in';
-      ctx.beginPath();
-      ctx.arc(size / 2, size / 2, size / 2, 0, Math.PI * 2);
-      ctx.fill();
-
-      // Get data URL
-      const dataUrl = canvas.toDataURL('image/png');
-
-      // Save to localStorage
-      localStorage.setItem('userPhoto', dataUrl);
-      setUserPhoto(dataUrl);
-
-      // Also try to upload to Supabase Storage
-      try {
-        const base64Data = dataUrl.split(',')[1];
-        const binaryString = atob(base64Data);
-        const bytes = new Uint8Array(binaryString.length);
-        for (let i = 0; i < binaryString.length; i++) {
-          bytes[i] = binaryString.charCodeAt(i);
-        }
-        const blob = new Blob([bytes], { type: 'image/png' });
-        const fileName = `avatars/${user?.id}-${Date.now()}.png`;
-
-        const { data, error } = await supabase.storage
-          .from('avatars')
-          .upload(fileName, blob, { upsert: true, contentType: 'image/png' });
-
-        if (!error && data) {
-          const { data: { publicUrl } } = supabase.storage
-            .from('avatars')
-            .getPublicUrl(fileName);
-
-          // Update localStorage with URL
-          localStorage.setItem('userPhoto', publicUrl);
-          setUserPhoto(publicUrl);
-
-          // Update in members table
-          await supabase
-            .from('members')
-            .update({ avatar_url: publicUrl })
-            .eq('user_id', user?.id);
-        }
-      } catch (err) {
-        console.error('Error uploading to Supabase:', err);
-      }
-
-      // Close cropper
+  const handleSavePhoto = async () => {
+    if (!previewUrl || !fileInputRef.current?.files?.[0]) {
       setShowCropper(false);
       setPreviewUrl(null);
-    };
+      return;
+    }
 
-    img.src = previewUrl;
-  };
+    try {
+      const file = fileInputRef.current.files[0];
 
-  const handleSavePhoto = () => {
-    // ALWAYS upload the original file - no cropping applied
-    const uploadOriginal = async () => {
-      try {
-        const file = fileInputRef.current?.files?.[0];
-        if (file) {
-          const fileName = `avatars/${user?.id}-${Date.now()}.png`;
-          const { data, error } = await supabase.storage
-            .from('avatars')
-            .upload(fileName, file, { upsert: true });
+      // Generate unique filename
+      const fileExt = file.name.split('.').pop() || 'png';
+      const fileName = `avatars/${user?.id}-${Date.now()}.${fileExt}`;
 
-          if (error) throw error;
+      // Upload original file directly to Supabase Storage
+      const { data: uploadData, error: uploadError } = await supabase.storage
+        .from('avatars')
+        .upload(fileName, file, {
+          upsert: true,
+          contentType: file.type
+        });
 
-          const { data: { publicUrl } } = supabase.storage
-            .from('avatars')
-            .getPublicUrl(fileName);
-
-          // Save the full image URL
-          localStorage.setItem('userPhoto', publicUrl);
-          setUserPhoto(publicUrl);
-
-          // Also update in members table
-          await supabase
-            .from('members')
-            .update({ avatar_url: publicUrl })
-            .eq('user_id', user?.id);
-        }
-      } catch (err) {
-        console.error('Upload error:', err);
-        alert('Error al subir la foto. Intentá de nuevo.');
+      if (uploadError) {
+        console.error('Upload error:', uploadError);
+        alert('Error al subir la foto: ' + uploadError.message);
+        return;
       }
+
+      // Get public URL
+      const { data: { publicUrl } } = supabase.storage
+        .from('avatars')
+        .getPublicUrl(fileName);
+
+      // Save to localStorage and state
+      localStorage.setItem('userPhoto', publicUrl);
+      setUserPhoto(publicUrl);
+
+      // Update in members table
+      const { error: updateError } = await supabase
+        .from('members')
+        .update({ avatar_url: publicUrl })
+        .eq('user_id', user?.id);
+
+      if (updateError) {
+        console.error('Update error:', updateError);
+      }
+
+      console.log('Photo uploaded successfully:', publicUrl);
+
+    } catch (err) {
+      console.error('Photo upload error:', err);
+      alert('Error al subir la foto. Intentá de nuevo.');
+    } finally {
+      // Close cropper modal
       setShowCropper(false);
       setPreviewUrl(null);
-    };
-
-    uploadOriginal();
+      // Reset file input
+      if (fileInputRef.current) {
+        fileInputRef.current.value = '';
+      }
+    }
   };
 
   return (
@@ -415,7 +371,10 @@ export const Header = () => {
 
           {/* Logout Button */}
           <button
-            onClick={() => { logout(); window.location.href = '/login'; }}
+            onClick={async () => {
+              await logout();
+              window.location.href = '/login';
+            }}
             className="w-full flex items-center justify-center gap-2 px-4 py-3 bg-neutral-800 hover:bg-neutral-700 rounded-xl text-gray-400 hover:text-white transition-colors"
           >
             <LogOut size={18} />
@@ -452,12 +411,20 @@ export const Header = () => {
       {/* Image Cropper Modal */}
       <Modal
         isOpen={showCropper}
-        onClose={() => setShowCropper(false)}
+        onClose={() => {
+          setShowCropper(false);
+          setPreviewUrl(null);
+          if (fileInputRef.current) fileInputRef.current.value = '';
+        }}
         title="Ajustar Foto de Perfil"
         size="md"
         footer={
           <>
-            <Button variant="secondary" onClick={() => setShowCropper(false)}>Cancelar</Button>
+            <Button variant="secondary" onClick={() => {
+              setShowCropper(false);
+              setPreviewUrl(null);
+              if (fileInputRef.current) fileInputRef.current.value = '';
+            }}>Cancelar</Button>
             <Button onClick={handleSavePhoto}>
               <Check size={16} />
               Guardar

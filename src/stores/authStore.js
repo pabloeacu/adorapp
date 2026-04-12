@@ -10,11 +10,15 @@ export const useAuthStore = create((set, get) => ({
   // Initialize auth state
   initialize: async () => {
     try {
+      // Clear ALL cached auth data first
+      localStorage.removeItem('user_profile');
+      localStorage.removeItem('user');
+
       // Check for existing session
       const { data: { session } } = await supabase.auth.getSession();
 
       if (session?.user) {
-        set({ user: session.user });
+        set({ user: session.user, loading: true });
         await get().fetchProfile(session.user.id);
       }
     } catch (err) {
@@ -25,16 +29,30 @@ export const useAuthStore = create((set, get) => ({
 
     // Listen for auth changes
     supabase.auth.onAuthStateChange(async (event, session) => {
+      // IMPORTANT: Clear cache on EVERY auth state change
+      localStorage.removeItem('user_profile');
+      localStorage.removeItem('user');
+
       if (session?.user) {
-        set({ user: session.user });
+        set({ user: session.user, loading: true });
         await get().fetchProfile(session.user.id);
+        set({ loading: false });
       } else {
-        set({ user: null, profile: null });
+        set({ user: null, profile: null, loading: false });
       }
     });
   },
 
-  // Fetch user profile from members table
+  // Force refresh profile from database - ALWAYS bypass cache
+  refreshProfile: async () => {
+    const userId = get().user?.id;
+    if (!userId) return;
+
+    localStorage.removeItem('user_profile');
+    await get().fetchProfile(userId);
+  },
+
+  // Fetch user profile from members table - ALWAYS fresh from DB
   fetchProfile: async (userId) => {
     try {
       // ALWAYS clear cached profile to ensure fresh data from database
@@ -53,9 +71,9 @@ export const useAuthStore = create((set, get) => ({
       }
 
       if (data) {
+        console.log('🔍 PROFILE LOADED FROM DB:', data.role, data.name, 'user_id:', data.user_id);
         set({ profile: data });
-        localStorage.setItem('user_profile', JSON.stringify(data));
-        console.log('Profile loaded fresh from DB - Role:', data.role, 'Name:', data.name);
+        // Don't cache to localStorage to avoid stale data issues
       }
     } catch (err) {
       console.log('Profile fetch error (expected for new users):', err.message);
@@ -68,6 +86,10 @@ export const useAuthStore = create((set, get) => ({
     set({ error: null, loading: true });
 
     try {
+      // Clear ALL cached data before login
+      localStorage.removeItem('user_profile');
+      localStorage.removeItem('user');
+
       const { data, error } = await supabase.auth.signInWithPassword({
         email,
         password,
@@ -79,7 +101,8 @@ export const useAuthStore = create((set, get) => ({
       }
 
       if (data?.user) {
-        set({ user: data.user });
+        set({ user: data.user, loading: true });
+        // Fetch profile fresh from DB
         await get().fetchProfile(data.user.id);
         set({ loading: false });
         return true;
