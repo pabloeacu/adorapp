@@ -139,13 +139,15 @@ export const Miembros = () => {
     }
   };
 
-  const handlePermanentlyDelete = (memberId, memberName) => {
+  const handlePermanentlyDelete = async (memberId, memberName) => {
     if (window.confirm(`¿Estás seguro de ELIMINAR PERMANENTEMENTE a ${memberName}? Esta acción no se puede deshacer.`)) {
       if (window.confirm('¿Realmente deseas eliminar este miembro? Esta acción es irreversible.')) {
-        // Delete from database - this would need backend support
-        // For now, just deactivate
-        deleteMember(memberId);
-        alert('Miembro eliminado. Nota: La eliminación permanente requiere soporte del administrador.');
+        const success = await deleteMember(memberId, true);
+        if (success) {
+          alert(`${memberName} ha sido eliminado permanentemente del sistema.`);
+        } else {
+          alert('Error al eliminar el miembro. Contactá al administrador.');
+        }
       }
     }
   };

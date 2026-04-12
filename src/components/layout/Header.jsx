@@ -226,50 +226,41 @@ export const Header = () => {
   };
 
   const handleSavePhoto = () => {
-    // Check if user made any adjustments
-    const hasAdjustments = zoom !== 1 || rotation !== 0 || position.x !== 0 || position.y !== 0;
+    // ALWAYS upload the original file - no cropping applied
+    const uploadOriginal = async () => {
+      try {
+        const file = fileInputRef.current?.files?.[0];
+        if (file) {
+          const fileName = `avatars/${user?.id}-${Date.now()}.png`;
+          const { data, error } = await supabase.storage
+            .from('avatars')
+            .upload(fileName, file, { upsert: true });
 
-    if (hasAdjustments) {
-      // User made adjustments - use processAndSavePhoto to save the cropped version
-      processAndSavePhoto();
-    } else {
-      // No adjustments - upload original file directly
-      const uploadOriginal = async () => {
-        try {
-          const file = fileInputRef.current?.files?.[0];
-          if (file) {
-            const fileName = `avatars/${user?.id}-${Date.now()}.png`;
-            const { data, error } = await supabase.storage
-              .from('avatars')
-              .upload(fileName, file, { upsert: true });
+          if (error) throw error;
 
-            if (error) throw error;
+          const { data: { publicUrl } } = supabase.storage
+            .from('avatars')
+            .getPublicUrl(fileName);
 
-            const { data: { publicUrl } } = supabase.storage
-              .from('avatars')
-              .getPublicUrl(fileName);
+          // Save the full image URL
+          localStorage.setItem('userPhoto', publicUrl);
+          setUserPhoto(publicUrl);
 
-            // Save the full image URL
-            localStorage.setItem('userPhoto', publicUrl);
-            setUserPhoto(publicUrl);
-
-            // Also update in members table
-            await supabase
-              .from('members')
-              .update({ avatar_url: publicUrl })
-              .eq('user_id', user?.id);
-          }
-        } catch (err) {
-          console.error('Upload error:', err);
-          // Fallback to processAndSavePhoto if upload fails
-          processAndSavePhoto();
+          // Also update in members table
+          await supabase
+            .from('members')
+            .update({ avatar_url: publicUrl })
+            .eq('user_id', user?.id);
         }
-        setShowCropper(false);
-        setPreviewUrl(null);
-      };
+      } catch (err) {
+        console.error('Upload error:', err);
+        alert('Error al subir la foto. Intentá de nuevo.');
+      }
+      setShowCropper(false);
+      setPreviewUrl(null);
+    };
 
-      uploadOriginal();
-    }
+    uploadOriginal();
   };
 
   return (

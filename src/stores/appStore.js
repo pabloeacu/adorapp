@@ -261,20 +261,53 @@ export const useAppStore = create((set, get) => ({
     }
   },
 
-  deleteMember: async (id) => {
+  deleteMember: async (id, permanent = false) => {
     try {
-      const { error } = await supabase
-        .from('members')
-        .update({ active: false })
-        .eq('id', id);
+      if (permanent) {
+        // Permanent deletion - remove from database completely
+        const member = get().members.find(m => m.id === id);
 
-      if (error) throw error;
+        // Delete the auth user if exists
+        if (member?.userId) {
+          try {
+            const { error: authError } = await supabaseAdmin.auth.admin.deleteUser(member.userId);
+            if (authError) {
+              console.error('Error deleting auth user:', authError);
+              // Continue with member deletion even if auth delete fails
+            }
+          } catch (authErr) {
+            console.error('Auth delete error:', authErr);
+          }
+        }
 
-      set((state) => ({
-        members: state.members.map(m => m.id === id ? { ...m, active: false } : m),
-      }));
+        // Delete from members table
+        const { error } = await supabase
+          .from('members')
+          .delete()
+          .eq('id', id);
 
-      return true;
+        if (error) throw error;
+
+        set((state) => ({
+          members: state.members.filter(m => m.id !== id),
+        }));
+
+        return true;
+      } else {
+        // Soft delete - just deactivate
+        const { error } = await supabase
+          .from('members')
+          .update({ active: false })
+          .eq('id', id);
+
+        if (error) throw error;
+
+        set((state) => ({
+          members: state.members.map(m => m.id === id ? { ...m, active: false } : m),
+        }));
+
+        return true;
+      }
     } catch (err) {
       console.error('Error deleting member:', err);
       set({ error: err.message });

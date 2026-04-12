@@ -37,18 +37,29 @@ export const useAuthStore = create((set, get) => ({
   // Fetch user profile from members table
   fetchProfile: async (userId) => {
     try {
+      // ALWAYS clear cached profile to ensure fresh data from database
+      localStorage.removeItem('user_profile');
+
       const { data, error } = await supabase
         .from('members')
         .select('*')
         .eq('user_id', userId)
         .single();
 
-      if (!error && data) {
+      if (error) {
+        console.log('Profile fetch error:', error.message);
+        set({ profile: null });
+        return;
+      }
+
+      if (data) {
         set({ profile: data });
         localStorage.setItem('user_profile', JSON.stringify(data));
+        console.log('Profile loaded fresh from DB - Role:', data.role, 'Name:', data.name);
       }
     } catch (err) {
       console.log('Profile fetch error (expected for new users):', err.message);
+      set({ profile: null });
     }
   },
 
