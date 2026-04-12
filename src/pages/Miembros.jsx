@@ -2,7 +2,7 @@ import React, { useState, useMemo } from 'react';
 import {
   Plus, Search, Mail, Phone, Shield, MoreVertical, Edit, Trash2,
   UserPlus, Check, X, ChevronDown, ChevronUp, Filter, Lock, Key,
-  LayoutGrid, List
+  LayoutGrid, List, AlertTriangle, UserX
 } from 'lucide-react';
 import { useAppStore, MEMBER_ROLES, INSTRUMENTS } from '../stores/appStore';
 import { useAuthStore } from '../stores/authStore';
@@ -12,6 +12,7 @@ import { Badge } from '../components/ui/Badge';
 import { Avatar } from '../components/ui/Avatar';
 import { Modal } from '../components/ui/Modal';
 import { Input } from '../components/ui/Input';
+import { ConfirmModal, SuccessModal, ErrorModal } from '../components/ui/ConfirmModal';
 
 const roleConfig = {
   pastor: { label: 'Pastor', color: 'text-purple-400', bg: 'bg-purple-500/20' },
@@ -52,6 +53,28 @@ export const Miembros = () => {
   const [showResetPasswordModal, setShowResetPasswordModal] = useState(false);
   const [memberToReset, setMemberToReset] = useState(null);
   const [newPassword, setNewPassword] = useState('');
+
+  // State for confirmation modals
+  const [confirmModal, setConfirmModal] = useState({
+    isOpen: false,
+    title: '',
+    message: '',
+    type: 'warning',
+    onConfirm: null,
+    loading: false
+  });
+
+  const [successModal, setSuccessModal] = useState({
+    isOpen: false,
+    title: '',
+    message: ''
+  });
+
+  const [errorModal, setErrorModal] = useState({
+    isOpen: false,
+    title: '',
+    message: ''
+  });
 
   const filteredMembers = useMemo(() => {
     return members.filter(member => {
@@ -133,23 +156,66 @@ export const Miembros = () => {
     }));
   };
 
-  const handleDelete = (memberId) => {
-    if (window.confirm('¿Estás seguro de desactivar este miembro?')) {
-      deleteMember(memberId);
-    }
-  };
-
-  const handlePermanentlyDelete = async (memberId, memberName) => {
-    if (window.confirm(`¿Estás seguro de ELIMINAR PERMANENTEMENTE a ${memberName}? Esta acción no se puede deshacer.`)) {
-      if (window.confirm('¿Realmente deseas eliminar este miembro? Esta acción es irreversible.')) {
-        const success = await deleteMember(memberId, true);
+  // Handler for soft delete (deactivate member)
+  const handleDelete = (memberId, memberName) => {
+    setConfirmModal({
+      isOpen: true,
+      title: 'Desactivar Miembro',
+      message: `¿Estás seguro de desactivar a ${memberName}? El miembro no podrá iniciar sesión.`,
+      type: 'warning',
+      confirmText: 'Desactivar',
+      cancelText: 'Cancelar',
+      icon: AlertTriangle,
+      onConfirm: async () => {
+        setConfirmModal(prev => ({ ...prev, loading: true }));
+        const success = await deleteMember(memberId, false);
+        setConfirmModal(prev => ({ ...prev, loading: false, isOpen: false }));
         if (success) {
-          alert(`${memberName} ha sido eliminado permanentemente del sistema.`);
+          setSuccessModal({
+            isOpen: true,
+            title: 'Miembro Desactivado',
+            message: `${memberName} ha sido desactivado correctamente.`
+          });
         } else {
-          alert('Error al eliminar el miembro. Contactá al administrador.');
+          setErrorModal({
+            isOpen: true,
+            title: 'Error',
+            message: 'No se pudo desactivar el miembro. Contactá al administrador.'
+          });
         }
       }
-    }
+    });
+  };
+
+  // Handler for permanent delete (pastor only)
+  const handlePermanentlyDelete = (memberId, memberName) => {
+    setConfirmModal({
+      isOpen: true,
+      title: 'Eliminar Miembro Permanentemente',
+      message: `¿Estás seguro de ELIMINAR PERMANENTEMENTE a ${memberName}? Esta acción no se puede deshacer y eliminará toda la información del miembro.`,
+      type: 'danger',
+      confirmText: 'Eliminar Definitivamente',
+      cancelText: 'Cancelar',
+      icon: UserX,
+      onConfirm: async () => {
+        setConfirmModal(prev => ({ ...prev, loading: true }));
+        const success = await deleteMember(memberId, true);
+        setConfirmModal(prev => ({ ...prev, loading: false, isOpen: false }));
+        if (success) {
+          setSuccessModal({
+            isOpen: true,
+            title: 'Miembro Eliminado',
+            message: `${memberName} ha sido eliminado permanentemente del sistema.`
+          });
+        } else {
+          setErrorModal({
+            isOpen: true,
+            title: 'Error',
+            message: 'No se pudo eliminar el miembro. Contactá al administrador.'
+          });
+        }
+      }
+    });
   };
 
   const handleResetPassword = (member) => {
@@ -174,18 +240,30 @@ export const Miembros = () => {
 
         if (error) {
           console.error('Error resetting password:', error);
-          alert('Error al restablecer la contraseña: ' + error.message);
+          setErrorModal({
+            isOpen: true,
+            title: 'Error',
+            message: 'No se pudo restablecer la contraseña: ' + error.message
+          });
           return;
         }
       }
 
-      alert(`Contraseña de ${memberToReset.name} została restablecida.\n\nNueva contraseña: ${newPassword}`);
       setShowResetPasswordModal(false);
+      setSuccessModal({
+        isOpen: true,
+        title: 'Contraseña Restablecida',
+        message: `La contraseña de ${memberToReset.name} ha sido actualizada.`
+      });
       setMemberToReset(null);
       setNewPassword('');
     } catch (err) {
       console.error('Error:', err);
-      alert('Error al restablecer la contraseña');
+      setErrorModal({
+        isOpen: true,
+        title: 'Error',
+        message: 'No se pudo restablecer la contraseña.'
+      });
     }
   };
 
@@ -557,9 +635,9 @@ export const Miembros = () => {
                             <Edit size={14} />
                           </button>
                           <button
-                            onClick={() => handleDelete(member.id)}
+                            onClick={() => handleDelete(member.id, member.name)}
                             className="p-1.5 rounded hover:bg-neutral-800 transition-colors text-gray-400 hover:text-red-400"
-                            title="Eliminar"
+                            title="Desactivar"
                           >
                             <Trash2 size={14} />
                           </button>
@@ -816,6 +894,36 @@ export const Miembros = () => {
           </div>
         </div>
       </Modal>
+
+      {/* Confirmation Modal */}
+      <ConfirmModal
+        isOpen={confirmModal.isOpen}
+        onClose={() => setConfirmModal(prev => ({ ...prev, isOpen: false }))}
+        onConfirm={confirmModal.onConfirm}
+        title={confirmModal.title}
+        message={confirmModal.message}
+        type={confirmModal.type}
+        confirmText={confirmModal.confirmText}
+        cancelText={confirmModal.cancelText}
+        icon={confirmModal.icon}
+        loading={confirmModal.loading}
+      />
+
+      {/* Success Modal */}
+      <SuccessModal
+        isOpen={successModal.isOpen}
+        onClose={() => setSuccessModal(prev => ({ ...prev, isOpen: false }))}
+        title={successModal.title}
+        message={successModal.message}
+      />
+
+      {/* Error Modal */}
+      <ErrorModal
+        isOpen={errorModal.isOpen}
+        onClose={() => setErrorModal(prev => ({ ...prev, isOpen: false }))}
+        title={errorModal.title}
+        message={errorModal.message}
+      />
     </div>
   );
 };
