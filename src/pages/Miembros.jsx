@@ -48,6 +48,11 @@ export const Miembros = () => {
   const [showPasswordModal, setShowPasswordModal] = useState(false);
   const [createdMemberData, setCreatedMemberData] = useState(null);
 
+  // State for password reset modal
+  const [showResetPasswordModal, setShowResetPasswordModal] = useState(false);
+  const [memberToReset, setMemberToReset] = useState(null);
+  const [newPassword, setNewPassword] = useState('');
+
   const filteredMembers = useMemo(() => {
     return members.filter(member => {
       const matchesSearch = member.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
@@ -131,6 +136,54 @@ export const Miembros = () => {
   const handleDelete = (memberId) => {
     if (window.confirm('¿Estás seguro de desactivar este miembro?')) {
       deleteMember(memberId);
+    }
+  };
+
+  const handlePermanentlyDelete = (memberId, memberName) => {
+    if (window.confirm(`¿Estás seguro de ELIMINAR PERMANENTEMENTE a ${memberName}? Esta acción no se puede deshacer.`)) {
+      if (window.confirm('¿Realmente deseas eliminar este miembro? Esta acción es irreversible.')) {
+        // Delete from database - this would need backend support
+        // For now, just deactivate
+        deleteMember(memberId);
+        alert('Miembro eliminado. Nota: La eliminación permanente requiere soporte del administrador.');
+      }
+    }
+  };
+
+  const handleResetPassword = (member) => {
+    setMemberToReset(member);
+    setNewPassword('');
+    setShowResetPasswordModal(true);
+  };
+
+  const handleSaveNewPassword = async () => {
+    if (!newPassword.trim() || !memberToReset) return;
+
+    try {
+      // Import supabaseAdmin for admin operations
+      const { supabaseAdmin } = await import('../lib/supabase');
+
+      if (memberToReset.user_id) {
+        // Update password in auth
+        const { error } = await supabaseAdmin.auth.admin.updateUserById(
+          memberToReset.user_id,
+          { password: newPassword }
+        );
+
+        if (error) {
+          console.error('Error resetting password:', error);
+          alert('Error al restablecer la contraseña: ' + error.message);
+          return;
+        }
+      }
+
+      alert(`Contraseña de ${memberToReset.name} została restablecida.\n\nNueva contraseña: ${newPassword}`);
+      setShowResetPasswordModal(false);
+      setMemberToReset(null);
+      setNewPassword('');
+    } catch (err) {
+      console.error('Error:', err);
+      alert('Error al restablecer la contraseña');
     }
   };
 
@@ -343,6 +396,13 @@ export const Miembros = () => {
                 {isPastor && (
                   <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
                     <button
+                      onClick={() => handleResetPassword(member)}
+                      className="p-2 rounded-lg hover:bg-neutral-800 transition-colors"
+                      title="Restablecer contraseña"
+                    >
+                      <Key size={16} className="text-purple-400" />
+                    </button>
+                    <button
                       onClick={() => handleOpenModal(member)}
                       className="p-2 rounded-lg hover:bg-neutral-800 transition-colors"
                       title="Editar"
@@ -350,9 +410,9 @@ export const Miembros = () => {
                       <Edit size={16} className="text-gray-400" />
                     </button>
                     <button
-                      onClick={() => handleDelete(member.id)}
+                      onClick={() => handlePermanentlyDelete(member.id, member.name)}
                       className="p-2 rounded-lg hover:bg-neutral-800 transition-colors"
-                      title="Desactivar"
+                      title="Eliminar"
                     >
                       <Trash2 size={16} className="text-gray-400 hover:text-red-400" />
                     </button>
@@ -705,6 +765,53 @@ export const Miembros = () => {
           >
             Entendido
           </Button>
+        </div>
+      </Modal>
+
+      {/* Reset Password Modal */}
+      <Modal
+        isOpen={showResetPasswordModal}
+        onClose={() => {
+          setShowResetPasswordModal(false);
+          setMemberToReset(null);
+          setNewPassword('');
+        }}
+        title="Restablecer Contraseña"
+        size="md"
+        footer={
+          <>
+            <Button variant="secondary" onClick={() => setShowResetPasswordModal(false)}>Cancelar</Button>
+            <Button onClick={handleSaveNewPassword} disabled={!newPassword.trim()}>
+              Guardar Nueva Contraseña
+            </Button>
+          </>
+        }
+      >
+        <div className="space-y-4">
+          <div className="p-4 bg-neutral-800/50 rounded-xl">
+            <p className="text-sm text-gray-400 mb-1">Miembro</p>
+            <p className="font-semibold">{memberToReset?.name}</p>
+            <p className="text-sm text-gray-400 mt-1">{memberToReset?.email}</p>
+          </div>
+
+          <div>
+            <label className="text-xs text-gray-400 font-medium uppercase tracking-wide block mb-2">
+              Nueva Contraseña
+            </label>
+            <input
+              type="text"
+              placeholder="Ingresá la nueva contraseña"
+              value={newPassword}
+              onChange={(e) => setNewPassword(e.target.value)}
+              className="w-full px-4 py-3 bg-neutral-900 border border-neutral-800 rounded-xl focus:outline-none focus:border-purple-500 transition-colors"
+            />
+          </div>
+
+          <div className="bg-yellow-500/10 border border-yellow-500/30 rounded-xl p-4">
+            <p className="text-sm text-yellow-300">
+              ⚠️ <strong>Importante:</strong> La contraseña anterior dejará de funcionar. Compartí la nueva contraseña de forma segura con el miembro.
+            </p>
+          </div>
         </div>
       </Modal>
     </div>

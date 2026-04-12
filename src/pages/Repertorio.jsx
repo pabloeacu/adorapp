@@ -34,9 +34,9 @@ const categoryConfig = {
 
 export const Repertorio = () => {
   const { songs, addSong, updateSong, deleteSong, getUnusedSongs } = useAppStore();
-  const user = useAuthStore((state) => state.user);
-  const isPastor = user?.role === 'pastor';
-  const isLeader = user?.role === 'leader';
+  const { profile } = useAuthStore();
+  const isPastor = profile?.role === 'pastor';
+  const isLeader = profile?.role === 'leader';
 
   const [searchTerm, setSearchTerm] = useState('');
   const [filterCategory, setFilterCategory] = useState('all');

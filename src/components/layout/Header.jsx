@@ -144,7 +144,7 @@ export const Header = () => {
     const ctx = canvas.getContext('2d');
     const img = new Image();
 
-    img.onload = () => {
+    img.onload = async () => {
       // Set canvas size for circular crop
       const size = 400;
       canvas.width = size;
@@ -183,6 +183,40 @@ export const Header = () => {
       localStorage.setItem('userPhoto', dataUrl);
       setUserPhoto(dataUrl);
 
+      // Also try to upload to Supabase Storage
+      try {
+        const base64Data = dataUrl.split(',')[1];
+        const binaryString = atob(base64Data);
+        const bytes = new Uint8Array(binaryString.length);
+        for (let i = 0; i < binaryString.length; i++) {
+          bytes[i] = binaryString.charCodeAt(i);
+        }
+        const blob = new Blob([bytes], { type: 'image/png' });
+        const fileName = `avatars/${user?.id}-${Date.now()}.png`;
+
+        const { data, error } = await supabase.storage
+          .from('avatars')
+          .upload(fileName, blob, { upsert: true, contentType: 'image/png' });
+
+        if (!error && data) {
+          const { data: { publicUrl } } = supabase.storage
+            .from('avatars')
+            .getPublicUrl(fileName);
+
+          // Update localStorage with URL
+          localStorage.setItem('userPhoto', publicUrl);
+          setUserPhoto(publicUrl);
+
+          // Update in members table
+          await supabase
+            .from('members')
+            .update({ avatar_url: publicUrl })
+            .eq('user_id', user?.id);
+        }
+      } catch (err) {
+        console.error('Error uploading to Supabase:', err);
+      }
+
       // Close cropper
       setShowCropper(false);
       setPreviewUrl(null);
@@ -192,40 +226,50 @@ export const Header = () => {
   };
 
   const handleSavePhoto = () => {
-    // Upload original full image to Supabase Storage
-    const uploadOriginal = async () => {
-      try {
-        const file = fileInputRef.current?.files?.[0];
-        if (file) {
-          const fileName = `avatars/${user?.id}-${Date.now()}.png`;
-          const { data, error } = await supabase.storage
-            .from('avatars')
-            .upload(fileName, file, { upsert: true });
+    // Check if user made any adjustments
+    const hasAdjustments = zoom !== 1 || rotation !== 0 || position.x !== 0 || position.y !== 0;
 
-          if (error) throw error;
+    if (hasAdjustments) {
+      // User made adjustments - use processAndSavePhoto to save the cropped version
+      processAndSavePhoto();
+    } else {
+      // No adjustments - upload original file directly
+      const uploadOriginal = async () => {
+        try {
+          const file = fileInputRef.current?.files?.[0];
+          if (file) {
+            const fileName = `avatars/${user?.id}-${Date.now()}.png`;
+            const { data, error } = await supabase.storage
+              .from('avatars')
+              .upload(fileName, file, { upsert: true });
 
-          const { data: { publicUrl } } = supabase.storage
-            .from('avatars')
-            .getPublicUrl(fileName);
+            if (error) throw error;
 
-          // Save the full image URL
-          localStorage.setItem('userPhoto', publicUrl);
-          setUserPhoto(publicUrl);
+            const { data: { publicUrl } } = supabase.storage
+              .from('avatars')
+              .getPublicUrl(fileName);
 
-          // Also update in members table
-          await supabase
-            .from('members')
-            .update({ avatar_url: publicUrl })
-            .eq('user_id', user?.id);
+            // Save the full image URL
+            localStorage.setItem('userPhoto', publicUrl);
+            setUserPhoto(publicUrl);
+
+            // Also update in members table
+            await supabase
+              .from('members')
+              .update({ avatar_url: publicUrl })
+              .eq('user_id', user?.id);
+          }
+        } catch (err) {
+          console.error('Upload error:', err);
+          // Fallback to processAndSavePhoto if upload fails
+          processAndSavePhoto();
         }
-      } catch (err) {
-        console.error('Upload error:', err);
-      }
-      setShowCropper(false);
-      setPreviewUrl(null);
-    };
+        setShowCropper(false);
+        setPreviewUrl(null);
+      };
 
-    uploadOriginal();
+      uploadOriginal();
+    }
   };
 
   return (
