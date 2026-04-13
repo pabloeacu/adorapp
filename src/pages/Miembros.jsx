@@ -309,6 +309,7 @@ export const Miembros = () => {
               <List size={18} />
             </button>
           </div>
+          {/* Only show Add Member button for pastors - NEVER for members */}
           {isPastor && (
             <Button icon={Plus} onClick={() => handleOpenModal()}>
               Agregar Miembro

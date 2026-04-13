@@ -264,7 +264,8 @@ export const Repertorio = () => {
                 <List size={18} />
               </button>
             </div>
-            {(isPastor || isLeader) && (
+            {/* Only pastors can add songs - NEVER leaders or members */}
+            {isPastor && (
               <Button icon={Plus} onClick={() => handleOpenModal()}>
                 Nueva Canción
               </Button>
