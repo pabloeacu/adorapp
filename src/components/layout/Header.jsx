@@ -1,13 +1,12 @@
 import React, { useState, useRef, useEffect, useCallback } from 'react';
 import { useLocation } from 'react-router-dom';
-import { Bell, Search, ChevronRight, User, Mail, Shield, Camera, X, RotateCcw, ZoomIn, ZoomOut, Check, Move, LogOut, Trash2, Phone, Cross, Users2, Calendar } from 'lucide-react';
+import { Bell, Search, ChevronRight, User, Mail, Shield, Camera, X, RotateCcw, ZoomIn, ZoomOut, Check, Move, LogOut, Trash2, Phone, Cross, Users2, Calendar, Loader2 } from 'lucide-react';
 import { useAuthStore } from '../../stores/authStore';
 import { useAppStore } from '../../stores/appStore';
 import { supabase } from '../../lib/supabase';
 import { Avatar } from '../ui/Avatar';
 import { Modal } from '../ui/Modal';
 import { Button } from '../ui/Button';
-import { Input } from '../ui/Input';
 
 const pageTitles = {
   '/': 'Dashboard',
@@ -37,7 +36,8 @@ export const Header = () => {
   const [position, setPosition] = useState({ x: 0, y: 0 });
   const [isDragging, setIsDragging] = useState(false);
   const [dragStart, setDragStart] = useState({ x: 0, y: 0 });
-  const imageContainerRef = useRef(null);
+  const [isSaving, setIsSaving] = useState(false);
+  const canvasRef = useRef(null);
   const fileInputRef = useRef(null);
   const title = pageTitles[location.pathname] || 'AdorAPP';
 
@@ -49,8 +49,10 @@ export const Header = () => {
     const savedPhoto = localStorage.getItem('userPhoto');
     if (savedPhoto) {
       setUserPhoto(savedPhoto);
+    } else if (profile?.avatar_url) {
+      setUserPhoto(profile.avatar_url);
     }
-  }, []);
+  }, [profile]);
 
   // Listen for events from MobileNav
   useEffect(() => {
@@ -84,13 +86,11 @@ export const Header = () => {
 
   const handleSaveProfile = () => {
     if (editName.trim()) {
-      // Update auth store
       useAuthStore.setState({
         user: { ...user, name: editName.trim() }
       });
       localStorage.setItem('user', JSON.stringify({ ...user, name: editName.trim() }));
 
-      // Update in members list if exists
       const memberIndex = members.findIndex(m => m.email === user?.email);
       if (memberIndex !== -1) {
         updateMember(members[memberIndex].id, { name: editName.trim() });
@@ -126,7 +126,6 @@ export const Header = () => {
         return;
       }
 
-      // Refresh profile
       await refreshProfile();
       setIsEditing(false);
     } catch (err) {
@@ -165,9 +164,9 @@ export const Header = () => {
     localStorage.removeItem('userPhoto');
     setUserPhoto(null);
     setShowPhotoOptions(false);
-    // Also delete from Supabase if exists
     if (profile?.avatar_url) {
-      supabase.storage.from('avatars').remove([profile.avatar_url.split('/').pop()]);
+      const fileName = profile.avatar_url.split('/').pop();
+      supabase.storage.from('avatars').remove([fileName]);
     }
   };
 
@@ -175,20 +174,17 @@ export const Header = () => {
     const file = e.target.files?.[0];
     if (!file) return;
 
-    // Validate file type
     if (!file.type.startsWith('image/')) {
       alert('Por favor selecciona una imagen válida.');
       return;
     }
 
-    // Validate file size (max 5MB)
     if (file.size > 5 * 1024 * 1024) {
       alert('La imagen es muy grande. Máximo 5MB.');
       return;
     }
 
     try {
-      // Show loading state in preview
       const url = URL.createObjectURL(file);
       setPreviewUrl(url);
       setShowCropper(true);
@@ -202,6 +198,7 @@ export const Header = () => {
   };
 
   const handleMouseDown = (e) => {
+    e.preventDefault();
     setIsDragging(true);
     setDragStart({
       x: e.clientX - position.x,
@@ -233,63 +230,130 @@ export const Header = () => {
     }
   }, [isDragging, handleMouseMove, handleMouseUp]);
 
+  // Process and save photo with crop/zoom/rotation applied
   const handleSavePhoto = async () => {
-    if (!previewUrl || !fileInputRef.current?.files?.[0]) {
-      setShowCropper(false);
-      setPreviewUrl(null);
+    if (!previewUrl) {
+      alert('No hay imagen para guardar');
       return;
     }
 
-    try {
-      const file = fileInputRef.current.files[0];
+    setIsSaving(true);
 
-      // Generate unique filename
-      const fileExt = file.name.split('.').pop() || 'png';
+    try {
+      // Create canvas for processing
+      const canvas = document.createElement('canvas');
+      const ctx = canvas.getContext('2d');
+      const img = new Image();
+
+      await new Promise((resolve, reject) => {
+        img.onload = resolve;
+        img.onerror = reject;
+        img.src = previewUrl;
+      });
+
+      // Circular crop size
+      const cropSize = 400;
+      canvas.width = cropSize;
+      canvas.height = cropSize;
+
+      // Clear canvas
+      ctx.clearRect(0, 0, cropSize, cropSize);
+
+      // Calculate center of image considering zoom and position
+      const centerX = cropSize / 2;
+      const centerY = cropSize / 2;
+      const imgAspect = img.width / img.height;
+
+      let drawWidth, drawHeight;
+      if (imgAspect > 1) {
+        drawHeight = cropSize * zoom;
+        drawWidth = drawHeight * imgAspect;
+      } else {
+        drawWidth = cropSize * zoom;
+        drawHeight = drawWidth / imgAspect;
+      }
+
+      // Apply zoom to position
+      const adjustedX = position.x;
+      const adjustedY = position.y;
+
+      // Translate to center, rotate, scale, translate back
+      ctx.save();
+      ctx.translate(centerX, centerY);
+      ctx.rotate((rotation * Math.PI) / 180);
+      ctx.drawImage(
+        img,
+        -drawWidth / 2 + adjustedX,
+        -drawHeight / 2 + adjustedY,
+        drawWidth,
+        drawHeight
+      );
+      ctx.restore();
+
+      // Create circular clip
+      ctx.save();
+      ctx.beginPath();
+      ctx.arc(centerX, centerY, cropSize / 2, 0, Math.PI * 2);
+      ctx.clip();
+      ctx.drawImage(canvas, 0, 0);
+      ctx.restore();
+
+      // Convert to blob
+      const blob = await new Promise(resolve => {
+        canvas.toBlob(resolve, 'image/jpeg', 0.9);
+      });
+
+      if (!blob) {
+        throw new Error('Error al procesar la imagen');
+      }
+
+      // Upload to Supabase
+      const fileExt = 'jpg';
       const fileName = `avatars/${user?.id}-${Date.now()}.${fileExt}`;
 
-      // Upload original file directly to Supabase Storage
       const { data: uploadData, error: uploadError } = await supabase.storage
         .from('avatars')
-        .upload(fileName, file, {
+        .upload(fileName, blob, {
           upsert: true,
-          contentType: file.type
+          contentType: 'image/jpeg'
         });
 
       if (uploadError) {
         console.error('Upload error:', uploadError);
-        alert('Error al subir la foto: ' + uploadError.message);
-        return;
+        // Fallback: save as local data URL
+        const dataUrl = canvas.toDataURL('image/jpeg', 0.9);
+        localStorage.setItem('userPhoto', dataUrl);
+        setUserPhoto(dataUrl);
+
+        // Try to update member table anyway
+        await supabase
+          .from('members')
+          .update({ avatar_url: dataUrl })
+          .eq('user_id', user?.id);
+      } else {
+        // Get public URL
+        const { data: { publicUrl } } = supabase.storage
+          .from('avatars')
+          .getPublicUrl(fileName);
+
+        localStorage.setItem('userPhoto', publicUrl);
+        setUserPhoto(publicUrl);
+
+        await supabase
+          .from('members')
+          .update({ avatar_url: publicUrl })
+          .eq('user_id', user?.id);
       }
 
-      // Get public URL
-      const { data: { publicUrl } } = supabase.storage
-        .from('avatars')
-        .getPublicUrl(fileName);
-
-      // Save to localStorage and state
-      localStorage.setItem('userPhoto', publicUrl);
-      setUserPhoto(publicUrl);
-
-      // Update in members table
-      const { error: updateError } = await supabase
-        .from('members')
-        .update({ avatar_url: publicUrl })
-        .eq('user_id', user?.id);
-
-      if (updateError) {
-        console.error('Update error:', updateError);
-      }
-
-      console.log('Photo uploaded successfully:', publicUrl);
+      console.log('Photo saved successfully');
 
     } catch (err) {
-      console.error('Photo upload error:', err);
-      alert('Error al subir la foto. Intentá de nuevo.');
+      console.error('Photo save error:', err);
+      alert('Error al guardar la foto. Intentá de nuevo.');
     } finally {
-      // Close cropper modal
+      setIsSaving(false);
       setShowCropper(false);
       setPreviewUrl(null);
-      // Reset file input
       if (fileInputRef.current) {
         fileInputRef.current.value = '';
       }
@@ -564,26 +628,48 @@ export const Header = () => {
         </div>
       </Modal>
 
-      {/* Image Cropper Modal */}
+      {/* Image Cropper Modal - Fixed Version */}
       <Modal
         isOpen={showCropper}
         onClose={() => {
-          setShowCropper(false);
-          setPreviewUrl(null);
-          if (fileInputRef.current) fileInputRef.current.value = '';
+          if (!isSaving) {
+            setShowCropper(false);
+            setPreviewUrl(null);
+            if (fileInputRef.current) fileInputRef.current.value = '';
+          }
         }}
         title="Ajustar Foto de Perfil"
         size="md"
         footer={
           <>
-            <Button variant="secondary" onClick={() => {
-              setShowCropper(false);
-              setPreviewUrl(null);
-              if (fileInputRef.current) fileInputRef.current.value = '';
-            }}>Cancelar</Button>
-            <Button onClick={handleSavePhoto}>
-              <Check size={16} />
-              Guardar
+            <Button
+              variant="secondary"
+              onClick={() => {
+                if (!isSaving) {
+                  setShowCropper(false);
+                  setPreviewUrl(null);
+                  if (fileInputRef.current) fileInputRef.current.value = '';
+                }
+              }}
+              disabled={isSaving}
+            >
+              Cancelar
+            </Button>
+            <Button
+              onClick={handleSavePhoto}
+              disabled={isSaving}
+            >
+              {isSaving ? (
+                <>
+                  <Loader2 size={16} className="animate-spin" />
+                  Guardando...
+                </>
+              ) : (
+                <>
+                  <Check size={16} />
+                  Guardar
+                </>
+              )}
             </Button>
           </>
         }
