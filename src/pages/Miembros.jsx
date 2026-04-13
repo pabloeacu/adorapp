@@ -2,7 +2,7 @@ import React, { useState, useMemo } from 'react';
 import {
   Plus, Search, Mail, Phone, Shield, MoreVertical, Edit, Trash2,
   UserPlus, Check, X, ChevronDown, ChevronUp, Filter, Lock, Key,
-  LayoutGrid, List, AlertTriangle, UserX
+  LayoutGrid, List, AlertTriangle, UserX, Cross, Users2, Calendar
 } from 'lucide-react';
 import { useAppStore, MEMBER_ROLES, INSTRUMENTS } from '../stores/appStore';
 import { useAuthStore } from '../stores/authStore';
@@ -39,6 +39,9 @@ export const Miembros = () => {
     name: '',
     email: '',
     phone: '',
+    pastor_area: '',
+    leader_of: '',
+    birthdate: '',
     role: 'member',
     instruments: [],
     active: true,
@@ -99,6 +102,9 @@ export const Miembros = () => {
         name: member.name,
         email: member.email || '',
         phone: member.phone || '',
+        pastor_area: member.pastor_area || '',
+        leader_of: member.leader_of || '',
+        birthdate: member.birthdate || '',
         role: member.role,
         instruments: member.instruments || [],
         active: member.active,
@@ -110,6 +116,9 @@ export const Miembros = () => {
         name: '',
         email: '',
         phone: '',
+        pastor_area: '',
+        leader_of: '',
+        birthdate: '',
         role: 'member',
         instruments: [],
         active: true,
@@ -513,6 +522,24 @@ export const Miembros = () => {
                     <span>{member.phone}</span>
                   </div>
                 )}
+                {member.pastor_area && (
+                  <div className="flex items-center gap-2 text-gray-400">
+                    <Cross size={14} />
+                    <span>{member.pastor_area}</span>
+                  </div>
+                )}
+                {member.leader_of && (
+                  <div className="flex items-center gap-2 text-gray-400">
+                    <Users2 size={14} />
+                    <span>{member.leader_of}</span>
+                  </div>
+                )}
+                {member.birthdate && (
+                  <div className="flex items-center gap-2 text-gray-400">
+                    <Calendar size={14} />
+                    <span>{new Date(member.birthdate).toLocaleDateString('es-AR')}</span>
+                  </div>
+                )}
               </div>
 
               <div className="flex flex-wrap gap-1.5 mt-3">
@@ -559,10 +586,12 @@ export const Miembros = () => {
               <thead>
                 <tr className="border-b border-neutral-800">
                   <th className="text-left px-4 py-3 text-xs text-gray-400 font-medium uppercase">Nombre</th>
-                  <th className="text-left px-4 py-3 text-xs text-gray-400 font-medium uppercase">Email</th>
+                  <th className="text-left px-4 py-3 text-xs text-gray-400 font-medium uppercase hidden lg:table-cell">Email</th>
                   <th className="text-left px-4 py-3 text-xs text-gray-400 font-medium uppercase">Teléfono</th>
+                  <th className="text-left px-4 py-3 text-xs text-gray-400 font-medium uppercase">Pastor</th>
+                  <th className="text-left px-4 py-3 text-xs text-gray-400 font-medium uppercase">Líder</th>
                   <th className="text-left px-4 py-3 text-xs text-gray-400 font-medium uppercase">Rol</th>
-                  <th className="text-left px-4 py-3 text-xs text-gray-400 font-medium uppercase">Instrumentos</th>
+                  <th className="text-left px-4 py-3 text-xs text-gray-400 font-medium uppercase hidden xl:table-cell">Instrumentos</th>
                   <th className="text-left px-4 py-3 text-xs text-gray-400 font-medium uppercase">Estado</th>
                   {isPastor && (
                     <th className="text-right px-4 py-3 text-xs text-gray-400 font-medium uppercase">Acciones</th>
@@ -585,12 +614,14 @@ export const Miembros = () => {
                     </td>
                     <td className="px-4 py-3 text-sm text-gray-400">{member.email || '-'}</td>
                     <td className="px-4 py-3 text-sm text-gray-400">{member.phone || '-'}</td>
+                    <td className="px-4 py-3 text-sm text-gray-400">{member.pastor_area || '-'}</td>
+                    <td className="px-4 py-3 text-sm text-gray-400">{member.leader_of || '-'}</td>
                     <td className="px-4 py-3">
                       <span className={`text-xs font-medium ${roleConfig[member.role]?.color}`}>
                         {roleConfig[member.role]?.label}
                       </span>
                     </td>
-                    <td className="px-4 py-3">
+                    <td className="px-4 py-3 hidden xl:table-cell">
                       <div className="flex flex-wrap gap-1">
                         {member.instruments?.slice(0, 2).map((inst) => (
                           <span key={inst} className="px-2 py-0.5 bg-neutral-800 rounded text-xs">
@@ -704,11 +735,33 @@ export const Miembros = () => {
             />
             <Input
               label="Teléfono"
-              placeholder="+1 234 567 890"
+              placeholder="+54 11 1234-5678"
               value={formData.phone}
               onChange={(e) => setFormData({ ...formData, phone: e.target.value })}
             />
           </div>
+
+          <div className="grid grid-cols-2 gap-4">
+            <Input
+              label="Pastor de área"
+              placeholder="Nombre del pastor"
+              value={formData.pastor_area}
+              onChange={(e) => setFormData({ ...formData, pastor_area: e.target.value })}
+            />
+            <Input
+              label="Líder de"
+              placeholder="Grupo o área"
+              value={formData.leader_of}
+              onChange={(e) => setFormData({ ...formData, leader_of: e.target.value })}
+            />
+          </div>
+
+          <Input
+            label="Fecha de nacimiento"
+            type="date"
+            value={formData.birthdate}
+            onChange={(e) => setFormData({ ...formData, birthdate: e.target.value })}
+          />
 
           {/* Password field - only visible when adding new member */}
           {!editingMember && (

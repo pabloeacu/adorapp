@@ -1,6 +1,6 @@
 import React, { useState, useRef, useEffect, useCallback } from 'react';
 import { useLocation } from 'react-router-dom';
-import { Bell, Search, ChevronRight, User, Mail, Shield, Camera, X, RotateCcw, ZoomIn, ZoomOut, Check, Move, LogOut, Trash2 } from 'lucide-react';
+import { Bell, Search, ChevronRight, User, Mail, Shield, Camera, X, RotateCcw, ZoomIn, ZoomOut, Check, Move, LogOut, Trash2, Phone, Cross, Users2, Calendar } from 'lucide-react';
 import { useAuthStore } from '../../stores/authStore';
 import { useAppStore } from '../../stores/appStore';
 import { supabase } from '../../lib/supabase';
@@ -24,6 +24,10 @@ export const Header = () => {
   const [showProfile, setShowProfile] = useState(false);
   const [isEditing, setIsEditing] = useState(false);
   const [editName, setEditName] = useState('');
+  const [editPhone, setEditPhone] = useState('');
+  const [editPastorArea, setEditPastorArea] = useState('');
+  const [editLeaderOf, setEditLeaderOf] = useState('');
+  const [editBirthdate, setEditBirthdate] = useState('');
   const [showCropper, setShowCropper] = useState(false);
   const [showPhotoOptions, setShowPhotoOptions] = useState(false);
   const [previewUrl, setPreviewUrl] = useState(null);
@@ -70,7 +74,11 @@ export const Header = () => {
   }, [profile, user]);
 
   const handleEditProfile = () => {
-    setEditName(user?.name || '');
+    setEditName(user?.name || profile?.name || '');
+    setEditPhone(profile?.phone || '');
+    setEditPastorArea(profile?.pastor_area || '');
+    setEditLeaderOf(profile?.leader_of || '');
+    setEditBirthdate(profile?.birthdate || '');
     setIsEditing(true);
   };
 
@@ -89,6 +97,54 @@ export const Header = () => {
       }
 
       setIsEditing(false);
+    }
+  };
+
+  const handleSaveExtendedProfile = async () => {
+    if (!editName.trim()) {
+      alert('El nombre es obligatorio');
+      return;
+    }
+
+    try {
+      const updateData = {
+        name: editName.trim(),
+        phone: editPhone?.trim() || null,
+        pastor_area: editPastorArea?.trim() || null,
+        leader_of: editLeaderOf?.trim() || null,
+        birthdate: editBirthdate || null
+      };
+
+      const { error } = await supabase
+        .from('members')
+        .update(updateData)
+        .eq('user_id', user?.id);
+
+      if (error) {
+        console.error('Error updating profile:', error);
+        alert('Error al actualizar el perfil');
+        return;
+      }
+
+      // Refresh profile
+      await refreshProfile();
+      setIsEditing(false);
+    } catch (err) {
+      console.error('Error saving profile:', err);
+      alert('Error al guardar los cambios');
+    }
+  };
+
+  const refreshProfile = async () => {
+    if (user?.id) {
+      const { data } = await supabase
+        .from('members')
+        .select('*')
+        .eq('user_id', user.id)
+        .single();
+      if (data) {
+        useAuthStore.setState({ profile: data });
+      }
     }
   };
 
@@ -330,7 +386,7 @@ export const Header = () => {
                       placeholder="Tu nombre"
                     />
                     <button
-                      onClick={handleSaveProfile}
+                      onClick={handleSaveExtendedProfile}
                       className="p-1.5 bg-green-600 rounded-lg hover:bg-green-500 transition-colors"
                       title="Guardar"
                     >
@@ -346,6 +402,85 @@ export const Header = () => {
                   </div>
                 ) : (
                   <p className="font-medium">{profile?.name || user?.name}</p>
+                )}
+              </div>
+            </div>
+
+            <div className="flex items-center gap-3 p-3 bg-neutral-800/50 rounded-xl">
+              <div className="p-2 bg-neutral-700 rounded-lg">
+                <Phone size={18} className="text-gray-400" />
+              </div>
+              <div className="flex-1">
+                <p className="text-xs text-gray-400">Teléfono</p>
+                {isEditing ? (
+                  <input
+                    type="tel"
+                    value={editPhone}
+                    onChange={(e) => setEditPhone(e.target.value)}
+                    className="w-full bg-neutral-700 border border-neutral-600 rounded-lg px-3 py-1.5 text-white focus:outline-none focus:border-blue-500"
+                    placeholder="+54 11 1234-5678"
+                  />
+                ) : (
+                  <p className="font-medium">{profile?.phone || 'No configurado'}</p>
+                )}
+              </div>
+            </div>
+
+            <div className="flex items-center gap-3 p-3 bg-neutral-800/50 rounded-xl">
+              <div className="p-2 bg-neutral-700 rounded-lg">
+                <Cross size={18} className="text-gray-400" />
+              </div>
+              <div className="flex-1">
+                <p className="text-xs text-gray-400">Pastor de área</p>
+                {isEditing ? (
+                  <input
+                    type="text"
+                    value={editPastorArea}
+                    onChange={(e) => setEditPastorArea(e.target.value)}
+                    className="w-full bg-neutral-700 border border-neutral-600 rounded-lg px-3 py-1.5 text-white focus:outline-none focus:border-blue-500"
+                    placeholder="Nombre del pastor"
+                  />
+                ) : (
+                  <p className="font-medium">{profile?.pastor_area || 'No configurado'}</p>
+                )}
+              </div>
+            </div>
+
+            <div className="flex items-center gap-3 p-3 bg-neutral-800/50 rounded-xl">
+              <div className="p-2 bg-neutral-700 rounded-lg">
+                <Users2 size={18} className="text-gray-400" />
+              </div>
+              <div className="flex-1">
+                <p className="text-xs text-gray-400">Líder de</p>
+                {isEditing ? (
+                  <input
+                    type="text"
+                    value={editLeaderOf}
+                    onChange={(e) => setEditLeaderOf(e.target.value)}
+                    className="w-full bg-neutral-700 border border-neutral-600 rounded-lg px-3 py-1.5 text-white focus:outline-none focus:border-blue-500"
+                    placeholder="Grupo o área"
+                  />
+                ) : (
+                  <p className="font-medium">{profile?.leader_of || 'No configurado'}</p>
+                )}
+              </div>
+            </div>
+
+            <div className="flex items-center gap-3 p-3 bg-neutral-800/50 rounded-xl">
+              <div className="p-2 bg-neutral-700 rounded-lg">
+                <Calendar size={18} className="text-gray-400" />
+              </div>
+              <div className="flex-1">
+                <p className="text-xs text-gray-400">Fecha de nacimiento</p>
+                {isEditing ? (
+                  <input
+                    type="date"
+                    value={editBirthdate}
+                    onChange={(e) => setEditBirthdate(e.target.value)}
+                    className="w-full bg-neutral-700 border border-neutral-600 rounded-lg px-3 py-1.5 text-white focus:outline-none focus:border-blue-500"
+                  />
+                ) : (
+                  <p className="font-medium">{profile?.birthdate ? new Date(profile.birthdate).toLocaleDateString('es-AR') : 'No configurada'}</p>
                 )}
               </div>
             </div>
@@ -385,7 +520,7 @@ export const Header = () => {
           {(isPastor || isLeader) && !isEditing && (
             <div className="p-4 bg-green-500/10 border border-green-500/20 rounded-xl">
               <p className="text-sm text-green-300">
-                Puedes editar tu nombre directamente. Los cambios de instrumentos y otros datos deben ser realizados por un Pastor.
+                Podés editar todos tus datos directamente. Los cambios se guardan automáticamente.
               </p>
             </div>
           )}

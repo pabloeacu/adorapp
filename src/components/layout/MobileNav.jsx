@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { NavLink, useLocation } from 'react-router-dom';
 import {
   LayoutDashboard,
@@ -10,9 +10,19 @@ import {
   Camera,
   Settings,
   X,
-  ChevronRight
+  ChevronRight,
+  Check,
+  Phone,
+  Cross,
+  Users2,
+  Calendar,
+  RotateCcw,
+  ZoomIn,
+  ZoomOut,
+  Move
 } from 'lucide-react';
 import { useAuthStore } from '../../stores/authStore';
+import { supabase } from '../../lib/supabase';
 
 const navItems = [
   { path: '/', icon: LayoutDashboard, label: 'Inicio' },
@@ -25,9 +35,28 @@ const navItems = [
 export const MobileNav = () => {
   const [menuOpen, setMenuOpen] = useState(false);
   const [profileOpen, setProfileOpen] = useState(false);
+  const [showPhotoModal, setShowPhotoModal] = useState(false);
+  const [editMode, setEditMode] = useState(false);
+  const [showCropper, setShowCropper] = useState(false);
+  const [previewUrl, setPreviewUrl] = useState(null);
+  const [isDragging, setIsDragging] = useState(false);
+  const [dragStart, setDragStart] = useState({ x: 0, y: 0 });
+  const [zoom, setZoom] = useState(1);
+  const [rotation, setRotation] = useState(0);
+  const [position, setPosition] = useState({ x: 0, y: 0 });
+
+  // Edit profile form state
+  const [editName, setEditName] = useState('');
+  const [editPhone, setEditPhone] = useState('');
+  const [editPastorArea, setEditPastorArea] = useState('');
+  const [editLeaderOf, setEditLeaderOf] = useState('');
+  const [editBirthdate, setEditBirthdate] = useState('');
+
   const location = useLocation();
-  const { profile, logout } = useAuthStore();
+  const { profile, logout, refreshProfile } = useAuthStore();
   const profileSheetRef = useRef(null);
+  const fileInputRef = useRef(null);
+  const imageContainerRef = useRef(null);
 
   const handleLogout = async (e) => {
     e.stopPropagation();
@@ -36,37 +65,199 @@ export const MobileNav = () => {
     window.location.href = '/login';
   };
 
-  const handleChangePhoto = (e) => {
-    e.stopPropagation();
-    setProfileOpen(false);
-    window.dispatchEvent(new CustomEvent('openPhotoUpload'));
-  };
-
-  const handleEditProfile = (e) => {
-    e.stopPropagation();
-    setProfileOpen(false);
-    window.dispatchEvent(new CustomEvent('openEditProfile'));
-  };
-
   const handleCameraClick = (e) => {
     e.stopPropagation();
-    window.dispatchEvent(new CustomEvent('openPhotoUpload'));
+    setShowPhotoModal(true);
+  };
+
+  const handleEditProfileClick = (e) => {
+    e.stopPropagation();
+    setEditMode(true);
+    setEditName(profile?.name || '');
+    setEditPhone(profile?.phone || '');
+    setEditPastorArea(profile?.pastor_area || '');
+    setEditLeaderOf(profile?.leader_of || '');
+    setEditBirthdate(profile?.birthdate || '');
+  };
+
+  const handleMouseDown = (e) => {
+    setIsDragging(true);
+    setDragStart({
+      x: e.clientX - position.x,
+      y: e.clientY - position.y
+    });
+  };
+
+  const handleMouseMove = useCallback((e) => {
+    if (isDragging) {
+      setPosition({
+        x: e.clientX - dragStart.x,
+        y: e.clientY - dragStart.y
+      });
+    }
+  }, [isDragging, dragStart]);
+
+  const handleMouseUp = useCallback(() => {
+    setIsDragging(false);
+  }, []);
+
+  useEffect(() => {
+    if (isDragging) {
+      document.addEventListener('mousemove', handleMouseMove);
+      document.addEventListener('mouseup', handleMouseUp);
+      return () => {
+        document.removeEventListener('mousemove', handleMouseMove);
+        document.removeEventListener('mouseup', handleMouseUp);
+      };
+    }
+  }, [isDragging, handleMouseMove, handleMouseUp]);
+
+  const handleSaveProfile = async () => {
+    if (!editName.trim()) {
+      alert('El nombre es obligatorio');
+      return;
+    }
+
+    try {
+      const updateData = {
+        name: editName.trim(),
+        phone: editPhone.trim() || null,
+        pastor_area: editPastorArea.trim() || null,
+        leader_of: editLeaderOf.trim() || null,
+        birthdate: editBirthdate || null
+      };
+
+      const { error } = await supabase
+        .from('members')
+        .update(updateData)
+        .eq('user_id', profile?.user_id);
+
+      if (error) {
+        console.error('Error updating profile:', error);
+        alert('Error al actualizar el perfil');
+        return;
+      }
+
+      await refreshProfile();
+      setEditMode(false);
+    } catch (err) {
+      console.error('Error saving profile:', err);
+      alert('Error al guardar los cambios');
+    }
+  };
+
+  const handleFileSelect = async (e) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    // Validate file type
+    if (!file.type.startsWith('image/')) {
+      alert('Por favor selecciona una imagen válida.');
+      return;
+    }
+
+    // Validate file size (max 5MB)
+    if (file.size > 5 * 1024 * 1024) {
+      alert('La imagen es muy grande. Máximo 5MB.');
+      return;
+    }
+
+    try {
+      // Show loading state in preview
+      const url = URL.createObjectURL(file);
+      setPreviewUrl(url);
+      setShowCropper(true);
+      setShowPhotoModal(false);
+      setZoom(1);
+      setRotation(0);
+      setPosition({ x: 0, y: 0 });
+    } catch (err) {
+      console.error('Error selecting file:', err);
+      alert('Error al seleccionar la imagen.');
+    }
+  };
+
+  const handleSavePhoto = async () => {
+    if (!previewUrl) {
+      setShowCropper(false);
+      setPreviewUrl(null);
+      return;
+    }
+
+    try {
+      // Get original file from input
+      const file = fileInputRef.current?.files?.[0];
+      if (!file) {
+        setShowCropper(false);
+        setPreviewUrl(null);
+        return;
+      }
+
+      // Generate unique filename
+      const fileExt = file.name.split('.').pop() || 'png';
+      const fileName = `avatars/${profile?.user_id}-${Date.now()}.${fileExt}`;
+
+      // Upload original file directly to Supabase Storage (no processing, keep original size)
+      const { data: uploadData, error: uploadError } = await supabase.storage
+        .from('avatars')
+        .upload(fileName, file, {
+          upsert: true,
+          contentType: file.type
+        });
+
+      if (uploadError) {
+        console.error('Upload error:', uploadError);
+        alert('Error al subir la foto: ' + uploadError.message);
+        return;
+      }
+
+      // Get public URL
+      const { data: { publicUrl } } = supabase.storage
+        .from('avatars')
+        .getPublicUrl(fileName);
+
+      // Update in members table
+      const { error: updateError } = await supabase
+        .from('members')
+        .update({ avatar_url: publicUrl })
+        .eq('user_id', profile?.user_id);
+
+      if (updateError) {
+        console.error('Update error:', updateError);
+      }
+
+      // Refresh profile
+      await refreshProfile();
+
+    } catch (err) {
+      console.error('Photo upload error:', err);
+      alert('Error al subir la foto. Intentá de nuevo.');
+    } finally {
+      setShowCropper(false);
+      setPreviewUrl(null);
+      if (fileInputRef.current) {
+        fileInputRef.current.value = '';
+      }
+    }
   };
 
   // Close on escape key
   useEffect(() => {
     const handleEscape = (e) => {
-      if (e.key === 'Escape' && profileOpen) {
+      if (e.key === 'Escape' && (profileOpen || showPhotoModal || showCropper)) {
         setProfileOpen(false);
+        setShowPhotoModal(false);
+        setShowCropper(false);
+        setEditMode(false);
       }
     };
     window.addEventListener('keydown', handleEscape);
     return () => window.removeEventListener('keydown', handleEscape);
-  }, [profileOpen]);
+  }, [profileOpen, showPhotoModal, showCropper]);
 
   // Prevent scroll when profile is open
   useEffect(() => {
-    if (profileOpen) {
+    if (profileOpen || showPhotoModal || showCropper) {
       document.body.style.overflow = 'hidden';
     } else {
       document.body.style.overflow = '';
@@ -74,7 +265,7 @@ export const MobileNav = () => {
     return () => {
       document.body.style.overflow = '';
     };
-  }, [profileOpen]);
+  }, [profileOpen, showPhotoModal, showCropper]);
 
   return (
     <>
@@ -92,13 +283,14 @@ export const MobileNav = () => {
             onClick={(e) => {
               e.stopPropagation();
               setProfileOpen(!profileOpen);
+              setEditMode(false);
             }}
             className="flex items-center gap-2 p-1 rounded-full hover:bg-neutral-800 transition-colors"
           >
-            {profile?.photo_url ? (
+            {profile?.avatar_url || profile?.photo_url ? (
               <img
-                src={profile.photo_url}
-                alt={profile.name}
+                src={profile.avatar_url || profile.photo_url}
+                alt={profile?.name}
                 className="w-8 h-8 rounded-full object-cover border-2 border-neutral-700"
               />
             ) : (
@@ -116,15 +308,15 @@ export const MobileNav = () => {
           className="lg:hidden fixed inset-0 z-50 bg-black/80 backdrop-blur-sm animate-fade-in"
           style={{ display: 'block' }}
           onClick={(e) => {
-            // Only close if clicking the overlay itself
             if (e.target === e.currentTarget) {
               setProfileOpen(false);
+              setEditMode(false);
             }
           }}
         >
           <div
             ref={profileSheetRef}
-            className="absolute bottom-0 left-0 right-0 bg-neutral-900 rounded-t-3xl animate-slide-up"
+            className="absolute bottom-0 left-0 right-0 bg-neutral-900 rounded-t-3xl animate-slide-up max-h-[90vh] overflow-y-auto"
             style={{
               paddingBottom: 'calc(env(safe-area-inset-bottom) + 20px)',
               touchAction: 'none'
@@ -137,12 +329,15 @@ export const MobileNav = () => {
             </div>
 
             {/* Header */}
-            <div className="flex items-center justify-between px-5 py-4 border-b border-neutral-800">
-              <h2 className="text-white font-semibold text-lg">Mi Perfil</h2>
+            <div className="flex items-center justify-between px-5 py-4 border-b border-neutral-800 sticky top-0 bg-neutral-900">
+              <h2 className="text-white font-semibold text-lg">
+                {editMode ? 'Editar Perfil' : 'Mi Perfil'}
+              </h2>
               <button
                 onClick={(e) => {
                   e.stopPropagation();
                   setProfileOpen(false);
+                  setEditMode(false);
                 }}
                 className="p-2 rounded-full hover:bg-neutral-800 transition-colors"
               >
@@ -150,65 +345,446 @@ export const MobileNav = () => {
               </button>
             </div>
 
-            {/* Profile Info */}
+            {/* Profile Content */}
             <div className="p-5">
-              <div className="flex items-center gap-4 mb-6">
-                <div className="relative">
-                  {profile?.photo_url ? (
-                    <img
-                      src={profile.photo_url}
-                      alt={profile.name}
-                      className="w-16 h-16 rounded-full object-cover border-2 border-neutral-700"
-                    />
-                  ) : (
-                    <div className="w-16 h-16 rounded-full bg-neutral-800 flex items-center justify-center border-2 border-neutral-700">
-                      <UserCircle size={32} className="text-neutral-500" />
+              {editMode ? (
+                // Edit Form
+                <div className="space-y-4">
+                  {/* Profile Photo with Edit */}
+                  <div className="flex flex-col items-center mb-6">
+                    <div className="relative">
+                      {profile?.avatar_url || profile?.photo_url ? (
+                        <img
+                          src={profile.avatar_url || profile.photo_url}
+                          alt={profile?.name}
+                          className="w-20 h-20 rounded-full object-cover border-2 border-neutral-700"
+                        />
+                      ) : (
+                        <div className="w-20 h-20 rounded-full bg-neutral-800 flex items-center justify-center border-2 border-neutral-700">
+                          <UserCircle size={40} className="text-neutral-500" />
+                        </div>
+                      )}
+                      <button
+                        onClick={handleCameraClick}
+                        className="absolute -bottom-1 -right-1 w-8 h-8 rounded-full bg-white flex items-center justify-center shadow-lg hover:bg-neutral-100 transition-colors"
+                      >
+                        <Camera size={14} className="text-black" />
+                      </button>
                     </div>
-                  )}
-                  <button
-                    onClick={handleCameraClick}
-                    className="absolute -bottom-1 -right-1 w-7 h-7 rounded-full bg-white flex items-center justify-center shadow-lg hover:bg-neutral-100 transition-colors active:scale-95"
-                  >
-                    <Camera size={14} className="text-black" />
-                  </button>
+                    <p className="text-neutral-400 text-sm mt-2">Tocá la cámara para cambiar foto</p>
+                  </div>
+
+                  {/* Edit Fields */}
+                  <div className="space-y-4">
+                    <div>
+                      <label className="block text-neutral-400 text-xs mb-1.5 ml-1">Nombre completo *</label>
+                      <input
+                        type="text"
+                        value={editName}
+                        onChange={(e) => setEditName(e.target.value)}
+                        className="w-full bg-neutral-800 border border-neutral-700 rounded-xl px-4 py-3 text-white focus:outline-none focus:border-white transition-colors"
+                        placeholder="Tu nombre"
+                      />
+                    </div>
+
+                    <div>
+                      <label className="block text-neutral-400 text-xs mb-1.5 ml-1">Teléfono</label>
+                      <div className="relative">
+                        <Phone size={16} className="absolute left-4 top-1/2 -translate-y-1/2 text-neutral-500" />
+                        <input
+                          type="tel"
+                          value={editPhone}
+                          onChange={(e) => setEditPhone(e.target.value)}
+                          className="w-full bg-neutral-800 border border-neutral-700 rounded-xl pl-11 pr-4 py-3 text-white focus:outline-none focus:border-white transition-colors"
+                          placeholder="+54 11 1234-5678"
+                        />
+                      </div>
+                    </div>
+
+                    <div>
+                      <label className="block text-neutral-400 text-xs mb-1.5 ml-1">Pastor de área</label>
+                      <div className="relative">
+                        <Cross size={16} className="absolute left-4 top-1/2 -translate-y-1/2 text-neutral-500" />
+                        <input
+                          type="text"
+                          value={editPastorArea}
+                          onChange={(e) => setEditPastorArea(e.target.value)}
+                          className="w-full bg-neutral-800 border border-neutral-700 rounded-xl pl-11 pr-4 py-3 text-white focus:outline-none focus:border-white transition-colors"
+                          placeholder="Nombre del pastor"
+                        />
+                      </div>
+                    </div>
+
+                    <div>
+                      <label className="block text-neutral-400 text-xs mb-1.5 ml-1">Líder de</label>
+                      <div className="relative">
+                        <Users2 size={16} className="absolute left-4 top-1/2 -translate-y-1/2 text-neutral-500" />
+                        <input
+                          type="text"
+                          value={editLeaderOf}
+                          onChange={(e) => setEditLeaderOf(e.target.value)}
+                          className="w-full bg-neutral-800 border border-neutral-700 rounded-xl pl-11 pr-4 py-3 text-white focus:outline-none focus:border-white transition-colors"
+                          placeholder="Grupo o área que lidera"
+                        />
+                      </div>
+                    </div>
+
+                    <div>
+                      <label className="block text-neutral-400 text-xs mb-1.5 ml-1">Fecha de nacimiento</label>
+                      <div className="relative">
+                        <Calendar size={16} className="absolute left-4 top-1/2 -translate-y-1/2 text-neutral-500" />
+                        <input
+                          type="date"
+                          value={editBirthdate}
+                          onChange={(e) => setEditBirthdate(e.target.value)}
+                          className="w-full bg-neutral-800 border border-neutral-700 rounded-xl pl-11 pr-4 py-3 text-white focus:outline-none focus:border-white transition-colors"
+                        />
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Action Buttons */}
+                  <div className="flex gap-3 pt-4">
+                    <button
+                      onClick={() => setEditMode(false)}
+                      className="flex-1 py-3 bg-neutral-800 text-white font-medium rounded-xl hover:bg-neutral-700 transition-colors"
+                    >
+                      Cancelar
+                    </button>
+                    <button
+                      onClick={handleSaveProfile}
+                      className="flex-1 py-3 bg-white text-black font-medium rounded-xl hover:bg-neutral-200 transition-colors flex items-center justify-center gap-2"
+                    >
+                      <Check size={18} />
+                      Guardar
+                    </button>
+                  </div>
                 </div>
-                <div className="flex-1">
-                  <h3 className="text-white font-semibold text-lg">{profile?.name || 'Usuario'}</h3>
-                  <p className="text-neutral-400 text-sm capitalize">{profile?.role || 'Miembro'}</p>
-                </div>
+              ) : (
+                // View Mode
+                <>
+                  {/* Profile Info */}
+                  <div className="flex items-center gap-4 mb-6">
+                    <div className="relative">
+                      {profile?.avatar_url || profile?.photo_url ? (
+                        <img
+                          src={profile.avatar_url || profile.photo_url}
+                          alt={profile?.name}
+                          className="w-16 h-16 rounded-full object-cover border-2 border-neutral-700"
+                        />
+                      ) : (
+                        <div className="w-16 h-16 rounded-full bg-neutral-800 flex items-center justify-center border-2 border-neutral-700">
+                          <UserCircle size={32} className="text-neutral-500" />
+                        </div>
+                      )}
+                      <button
+                        onClick={handleCameraClick}
+                        className="absolute -bottom-1 -right-1 w-7 h-7 rounded-full bg-white flex items-center justify-center shadow-lg hover:bg-neutral-100 transition-colors"
+                      >
+                        <Camera size={14} className="text-black" />
+                      </button>
+                    </div>
+                    <div>
+                      <h3 className="text-white font-semibold text-lg">{profile?.name || 'Usuario'}</h3>
+                      <p className="text-neutral-400 text-sm capitalize">
+                        {profile?.role === 'pastor' ? 'Pastor' : profile?.role === 'leader' ? 'Líder' : 'Miembro'}
+                      </p>
+                    </div>
+                  </div>
+
+                  {/* Profile Details */}
+                  <div className="bg-neutral-800/50 rounded-2xl p-4 mb-4 space-y-3">
+                    <div className="flex items-center gap-3">
+                      <div className="p-2 bg-neutral-700 rounded-lg">
+                        <Phone size={16} className="text-neutral-400" />
+                      </div>
+                      <div className="flex-1">
+                        <p className="text-xs text-neutral-500">Teléfono</p>
+                        <p className="text-white text-sm">{profile?.phone || 'No configurado'}</p>
+                      </div>
+                    </div>
+                    <div className="flex items-center gap-3">
+                      <div className="p-2 bg-neutral-700 rounded-lg">
+                        <Cross size={16} className="text-neutral-400" />
+                      </div>
+                      <div className="flex-1">
+                        <p className="text-xs text-neutral-500">Pastor de área</p>
+                        <p className="text-white text-sm">{profile?.pastor_area || 'No configurado'}</p>
+                      </div>
+                    </div>
+                    <div className="flex items-center gap-3">
+                      <div className="p-2 bg-neutral-700 rounded-lg">
+                        <Users2 size={16} className="text-neutral-400" />
+                      </div>
+                      <div className="flex-1">
+                        <p className="text-xs text-neutral-500">Líder de</p>
+                        <p className="text-white text-sm">{profile?.leader_of || 'No configurado'}</p>
+                      </div>
+                    </div>
+                    <div className="flex items-center gap-3">
+                      <div className="p-2 bg-neutral-700 rounded-lg">
+                        <Calendar size={16} className="text-neutral-400" />
+                      </div>
+                      <div className="flex-1">
+                        <p className="text-xs text-neutral-500">Fecha de nacimiento</p>
+                        <p className="text-white text-sm">{profile?.birthdate || 'No configurada'}</p>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Menu Options */}
+                  <div className="space-y-1">
+                    <button
+                      onClick={handleCameraClick}
+                      className="w-full flex items-center gap-4 px-4 py-4 rounded-xl hover:bg-neutral-800 transition-colors"
+                    >
+                      <Camera size={20} className="text-neutral-400" />
+                      <span className="flex-1 text-left text-white">Cambiar foto de perfil</span>
+                      <ChevronRight size={18} className="text-neutral-600" />
+                    </button>
+
+                    <button
+                      onClick={handleEditProfileClick}
+                      className="w-full flex items-center gap-4 px-4 py-4 rounded-xl hover:bg-neutral-800 transition-colors"
+                    >
+                      <Settings size={20} className="text-neutral-400" />
+                      <span className="flex-1 text-left text-white">Editar datos del perfil</span>
+                      <ChevronRight size={18} className="text-neutral-600" />
+                    </button>
+
+                    <div className="h-px bg-neutral-800 my-2" />
+
+                    <button
+                      onClick={handleLogout}
+                      className="w-full flex items-center gap-4 px-4 py-4 rounded-xl hover:bg-red-500/10 transition-colors"
+                    >
+                      <LogOut size={20} className="text-red-500" />
+                      <span className="flex-1 text-left text-red-500 font-medium">Cerrar Sesión</span>
+                    </button>
+                  </div>
+                </>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Photo Upload Modal */}
+      {showPhotoModal && (
+        <div
+          className="lg:hidden fixed inset-0 z-[60] bg-black/90 backdrop-blur-sm animate-fade-in flex items-center justify-center p-4"
+          onClick={(e) => {
+            if (e.target === e.currentTarget) {
+              setShowPhotoModal(false);
+            }
+          }}
+        >
+          <div
+            className="bg-neutral-900 rounded-2xl w-full max-w-sm animate-scale-in"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="p-5">
+              <div className="flex items-center justify-between mb-6">
+                <h3 className="text-white font-semibold text-lg">Cambiar foto de perfil</h3>
+                <button
+                  onClick={() => setShowPhotoModal(false)}
+                  className="p-2 rounded-full hover:bg-neutral-800 transition-colors"
+                >
+                  <X size={20} className="text-neutral-400" />
+                </button>
               </div>
 
-              {/* Menu Options */}
-              <div className="space-y-1">
+              <div className="flex flex-col items-center mb-6">
+                <div className="w-32 h-32 rounded-full bg-neutral-800 flex items-center justify-center mb-4 overflow-hidden border-2 border-neutral-700">
+                  {profile?.avatar_url || profile?.photo_url ? (
+                    <img
+                      src={profile.avatar_url || profile.photo_url}
+                      alt={profile?.name}
+                      className="w-full h-full object-cover"
+                    />
+                  ) : (
+                    <UserCircle size={64} className="text-neutral-500" />
+                  )}
+                </div>
+                <p className="text-neutral-400 text-sm text-center">
+                  Selecciona una foto de tu dispositivo
+                </p>
+              </div>
+
+              <input
+                type="file"
+                ref={fileInputRef}
+                onChange={handleFileSelect}
+                accept="image/*"
+                className="hidden"
+              />
+
+              <button
+                onClick={() => fileInputRef.current?.click()}
+                className="w-full py-3 bg-white text-black font-medium rounded-xl hover:bg-neutral-200 transition-colors flex items-center justify-center gap-2"
+              >
+                <Camera size={18} />
+                Seleccionar imagen
+              </button>
+
+              <p className="text-neutral-500 text-xs text-center mt-4">
+                Formatos: JPG, PNG, GIF. Máximo 5MB.
+              </p>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Image Cropper Modal */}
+      {showCropper && (
+        <div
+          className="lg:hidden fixed inset-0 z-[70] bg-black/95 backdrop-blur-sm animate-fade-in flex flex-col"
+          onClick={(e) => {
+            if (e.target === e.currentTarget) {
+              setShowCropper(false);
+              setPreviewUrl(null);
+            }
+          }}
+        >
+          <div className="flex items-center justify-between p-4 border-b border-neutral-800" onClick={(e) => e.stopPropagation()}>
+            <button
+              onClick={() => {
+                setShowCropper(false);
+                setPreviewUrl(null);
+                if (fileInputRef.current) fileInputRef.current.value = '';
+              }}
+              className="p-2 rounded-full hover:bg-neutral-800 transition-colors"
+            >
+              <X size={20} className="text-neutral-400" />
+            </button>
+            <h3 className="text-white font-semibold">Ajustar Foto</h3>
+            <button
+              onClick={handleSavePhoto}
+              className="px-4 py-2 bg-white text-black font-medium rounded-lg hover:bg-neutral-200 transition-colors flex items-center gap-2"
+            >
+              <Check size={18} />
+              Guardar
+            </button>
+          </div>
+
+          <div className="flex-1 flex flex-col items-center justify-center p-4" onClick={(e) => e.stopPropagation()}>
+            {/* Image Preview with Circular Mask */}
+            <div className="relative flex items-center justify-center" style={{ height: '300px', width: '100%', maxWidth: '300px' }}>
+              {/* Checkered Background */}
+              <div
+                className="absolute inset-0 overflow-hidden rounded-2xl"
+                style={{
+                  background: 'repeating-conic-gradient(#2a2a2a 0% 25%, #1a1a1a 0% 50%) 50% / 20px 20px'
+                }}
+              />
+
+              {/* Circular Mask Container */}
+              <div
+                className="relative w-64 h-64 rounded-full overflow-hidden cursor-move"
+                onMouseDown={handleMouseDown}
+                style={{ cursor: isDragging ? 'grabbing' : 'grab' }}
+              >
+                {previewUrl && (
+                  <img
+                    src={previewUrl}
+                    alt="Preview"
+                    className="w-full h-full object-cover"
+                    style={{
+                      transform: `scale(${zoom}) rotate(${rotation}deg) translate(${position.x / zoom}px, ${position.y / zoom}px)`,
+                      transition: isDragging ? 'none' : 'transform 0.2s ease'
+                    }}
+                    draggable={false}
+                  />
+                )}
+
+                {/* Circle Border Overlay */}
+                <div className="absolute inset-0 border-[3px] border-white/60 rounded-full pointer-events-none" />
+
+                {/* Corner Handles */}
+                <div className="absolute top-0 left-0 w-6 h-6 border-t-4 border-l-4 border-white/60 rounded-tl-full pointer-events-none" />
+                <div className="absolute top-0 right-0 w-6 h-6 border-t-4 border-r-4 border-white/60 rounded-tr-full pointer-events-none" />
+                <div className="absolute bottom-0 left-0 w-6 h-6 border-b-4 border-l-4 border-white/60 rounded-bl-full pointer-events-none" />
+                <div className="absolute bottom-0 right-0 w-6 h-6 border-b-4 border-r-4 border-white/60 rounded-br-full pointer-events-none" />
+              </div>
+
+              {/* Drag Hint */}
+              {isDragging && (
+                <div className="absolute bottom-4 left-1/2 -translate-x-1/2 bg-black/70 text-white text-xs px-3 py-1.5 rounded-full flex items-center gap-1.5">
+                  <Move size={12} />
+                  Soltá para posicionar
+                </div>
+              )}
+            </div>
+
+            {/* Controls */}
+            <div className="w-full max-w-sm mt-6 space-y-4 p-4 bg-neutral-800/50 rounded-2xl">
+              {/* Zoom Control */}
+              <div className="space-y-2">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2 text-neutral-400">
+                    <ZoomOut size={16} />
+                    <span className="text-xs">Zoom</span>
+                  </div>
+                  <span className="text-xs text-white font-medium">{Math.round(zoom * 100)}%</span>
+                </div>
+                <input
+                  type="range"
+                  min="0.5"
+                  max="2.5"
+                  step="0.05"
+                  value={zoom}
+                  onChange={(e) => setZoom(parseFloat(e.target.value))}
+                  className="w-full h-2 bg-neutral-700 rounded-lg appearance-none cursor-pointer accent-white"
+                />
+              </div>
+
+              {/* Rotation Control */}
+              <div className="space-y-2">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2 text-neutral-400">
+                    <RotateCcw size={16} />
+                    <span className="text-xs">Rotación</span>
+                  </div>
+                  <span className="text-xs text-white font-medium">{rotation}°</span>
+                </div>
+                <input
+                  type="range"
+                  min="-180"
+                  max="180"
+                  step="5"
+                  value={rotation}
+                  onChange={(e) => setRotation(parseInt(e.target.value))}
+                  className="w-full h-2 bg-neutral-700 rounded-lg appearance-none cursor-pointer accent-white"
+                />
+              </div>
+
+              {/* Quick Actions */}
+              <div className="flex gap-2 pt-2">
                 <button
-                  onClick={handleChangePhoto}
-                  className="w-full flex items-center gap-4 px-4 py-4 rounded-xl hover:bg-neutral-800 transition-colors active:bg-neutral-700"
+                  onClick={() => { setZoom(1); setRotation(0); setPosition({ x: 0, y: 0 }); }}
+                  className="flex-1 px-3 py-2 bg-neutral-700 hover:bg-neutral-600 rounded-lg text-sm text-neutral-300 transition-colors flex items-center justify-center gap-1.5"
                 >
-                  <Camera size={20} className="text-neutral-400" />
-                  <span className="flex-1 text-left text-white">Cambiar foto de perfil</span>
-                  <ChevronRight size={18} className="text-neutral-600" />
+                  <RotateCcw size={14} />
+                  Restablecer
                 </button>
-
                 <button
-                  onClick={handleEditProfile}
-                  className="w-full flex items-center gap-4 px-4 py-4 rounded-xl hover:bg-neutral-800 transition-colors active:bg-neutral-700"
+                  onClick={() => setRotation(prev => prev + 90)}
+                  className="flex-1 px-3 py-2 bg-neutral-700 hover:bg-neutral-600 rounded-lg text-sm text-neutral-300 transition-colors"
                 >
-                  <Settings size={20} className="text-neutral-400" />
-                  <span className="flex-1 text-left text-white">Editar datos del perfil</span>
-                  <ChevronRight size={18} className="text-neutral-600" />
+                  +90°
                 </button>
-
-                <div className="h-px bg-neutral-800 my-2" />
-
                 <button
-                  onClick={handleLogout}
-                  className="w-full flex items-center gap-4 px-4 py-4 rounded-xl hover:bg-red-500/10 transition-colors active:bg-red-500/20"
+                  onClick={() => setRotation(prev => prev - 90)}
+                  className="flex-1 px-3 py-2 bg-neutral-700 hover:bg-neutral-600 rounded-lg text-sm text-neutral-300 transition-colors"
                 >
-                  <LogOut size={20} className="text-red-500" />
-                  <span className="flex-1 text-left text-red-500 font-medium">Cerrar Sesión</span>
+                  -90°
                 </button>
               </div>
             </div>
+
+            <p className="text-neutral-500 text-xs text-center mt-4 px-4">
+              Arrastrá la imagen para posicionarla. Ajustá el zoom y rotación.
+            </p>
           </div>
         </div>
       )}
@@ -226,10 +802,10 @@ export const MobileNav = () => {
           >
             <div className="flex items-center justify-between px-5 mb-6">
               <div className="flex items-center gap-3">
-                {profile?.photo_url ? (
+                {profile?.avatar_url || profile?.photo_url ? (
                   <img
-                    src={profile.photo_url}
-                    alt={profile.name}
+                    src={profile.avatar_url || profile.photo_url}
+                    alt={profile?.name}
                     className="w-10 h-10 rounded-full object-cover"
                   />
                 ) : (
@@ -239,7 +815,9 @@ export const MobileNav = () => {
                 )}
                 <div>
                   <p className="text-white font-medium">{profile?.name || 'Usuario'}</p>
-                  <p className="text-neutral-500 text-sm capitalize">{profile?.role || 'Miembro'}</p>
+                  <p className="text-neutral-500 text-sm capitalize">
+                    {profile?.role === 'pastor' ? 'Pastor' : profile?.role === 'leader' ? 'Líder' : 'Miembro'}
+                  </p>
                 </div>
               </div>
               <button

@@ -410,9 +410,11 @@ export const Ordenes = () => {
         <div className="text-center py-12">
           <Calendar size={48} className="mx-auto text-gray-600 mb-4" />
           <p className="text-gray-400">No hay órdenes {filterStatus !== 'all' ? 'con este filtro' : ''}</p>
-          <Button variant="secondary" icon={Plus} onClick={handleOpenModal} className="mt-4">
-            Crear primera orden
-          </Button>
+          {(isPastor || isLeader) && (
+            <Button variant="secondary" icon={Plus} onClick={handleOpenModal} className="mt-4">
+              Crear primera orden
+            </Button>
+          )}
         </div>
       )}
 
