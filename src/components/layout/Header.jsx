@@ -2,7 +2,7 @@
 // Photo Cropper fix - Canvas API image processing
 import React, { useState, useRef, useEffect, useCallback, useMemo } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
-import { Bell, Search, ChevronRight, User, Mail, Shield, Camera, X, RotateCcw, ZoomIn, ZoomOut, Check, Move, LogOut, Trash2, Phone, Cross, Users2, Calendar, Loader2, Lock, Eye, EyeOff, RefreshCw } from 'lucide-react';
+import { Bell, Search, ChevronRight, User, Mail, Shield, Camera, X, RotateCcw, ZoomIn, ZoomOut, Check, Move, LogOut, Trash2, Phone, Cross, Users2, Calendar, Loader2, Lock, Eye, EyeOff, RefreshCw, Music, Heart } from 'lucide-react';
 import { useAuthStore } from '../../stores/authStore';
 import { useAppStore } from '../../stores/appStore';
 import { supabase } from '../../lib/supabase';
@@ -48,6 +48,11 @@ export const Header = () => {
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const [passwordSaving, setPasswordSaving] = useState(false);
   const [isSyncing, setIsSyncing] = useState(false);
+  const [showNotifications, setShowNotifications] = useState(false);
+  const [notifications, setNotifications] = useState([]);
+  const [devocional, setDevocional] = useState(null);
+  const [showDevocional, setShowDevocional] = useState(false);
+  const [lastDevocionalDate, setLastDevocionalDate] = useState(() => localStorage.getItem('lastDevocionalDate') || '');
   const canvasRef = useRef(null);
   const fileInputRef = useRef(null);
   const title = pageTitles[location.pathname] || 'AdorAPP';
@@ -108,6 +113,135 @@ export const Header = () => {
       window.removeEventListener('openEditProfile', handleOpenEditProfile);
     };
   }, [profile, user, currentUserMember]);
+
+  // Biblical verses for daily devotional
+  const bibleVerses = [
+    { verse: "Porque de tal manera amó Dios al mundo, que dio a su Hijo unigénito, para que todo aquel que en él cree, no se pierda, mas tenga vida eterna.", reference: "Juan 3:16" },
+    { verse: "Todo lo puedo en Cristo que me fortalece.", reference: "Filipenses 4:13" },
+    { verse: "Confía en el Señor con todo tu corazón, y no te apoyes en tu propia inteligencia.", reference: "Proverbios 3:5" },
+    { verse: "El Señor es mi pastor; nada me faltará.", reference: "Salmo 23:1" },
+    { verse: "No temas, porque yo estoy contigo; no desmayes, porque yo soy tu Dios que te esfuerzo.", reference: "Isaías 41:10" },
+    { verse: "Venid a mí todos los que estáis trabajados y cargados, y yo os haré descansar.", reference: "Mateo 11:28" },
+    { verse: "Lámpara es a mis pies tu palabra, y lumbrera a mi camino.", reference: "Salmo 119:105" },
+    { verse: "El amor es paciente, es bondadoso; el amor no tiene envidia; el amor no se jacta con orgullo.", reference: "1 Corintios 13:4" },
+    { verse: "Buscad primeramente el reino de Dios y su justicia, y todas estas cosas os serán añadidas.", reference: "Mateo 6:33" },
+    { verse: "Porque donde están dos o tres congregados en mi nombre, allí estoy yo en medio de ellos.", reference: "Mateo 18:20" },
+    { verse: "Creced en la gracia y el conocimiento de nuestro Señor y Salvador Jesucristo.", reference: "2 Pedro 3:18" },
+    { verse: "El corazón alegre es buena medicina, mas el espíritu quebrantado seca los huesos.", reference: "Proverbios 17:22" },
+    { verse: "Siendo aún niños, those who were scattered abroad went from place to place preaching the word.", reference: "Hechos 8:4" },
+    { verse: "Jehovah is my strength and my shield; my heart trusted in him, and I am helped.", reference: "Salmo 28:7" },
+    { verse: "Pero si andamos en luz, como él está en luz, tenemos comunión unos con otros.", reference: "1 Juan 1:7" },
+  ];
+
+  // Daily devotional logic - shows at 6 AM or when app loads if after 6 AM
+  useEffect(() => {
+    const checkDevocional = () => {
+      const now = new Date();
+      const today = now.toISOString().split('T')[0];
+      const hour = now.getHours();
+
+      // Check if we should show devotional (6 AM - 8 AM) or if it's a new day
+      const shouldShowAt6AM = hour >= 6 && hour < 8;
+      const isNewDay = today !== lastDevocionalDate;
+
+      if (shouldShowAt6AM || (isNewDay && hour >= 6)) {
+        // Generate a deterministic verse based on the day
+        const dayOfYear = Math.floor((now - new Date(now.getFullYear(), 0, 0)) / (1000 * 60 * 60 * 24));
+        const verseIndex = dayOfYear % bibleVerses.length;
+        setDevocional(bibleVerses[verseIndex]);
+
+        if (isNewDay) {
+          setShowDevocional(true);
+          setLastDevocionalDate(today);
+          localStorage.setItem('lastDevocionalDate', today);
+        }
+      }
+    };
+
+    checkDevocional();
+    // Check again at 6 AM if app stays open
+    const timer = setInterval(() => {
+      const now = new Date();
+      if (now.getHours() === 6 && now.getMinutes() === 0) {
+        checkDevocional();
+      }
+    }, 60000);
+
+    return () => clearInterval(timer);
+  }, [lastDevocionalDate]);
+
+  // Load notifications - listen for new songs, bands, members
+  useEffect(() => {
+    const loadNotifications = async () => {
+      try {
+        // Get latest timestamp from localStorage or 24 hours ago
+        const lastCheck = localStorage.getItem('notificationsLastCheck') || new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString();
+
+        const notifs = [];
+
+        // Check for new songs
+        const { data: newSongs } = await supabase
+          .from('songs')
+          .select('id, title')
+          .order('created_at', { ascending: false })
+          .limit(5);
+
+        if (newSongs && newSongs.length > 0) {
+          notifs.push({
+            id: 'song-' + newSongs[0].id,
+            type: 'song',
+            message: `¡Nueva canción en el repertorio! "${newSongs[0].title}" - ¡Es hora de aprenderla!`,
+            icon: 'music',
+            time: new Date().toLocaleTimeString('es-AR', { hour: '2-digit', minute: '2-digit' })
+          });
+        }
+
+        // Check for new bands
+        const { data: newBands } = await supabase
+          .from('bands')
+          .select('id, name')
+          .order('created_at', { ascending: false })
+          .limit(3);
+
+        if (newBands && newBands.length > 0) {
+          notifs.push({
+            id: 'band-' + newBands[0].id,
+            type: 'band',
+            message: `¡Tenemos una nueva banda en línea! "${newBands[0].name}" te está esperando.`,
+            icon: 'users',
+            time: new Date().toLocaleTimeString('es-AR', { hour: '2-digit', minute: '2-digit' })
+          });
+        }
+
+        // Check for new members
+        const { data: newMembers } = await supabase
+          .from('members')
+          .select('id, name')
+          .order('created_at', { ascending: false })
+          .limit(3);
+
+        if (newMembers && newMembers.length > 0) {
+          notifs.push({
+            id: 'member-' + newMembers[0].id,
+            type: 'member',
+            message: `¡Recibimos a un nuevo miembro en la familia de adoración! Bienvenido/a ${newMembers[0].name}.`,
+            icon: 'heart',
+            time: new Date().toLocaleTimeString('es-AR', { hour: '2-digit', minute: '2-digit' })
+          });
+        }
+
+        setNotifications(notifs);
+        localStorage.setItem('notificationsLastCheck', new Date().toISOString());
+      } catch (err) {
+        console.log('Error loading notifications:', err);
+      }
+    };
+
+    loadNotifications();
+    // Refresh notifications every 5 minutes
+    const interval = setInterval(loadNotifications, 5 * 60 * 1000);
+    return () => clearInterval(interval);
+  }, []);
 
   const handleEditProfile = () => {
     setEditName(currentUserMember?.name || profile?.name || user?.name || '');
@@ -457,17 +591,24 @@ export const Header = () => {
           >
             <RefreshCw size={20} className={`text-gray-400 hover:text-white transition-colors ${isSyncing ? 'animate-spin' : ''}`} />
           </button>
-          <button className="p-2.5 rounded-lg hover:bg-neutral-800 transition-colors relative bg-neutral-900 border border-neutral-700 group" title="Notificaciones">
+          <button
+            className="p-2.5 rounded-lg hover:bg-neutral-800 transition-colors relative bg-neutral-900 border border-neutral-700 group"
+            title="Notificaciones"
+            onClick={() => setShowNotifications(true)}
+          >
             <Bell size={20} className="text-gray-400 group-hover:text-white transition-colors" />
-            <span className="absolute -top-0.5 -right-0.5 w-3 h-3 bg-red-500 rounded-full border-2 border-neutral-900 animate-pulse" />
+            {notifications.length > 0 && (
+              <span className="absolute -top-0.5 -right-0.5 w-3 h-3 bg-red-500 rounded-full border-2 border-neutral-900 animate-pulse" />
+            )}
           </button>
           <div
             className="flex items-center gap-3 pl-4 border-l border-neutral-800 cursor-pointer hover:bg-neutral-800/50 rounded-lg p-2 -m-2 transition-colors"
             onClick={() => {
-              // Navigate to Members section - Members is the single source of truth for profiles
-              navigate('/miembros?edit=self');
+              // Open profile modal for editing own profile
+              handleEditProfile();
+              setShowProfile(true);
             }}
-            title="Editar mi perfil en Miembros"
+            title="Mi Perfil"
           >
             <div className="text-right hidden sm:block">
               <p className="text-sm font-medium">{displayName}</p>
@@ -1001,6 +1142,108 @@ export const Header = () => {
             )}
           </div>
         </div>
+      </Modal>
+
+      {/* Notifications Modal */}
+      <Modal
+        isOpen={showNotifications}
+        onClose={() => setShowNotifications(false)}
+        title="Notificaciones"
+        size="md"
+      >
+        <div className="space-y-4">
+          {notifications.length === 0 ? (
+            <div className="text-center py-8">
+              <Bell size={48} className="mx-auto text-gray-600 mb-3" />
+              <p className="text-gray-400">No hay notificaciones nuevas</p>
+              <p className="text-xs text-gray-500 mt-1">Las notificaciones aparecen cuando hay nuevas canciones, bandas o miembros</p>
+            </div>
+          ) : (
+            <>
+              <div className="flex items-center justify-between mb-2">
+                <span className="text-xs text-gray-400">{notifications.length} notificación(es)</span>
+                <button
+                  onClick={() => {
+                    setNotifications([]);
+                    localStorage.setItem('notificationsLastCheck', new Date().toISOString());
+                  }}
+                  className="text-xs text-blue-400 hover:text-blue-300"
+                >
+                  Marcar todas como leídas
+                </button>
+              </div>
+              {notifications.map((notif) => (
+                <div
+                  key={notif.id}
+                  className="p-4 bg-neutral-800/50 rounded-xl border border-neutral-700 hover:border-blue-500/50 transition-colors"
+                >
+                  <div className="flex items-start gap-3">
+                    <div className={`p-2 rounded-lg ${
+                      notif.type === 'song' ? 'bg-purple-500/20' :
+                      notif.type === 'band' ? 'bg-blue-500/20' :
+                      'bg-green-500/20'
+                    }`}>
+                      {notif.icon === 'music' && <Music size={18} className="text-purple-400" />}
+                      {notif.icon === 'users' && <Users2 size={18} className="text-blue-400" />}
+                      {notif.icon === 'heart' && <Heart size={18} className="text-green-400" />}
+                    </div>
+                    <div className="flex-1">
+                      <p className="text-sm text-white leading-relaxed">{notif.message}</p>
+                      <p className="text-xs text-gray-500 mt-1">{notif.time}</p>
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </>
+          )}
+        </div>
+      </Modal>
+
+      {/* Daily Devotional Modal */}
+      <Modal
+        isOpen={showDevocional}
+        onClose={() => setShowDevocional(false)}
+        title="Devocional Diario"
+        size="md"
+      >
+        {devocional && (
+          <div className="space-y-6">
+            <div className="text-center">
+              <div className="inline-flex items-center gap-2 px-4 py-2 bg-amber-500/20 rounded-full mb-4">
+                <Cross size={16} className="text-amber-400" />
+                <span className="text-amber-400 text-sm font-medium">¿Ya hiciste tu devocional?</span>
+              </div>
+              <h3 className="text-2xl font-serif text-white mb-2">¡Buenos días, {displayName}!</h3>
+              <p className="text-gray-400 text-sm">Hoy es {new Date().toLocaleDateString('es-AR', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })}</p>
+            </div>
+
+            <div className="bg-gradient-to-br from-blue-900/30 to-purple-900/30 rounded-2xl p-6 border border-blue-500/20">
+              <div className="text-xs text-blue-400 uppercase tracking-wider mb-3">Versículo del día</div>
+              <blockquote className="text-lg text-white font-serif leading-relaxed mb-4 italic">
+                "{devocional.verse}"
+              </blockquote>
+              <cite className="text-blue-400 font-medium">— {devocional.reference}</cite>
+            </div>
+
+            <div className="flex gap-3">
+              <Button onClick={() => setShowDevocional(false)} className="flex-1">
+                <Check size={16} />
+                ¡Listo!
+              </Button>
+              <button
+                onClick={() => {
+                  // Show another verse
+                  const randomIndex = Math.floor(Math.random() * bibleVerses.length);
+                  setDevocional(bibleVerses[randomIndex]);
+                }}
+                className="px-4 py-3 bg-neutral-800 hover:bg-neutral-700 rounded-xl text-gray-300 hover:text-white transition-colors flex items-center gap-2"
+              >
+                <RotateCcw size={16} />
+                Otro versículo
+              </button>
+            </div>
+          </div>
+        )}
       </Modal>
     </>
   );
