@@ -1,3 +1,5 @@
+// AdorAPP - Centro de Avivamiento Familiar
+// Test: GitHub Actions CI/CD ✅
 import React, { useState, useRef, useEffect, useCallback } from 'react';
 import { useLocation } from 'react-router-dom';
 import { Bell, Search, ChevronRight, User, Mail, Shield, Camera, X, RotateCcw, ZoomIn, ZoomOut, Check, Move, LogOut, Trash2, Phone, Cross, Users2, Calendar, Loader2 } from 'lucide-react';
