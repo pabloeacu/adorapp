@@ -2,7 +2,7 @@
 // Photo Cropper fix - Canvas API image processing
 import React, { useState, useRef, useEffect, useCallback } from 'react';
 import { useLocation } from 'react-router-dom';
-import { Bell, Search, ChevronRight, User, Mail, Shield, Camera, X, RotateCcw, ZoomIn, ZoomOut, Check, Move, LogOut, Trash2, Phone, Cross, Users2, Calendar, Loader2 } from 'lucide-react';
+import { Bell, Search, ChevronRight, User, Mail, Shield, Camera, X, RotateCcw, ZoomIn, ZoomOut, Check, Move, LogOut, Trash2, Phone, Cross, Users2, Calendar, Loader2, Lock, Eye, EyeOff } from 'lucide-react';
 import { useAuthStore } from '../../stores/authStore';
 import { useAppStore } from '../../stores/appStore';
 import { supabase } from '../../lib/supabase';
@@ -39,6 +39,13 @@ export const Header = () => {
   const [isDragging, setIsDragging] = useState(false);
   const [dragStart, setDragStart] = useState({ x: 0, y: 0 });
   const [isSaving, setIsSaving] = useState(false);
+  // Password change state
+  const [showPasswordChange, setShowPasswordChange] = useState(false);
+  const [newPassword, setNewPassword] = useState('');
+  const [confirmPassword, setConfirmPassword] = useState('');
+  const [showNewPassword, setShowNewPassword] = useState(false);
+  const [showConfirmPassword, setShowConfirmPassword] = useState(false);
+  const [passwordSaving, setPasswordSaving] = useState(false);
   const canvasRef = useRef(null);
   const fileInputRef = useRef(null);
   const title = pageTitles[location.pathname] || 'AdorAPP';
@@ -129,10 +136,55 @@ export const Header = () => {
       }
 
       await refreshProfile();
+
+      // Sync appStore.members so Miembros page sees changes immediately
+      useAppStore.setState(state => ({
+        members: state.members.map(m =>
+          m.userId === user?.id ? {
+            ...m,
+            name: updateData.name,
+            phone: updateData.phone,
+            pastor_area: updateData.pastor_area,
+            leader_of: updateData.leader_of,
+            birthdate: updateData.birthdate,
+          } : m
+        )
+      }));
+
       setIsEditing(false);
     } catch (err) {
       console.error('Error saving profile:', err);
       alert('Error al guardar los cambios');
+    }
+  };
+
+  // Change own password
+  const handleChangePassword = async () => {
+    if (!newPassword.trim()) {
+      alert('Ingresá la nueva contraseña');
+      return;
+    }
+    if (newPassword.length < 6) {
+      alert('La contraseña debe tener al menos 6 caracteres');
+      return;
+    }
+    if (newPassword !== confirmPassword) {
+      alert('Las contraseñas no coinciden');
+      return;
+    }
+    setPasswordSaving(true);
+    try {
+      const { error } = await supabase.auth.updateUser({ password: newPassword });
+      if (error) throw error;
+      setShowPasswordChange(false);
+      setNewPassword('');
+      setConfirmPassword('');
+      alert('¡Contraseña actualizada correctamente!');
+    } catch (err) {
+      console.error('Error changing password:', err);
+      alert('Error al cambiar la contraseña: ' + (err.message || 'Intentá de nuevo'));
+    } finally {
+      setPasswordSaving(false);
     }
   };
 
@@ -249,63 +301,52 @@ export const Header = () => {
         img.src = previewUrl;
       });
 
-      // Circular crop size
+      // Output canvas size - high quality
       const cropSize = 400;
+      // The preview container is w-64 = 256px in CSS
+      const displaySize = 256;
+      // Scale factor from display coordinates to canvas coordinates
+      const posScale = cropSize / displaySize;
 
-      // Create the main canvas where we'll draw the final cropped image
       const canvas = document.createElement('canvas');
       canvas.width = cropSize;
       canvas.height = cropSize;
       const ctx = canvas.getContext('2d');
 
-      // Calculate scaled dimensions to cover the crop area (like object-fit: cover)
+      // Object-cover base scale: scale image so it fills the crop square
+      // (same logic as CSS object-cover on a square container)
       const imgAspect = img.width / img.height;
-      const containerAspect = 1; // Square container
-
-      let scale;
-      if (imgAspect > containerAspect) {
-        // Image is wider - scale by height
-        scale = cropSize / img.height;
+      let baseCoverScale;
+      if (imgAspect > 1) {
+        // Wide image → scale so height = cropSize (width overflows, gets clipped)
+        baseCoverScale = cropSize / img.height;
       } else {
-        // Image is taller or square - scale by width
-        scale = cropSize / img.width;
+        // Tall or square image → scale so width = cropSize (height overflows, gets clipped)
+        baseCoverScale = cropSize / img.width;
       }
 
-      // Apply zoom
-      scale *= zoom;
+      const baseW = img.width * baseCoverScale;
+      const baseH = img.height * baseCoverScale;
 
-      const scaledWidth = img.width * scale;
-      const scaledHeight = img.height * scale;
-
-      // Center the image and apply position offset
-      // The position values are in CSS pixels, convert to canvas scale
-      const offsetX = (cropSize - scaledWidth) / 2 + position.x;
-      const offsetY = (cropSize - scaledHeight) / 2 + position.y;
-
-      // Clear the canvas
-      ctx.clearRect(0, 0, cropSize, cropSize);
-
-      // Draw the image centered and scaled
-      ctx.save();
-      ctx.translate(cropSize / 2, cropSize / 2);
-      ctx.rotate((rotation * Math.PI) / 180);
-      ctx.drawImage(
-        img,
-        -scaledWidth / 2,
-        -scaledHeight / 2,
-        scaledWidth,
-        scaledHeight
-      );
-      ctx.restore();
-
-      // Apply circular clip
+      // CRITICAL: Clip to circle BEFORE drawing (not after)
       ctx.save();
       ctx.beginPath();
       ctx.arc(cropSize / 2, cropSize / 2, cropSize / 2, 0, Math.PI * 2);
       ctx.clip();
 
-      // Redraw to apply clip
-      ctx.drawImage(canvas, 0, 0);
+      // Replicate the CSS transform chain: scale(zoom) rotate(rotation) translate(px/zoom, py/zoom)
+      // Canvas transforms apply in reverse order, so we use translate → rotate → scale order:
+      ctx.translate(cropSize / 2, cropSize / 2);   // move to center (transform-origin: center)
+      ctx.scale(zoom, zoom);                         // CSS scale(zoom)
+      ctx.rotate((rotation * Math.PI) / 180);        // CSS rotate(rotation)
+      // CSS translate(px/zoom, py/zoom) × posScale to convert display→canvas coords
+      ctx.translate(
+        (position.x * posScale) / zoom,
+        (position.y * posScale) / zoom
+      );
+
+      // Draw object-cover image centered on origin
+      ctx.drawImage(img, -baseW / 2, -baseH / 2, baseW, baseH);
       ctx.restore();
 
       // Convert to blob
@@ -584,18 +625,18 @@ export const Header = () => {
 
           {/* Edit Button - ALL users can edit their profile */}
           {!isEditing && (
-            <Button onClick={handleEditProfile} variant="secondary" className="w-full">
-              <User size={16} />
-              Editar Perfil
-            </Button>
-          )}
-
-          {/* Permission Note - ALL users can edit */}
-          {!isEditing && (
-            <div className="p-4 bg-green-500/10 border border-green-500/20 rounded-xl">
-              <p className="text-sm text-green-300">
-                Podés editar todos tus datos directamente. Los cambios se guardan automáticamente.
-              </p>
+            <div className="flex flex-col gap-2">
+              <Button onClick={handleEditProfile} variant="secondary" className="w-full">
+                <User size={16} />
+                Editar Perfil
+              </Button>
+              <button
+                onClick={() => { setShowPasswordChange(true); setShowProfile(false); }}
+                className="w-full flex items-center justify-center gap-2 px-4 py-3 bg-neutral-800 hover:bg-neutral-700 rounded-xl text-gray-300 hover:text-white transition-colors text-sm font-medium"
+              >
+                <Lock size={16} />
+                Cambiar Contraseña
+              </button>
             </div>
           )}
 
@@ -806,6 +847,121 @@ export const Header = () => {
           <p className="text-xs text-gray-500 text-center">
             Arrastrá la imagen para posicionarla. Ajustá el zoom y rotación según sea necesario.
           </p>
+        </div>
+      </Modal>
+
+      {/* Password Change Modal */}
+      <Modal
+        isOpen={showPasswordChange}
+        onClose={() => {
+          setShowPasswordChange(false);
+          setNewPassword('');
+          setConfirmPassword('');
+        }}
+        title="Cambiar Contraseña"
+        size="sm"
+        footer={
+          <>
+            <Button
+              variant="secondary"
+              onClick={() => {
+                setShowPasswordChange(false);
+                setNewPassword('');
+                setConfirmPassword('');
+              }}
+              disabled={passwordSaving}
+            >
+              Cancelar
+            </Button>
+            <Button
+              onClick={handleChangePassword}
+              disabled={passwordSaving || !newPassword || !confirmPassword}
+            >
+              {passwordSaving ? (
+                <>
+                  <Loader2 size={16} className="animate-spin" />
+                  Guardando...
+                </>
+              ) : (
+                <>
+                  <Check size={16} />
+                  Guardar Contraseña
+                </>
+              )}
+            </Button>
+          </>
+        }
+      >
+        <div className="space-y-4">
+          <div className="p-4 bg-neutral-800/50 rounded-xl flex items-center gap-3">
+            <div className="p-2 bg-blue-500/20 rounded-lg">
+              <Lock size={18} className="text-blue-400" />
+            </div>
+            <div>
+              <p className="text-sm font-medium">{profile?.name || user?.email}</p>
+              <p className="text-xs text-gray-400">Cambiando contraseña de tu cuenta</p>
+            </div>
+          </div>
+
+          {/* New Password */}
+          <div>
+            <label className="text-xs text-gray-400 font-medium uppercase tracking-wide block mb-2">
+              Nueva Contraseña
+            </label>
+            <div className="relative">
+              <input
+                type={showNewPassword ? 'text' : 'password'}
+                value={newPassword}
+                onChange={(e) => setNewPassword(e.target.value)}
+                placeholder="Mínimo 6 caracteres"
+                className="w-full px-4 py-3 bg-neutral-900 border border-neutral-800 rounded-xl focus:outline-none focus:border-blue-500 transition-colors pr-12"
+              />
+              <button
+                type="button"
+                onClick={() => setShowNewPassword(!showNewPassword)}
+                className="absolute right-3 top-1/2 -translate-y-1/2 p-1 text-gray-400 hover:text-white transition-colors"
+              >
+                {showNewPassword ? <EyeOff size={18} /> : <Eye size={18} />}
+              </button>
+            </div>
+          </div>
+
+          {/* Confirm Password */}
+          <div>
+            <label className="text-xs text-gray-400 font-medium uppercase tracking-wide block mb-2">
+              Confirmar Contraseña
+            </label>
+            <div className="relative">
+              <input
+                type={showConfirmPassword ? 'text' : 'password'}
+                value={confirmPassword}
+                onChange={(e) => setConfirmPassword(e.target.value)}
+                placeholder="Repetí la nueva contraseña"
+                className={`w-full px-4 py-3 bg-neutral-900 border rounded-xl focus:outline-none transition-colors pr-12 ${
+                  confirmPassword && confirmPassword !== newPassword
+                    ? 'border-red-500 focus:border-red-500'
+                    : confirmPassword && confirmPassword === newPassword
+                    ? 'border-green-500 focus:border-green-500'
+                    : 'border-neutral-800 focus:border-blue-500'
+                }`}
+              />
+              <button
+                type="button"
+                onClick={() => setShowConfirmPassword(!showConfirmPassword)}
+                className="absolute right-3 top-1/2 -translate-y-1/2 p-1 text-gray-400 hover:text-white transition-colors"
+              >
+                {showConfirmPassword ? <EyeOff size={18} /> : <Eye size={18} />}
+              </button>
+            </div>
+            {confirmPassword && confirmPassword !== newPassword && (
+              <p className="text-xs text-red-400 mt-1">Las contraseñas no coinciden</p>
+            )}
+            {confirmPassword && confirmPassword === newPassword && (
+              <p className="text-xs text-green-400 mt-1 flex items-center gap-1">
+                <Check size={12} /> Las contraseñas coinciden
+              </p>
+            )}
+          </div>
         </div>
       </Modal>
     </>

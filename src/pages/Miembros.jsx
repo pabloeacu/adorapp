@@ -469,7 +469,7 @@ export const Miembros = () => {
             >
               <div className="flex items-start justify-between mb-4">
                 <div className="flex items-center gap-3">
-                  <Avatar name={member.name} size="lg" />
+                  <Avatar name={member.name} size="lg" src={member.avatarUrl} />
                   <div>
                     <div className="flex items-center gap-2">
                       <h3 className="font-semibold">{member.name}</h3>
@@ -609,7 +609,7 @@ export const Miembros = () => {
                   >
                     <td className="px-4 py-3">
                       <div className="flex items-center gap-3">
-                        <Avatar name={member.name} size="sm" />
+                        <Avatar name={member.name} size="sm" src={member.avatarUrl} />
                         <span className="font-medium">{member.name}</span>
                       </div>
                     </td>

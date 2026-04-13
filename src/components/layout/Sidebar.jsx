@@ -77,7 +77,9 @@ export const Sidebar = () => {
           )}
           <div className="flex-1 min-w-0">
             <p className="text-sm font-medium truncate">{profile?.name || user?.email}</p>
-            <p className="text-xs text-gray-500 capitalize">{profile?.role || 'Miembro'}</p>
+            <p className="text-xs text-gray-500 capitalize">
+              {profile?.role === 'pastor' ? 'Pastor' : profile?.role === 'leader' ? 'Líder' : 'Miembro'}
+            </p>
           </div>
         </div>
         <button
