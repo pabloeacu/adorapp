@@ -1,8 +1,8 @@
 // AdorAPP - Centro de Avivamiento Familiar
 // Photo Cropper fix - Canvas API image processing
 import React, { useState, useRef, useEffect, useCallback } from 'react';
-import { useLocation } from 'react-router-dom';
-import { Bell, Search, ChevronRight, User, Mail, Shield, Camera, X, RotateCcw, ZoomIn, ZoomOut, Check, Move, LogOut, Trash2, Phone, Cross, Users2, Calendar, Loader2, Lock, Eye, EyeOff } from 'lucide-react';
+import { useLocation, useNavigate } from 'react-router-dom';
+import { Bell, Search, ChevronRight, User, Mail, Shield, Camera, X, RotateCcw, ZoomIn, ZoomOut, Check, Move, LogOut, Trash2, Phone, Cross, Users2, Calendar, Loader2, Lock, Eye, EyeOff, RefreshCw } from 'lucide-react';
 import { useAuthStore } from '../../stores/authStore';
 import { useAppStore } from '../../stores/appStore';
 import { supabase } from '../../lib/supabase';
@@ -20,7 +20,8 @@ const pageTitles = {
 
 export const Header = () => {
   const location = useLocation();
-  const { user, profile, logout } = useAuthStore();
+  const navigate = useNavigate();
+  const { user, profile, logout, refreshProfile: authRefreshProfile } = useAuthStore();
   const { updateMember, members } = useAppStore();
   const [showProfile, setShowProfile] = useState(false);
   const [isEditing, setIsEditing] = useState(false);
@@ -46,6 +47,7 @@ export const Header = () => {
   const [showNewPassword, setShowNewPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const [passwordSaving, setPasswordSaving] = useState(false);
+  const [isSyncing, setIsSyncing] = useState(false);
   const canvasRef = useRef(null);
   const fileInputRef = useRef(null);
   const title = pageTitles[location.pathname] || 'AdorAPP';
@@ -135,7 +137,7 @@ export const Header = () => {
         return;
       }
 
-      await refreshProfile();
+      await authRefreshProfile();
 
       // Sync appStore.members so Miembros page sees changes immediately
       useAppStore.setState(state => ({
@@ -185,19 +187,6 @@ export const Header = () => {
       alert('Error al cambiar la contraseña: ' + (err.message || 'Intentá de nuevo'));
     } finally {
       setPasswordSaving(false);
-    }
-  };
-
-  const refreshProfile = async () => {
-    if (user?.id) {
-      const { data } = await supabase
-        .from('members')
-        .select('*')
-        .eq('user_id', user.id)
-        .single();
-      if (data) {
-        useAuthStore.setState({ profile: data });
-      }
     }
   };
 
@@ -420,8 +409,26 @@ export const Header = () => {
         </div>
 
         <div className="flex items-center gap-4">
-          <button className="p-2 rounded-lg hover:bg-neutral-800 transition-colors relative" title="Buscar">
+          <button
+            className="p-2 rounded-lg hover:bg-neutral-800 transition-colors relative"
+            title="Buscar"
+          >
             <Search size={20} className="text-gray-400 hover:text-white transition-colors" />
+          </button>
+          <button
+            className="p-2 rounded-lg hover:bg-neutral-800 transition-colors relative"
+            title="Sincronizar perfil con Miembros"
+            onClick={async () => {
+              setIsSyncing(true);
+              try {
+                await authRefreshProfile();
+                await useAppStore.getState().initialize();
+              } finally {
+                setIsSyncing(false);
+              }
+            }}
+          >
+            <RefreshCw size={20} className={`text-gray-400 hover:text-white transition-colors ${isSyncing ? 'animate-spin' : ''}`} />
           </button>
           <button className="p-2.5 rounded-lg hover:bg-neutral-800 transition-colors relative bg-neutral-900 border border-neutral-700 group" title="Notificaciones">
             <Bell size={20} className="text-gray-400 group-hover:text-white transition-colors" />
@@ -429,7 +436,11 @@ export const Header = () => {
           </button>
           <div
             className="flex items-center gap-3 pl-4 border-l border-neutral-800 cursor-pointer hover:bg-neutral-800/50 rounded-lg p-2 -m-2 transition-colors"
-            onClick={() => setShowProfile(true)}
+            onClick={() => {
+              // Navigate to Members section - Members is the single source of truth for profiles
+              navigate('/miembros?edit=self');
+            }}
+            title="Editar mi perfil en Miembros"
           >
             <div className="text-right hidden sm:block">
               <p className="text-sm font-medium">{profile?.name || user?.name}</p>

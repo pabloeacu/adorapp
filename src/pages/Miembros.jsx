@@ -1,4 +1,5 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import {
   Plus, Search, Mail, Phone, Shield, MoreVertical, Edit, Trash2,
   UserPlus, Check, X, ChevronDown, ChevronUp, Filter, Lock, Key,
@@ -23,6 +24,7 @@ const roleConfig = {
 export const Miembros = () => {
   const { members, addMember, updateMember, deleteMember, toggleMemberActive } = useAppStore();
   const { user, profile } = useAuthStore();
+  const [searchParams, setSearchParams] = useSearchParams();
   const isPastor = profile?.role === 'pastor';
   const isLeader = profile?.role === 'leader';
 
@@ -128,6 +130,19 @@ export const Miembros = () => {
     setIsModalOpen(true);
   };
 
+  // Handle ?edit=self query param - open current user's edit modal
+  useEffect(() => {
+    if (searchParams.get('edit') === 'self' && members.length > 0 && user) {
+      // Find the current user's member record
+      const currentUserMember = members.find(m => m.userId === user.id);
+      if (currentUserMember) {
+        handleOpenModal(currentUserMember);
+      }
+      // Clear the URL param after handling
+      setSearchParams({});
+    }
+  }, [searchParams, members, user, handleOpenModal]);
+
   const handleCloseModal = () => {
     setIsModalOpen(false);
     setEditingMember(null);
@@ -139,7 +154,15 @@ export const Miembros = () => {
     if (!formData.name.trim()) return;
 
     if (editingMember) {
-      updateMember(editingMember.id, formData);
+      // Update member in DB and appStore
+      await updateMember(editingMember.id, formData);
+
+      // CRITICAL: If the edited member is the CURRENT LOGGED-IN USER,
+      // refresh authStore.profile so all pages instantly see the new role/permissions
+      if (editingMember.userId === user?.id) {
+        await useAuthStore.getState().refreshProfile();
+      }
+
       handleCloseModal();
     } else {
       // Creating a new member - show password modal after creation
