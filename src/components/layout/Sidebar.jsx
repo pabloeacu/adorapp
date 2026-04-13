@@ -21,6 +21,10 @@ const navItems = [
 export const Sidebar = () => {
   const { user, profile, logout } = useAuthStore();
 
+  // Get user photo from localStorage or profile
+  const userPhoto = typeof window !== 'undefined' ? localStorage.getItem('userPhoto') : null;
+  const displayPhoto = userPhoto || profile?.avatar_url;
+
   return (
     <aside className="w-64 border-r border-neutral-800 h-screen flex flex-col">
       <div className="p-6">
@@ -60,9 +64,17 @@ export const Sidebar = () => {
 
       <div className="p-4 border-t border-neutral-800">
         <div className="flex items-center gap-3 px-4 py-3 rounded-xl bg-neutral-900">
-          <div className="w-8 h-8 rounded-full bg-gradient-to-br from-purple-500 to-pink-500 flex items-center justify-center text-xs font-bold">
-            {profile?.name?.charAt(0) || user?.email?.charAt(0) || 'U'}
-          </div>
+          {displayPhoto ? (
+            <img
+              src={displayPhoto}
+              alt="Perfil"
+              className="w-8 h-8 rounded-full object-cover"
+            />
+          ) : (
+            <div className="w-8 h-8 rounded-full bg-gradient-to-br from-purple-500 to-pink-500 flex items-center justify-center text-xs font-bold">
+              {profile?.name?.charAt(0) || user?.email?.charAt(0) || 'U'}
+            </div>
+          )}
           <div className="flex-1 min-w-0">
             <p className="text-sm font-medium truncate">{profile?.name || user?.email}</p>
             <p className="text-xs text-gray-500 capitalize">{profile?.role || 'Miembro'}</p>

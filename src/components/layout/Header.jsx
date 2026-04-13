@@ -232,7 +232,7 @@ export const Header = () => {
     }
   }, [isDragging, handleMouseMove, handleMouseUp]);
 
-  // Process and save photo with crop/zoom/rotation applied
+  // Process and save photo with crop/zoom/rotation applied - FIXED VERSION
   const handleSavePhoto = async () => {
     if (!previewUrl) {
       alert('No hay imagen para guardar');
@@ -242,11 +242,7 @@ export const Header = () => {
     setIsSaving(true);
 
     try {
-      // Create canvas for processing
-      const canvas = document.createElement('canvas');
-      const ctx = canvas.getContext('2d');
       const img = new Image();
-
       await new Promise((resolve, reject) => {
         img.onload = resolve;
         img.onerror = reject;
@@ -255,48 +251,60 @@ export const Header = () => {
 
       // Circular crop size
       const cropSize = 400;
+
+      // Create the main canvas where we'll draw the final cropped image
+      const canvas = document.createElement('canvas');
       canvas.width = cropSize;
       canvas.height = cropSize;
+      const ctx = canvas.getContext('2d');
 
-      // Clear canvas
-      ctx.clearRect(0, 0, cropSize, cropSize);
-
-      // Calculate center of image considering zoom and position
-      const centerX = cropSize / 2;
-      const centerY = cropSize / 2;
+      // Calculate scaled dimensions to cover the crop area (like object-fit: cover)
       const imgAspect = img.width / img.height;
+      const containerAspect = 1; // Square container
 
-      let drawWidth, drawHeight;
-      if (imgAspect > 1) {
-        drawHeight = cropSize * zoom;
-        drawWidth = drawHeight * imgAspect;
+      let scale;
+      if (imgAspect > containerAspect) {
+        // Image is wider - scale by height
+        scale = cropSize / img.height;
       } else {
-        drawWidth = cropSize * zoom;
-        drawHeight = drawWidth / imgAspect;
+        // Image is taller or square - scale by width
+        scale = cropSize / img.width;
       }
 
-      // Apply zoom to position
-      const adjustedX = position.x;
-      const adjustedY = position.y;
+      // Apply zoom
+      scale *= zoom;
 
-      // Translate to center, rotate, scale, translate back
+      const scaledWidth = img.width * scale;
+      const scaledHeight = img.height * scale;
+
+      // Center the image and apply position offset
+      // The position values are in CSS pixels, convert to canvas scale
+      const offsetX = (cropSize - scaledWidth) / 2 + position.x;
+      const offsetY = (cropSize - scaledHeight) / 2 + position.y;
+
+      // Clear the canvas
+      ctx.clearRect(0, 0, cropSize, cropSize);
+
+      // Draw the image centered and scaled
       ctx.save();
-      ctx.translate(centerX, centerY);
+      ctx.translate(cropSize / 2, cropSize / 2);
       ctx.rotate((rotation * Math.PI) / 180);
       ctx.drawImage(
         img,
-        -drawWidth / 2 + adjustedX,
-        -drawHeight / 2 + adjustedY,
-        drawWidth,
-        drawHeight
+        -scaledWidth / 2,
+        -scaledHeight / 2,
+        scaledWidth,
+        scaledHeight
       );
       ctx.restore();
 
-      // Create circular clip
+      // Apply circular clip
       ctx.save();
       ctx.beginPath();
-      ctx.arc(centerX, centerY, cropSize / 2, 0, Math.PI * 2);
+      ctx.arc(cropSize / 2, cropSize / 2, cropSize / 2, 0, Math.PI * 2);
       ctx.clip();
+
+      // Redraw to apply clip
       ctx.drawImage(canvas, 0, 0);
       ctx.restore();
 
@@ -574,16 +582,16 @@ export const Header = () => {
             </div>
           </div>
 
-          {/* Edit Button for Pastors/Leaders */}
-          {(isPastor || isLeader) && !isEditing && (
+          {/* Edit Button - ALL users can edit their profile */}
+          {!isEditing && (
             <Button onClick={handleEditProfile} variant="secondary" className="w-full">
               <User size={16} />
               Editar Perfil
             </Button>
           )}
 
-          {/* Permission Note */}
-          {(isPastor || isLeader) && !isEditing && (
+          {/* Permission Note - ALL users can edit */}
+          {!isEditing && (
             <div className="p-4 bg-green-500/10 border border-green-500/20 rounded-xl">
               <p className="text-sm text-green-300">
                 Podés editar todos tus datos directamente. Los cambios se guardan automáticamente.

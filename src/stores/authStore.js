@@ -7,6 +7,7 @@ export const useAuthStore = create((set, get) => ({
   profile: null,
   loading: true,
   error: null,
+  isRefreshing: false, // Prevent multiple simultaneous refreshes
 
   // Initialize auth state
   initialize: async () => {
@@ -28,19 +29,16 @@ export const useAuthStore = create((set, get) => ({
       set({ loading: false });
     }
 
-    // Listen for auth changes
+    // Listen for auth changes - ONLY handle sign out events, not refreshes
     supabase.auth.onAuthStateChange(async (event, session) => {
-      // IMPORTANT: Clear cache on EVERY auth state change
-      localStorage.removeItem('user_profile');
-      localStorage.removeItem('user');
-
-      if (session?.user) {
-        set({ user: session.user, loading: true });
-        await get().fetchProfile(session.user.id);
-        set({ loading: false });
-      } else {
-        set({ user: null, profile: null, loading: false });
+      // Only process SIGNED_IN and SIGNED_OUT events, ignore TOKEN_REFRESHED
+      if (event === 'SIGNED_OUT' || event === 'INITIAL_SESSION') {
+        if (!session?.user) {
+          // User signed out or no session
+          set({ user: null, profile: null, loading: false });
+        }
       }
+      // IGNORE token refresh events to prevent infinite loops
     });
   },
 
