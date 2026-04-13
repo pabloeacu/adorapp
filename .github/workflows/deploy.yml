@@ -33,6 +33,6 @@ jobs:
           npm install -g vercel@latest
 
           echo "Deploying to Vercel production..."
-          vercel --prod --token=${{ secrets.VERCEL_TOKEN }}
+          vercel --prod --yes --token=${{ secrets.VERCEL_TOKEN }}
         env:
           VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
