@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { BrowserRouter, Routes, Route } from 'react-router-dom';
+import { BrowserRouter, Routes, Route, useLocation } from 'react-router-dom';
 import { Layout } from './components/layout/Layout';
 import { Login } from './pages/Login';
 import { Dashboard } from './pages/Dashboard';
@@ -9,6 +9,40 @@ import { Bandas } from './pages/Bandas';
 import { Miembros } from './pages/Miembros';
 import { useAuthStore } from './stores/authStore';
 import { useAppStore } from './stores/appStore';
+
+// Component that auto-syncs on every route change and periodically
+const RouteSync = ({ children }) => {
+  const location = useLocation();
+  const initializeApp = useAppStore((state) => state.initialize);
+  const refreshProfile = useAuthStore((state) => state.refreshProfile);
+  const user = useAuthStore((state) => state.user);
+
+  // AUTO-SYNC on every route change - NEVER cache profile data
+  useEffect(() => {
+    const syncData = async () => {
+      if (user) {
+        // ALWAYS reload from Supabase - no cache
+        await initializeApp();
+        await refreshProfile();
+      }
+    };
+    syncData();
+  }, [location.pathname, user, initializeApp, refreshProfile]);
+
+  // AUTO-SYNC every 30 seconds - keeps data fresh from database
+  useEffect(() => {
+    if (!user) return;
+
+    const interval = setInterval(async () => {
+      await initializeApp();
+      await refreshProfile();
+    }, 30000); // Sync every 30 seconds
+
+    return () => clearInterval(interval);
+  }, [user, initializeApp, refreshProfile]);
+
+  return children;
+};
 
 function App() {
   const [initialized, setInitialized] = useState(false);
@@ -43,16 +77,18 @@ function App() {
 
   return (
     <BrowserRouter>
-      <Routes>
-        <Route path="/login" element={<Login />} />
-        <Route path="/" element={<Layout />}>
-          <Route index element={<Dashboard />} />
-          <Route path="ordenes" element={<Ordenes />} />
-          <Route path="repertorio" element={<Repertorio />} />
-          <Route path="bandas" element={<Bandas />} />
-          <Route path="miembros" element={<Miembros />} />
-        </Route>
-      </Routes>
+      <RouteSync>
+        <Routes>
+          <Route path="/login" element={<Login />} />
+          <Route path="/" element={<Layout />}>
+            <Route index element={<Dashboard />} />
+            <Route path="ordenes" element={<Ordenes />} />
+            <Route path="repertorio" element={<Repertorio />} />
+            <Route path="bandas" element={<Bandas />} />
+            <Route path="miembros" element={<Miembros />} />
+          </Route>
+        </Routes>
+      </RouteSync>
     </BrowserRouter>
   );
 }
