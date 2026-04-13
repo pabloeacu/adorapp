@@ -51,7 +51,7 @@ export const Header = () => {
   const [showNotifications, setShowNotifications] = useState(false);
   const [notifications, setNotifications] = useState([]);
   const [devocional, setDevocional] = useState(null);
-  const [showDevocional, setShowDevocional] = useState(false);
+  const [devocionalVisible, setDevocionalVisible] = useState(false);
   const [lastDevocionalDate, setLastDevocionalDate] = useState(() => localStorage.getItem('lastDevocionalDate') || '');
   const canvasRef = useRef(null);
   const fileInputRef = useRef(null);
@@ -60,19 +60,19 @@ export const Header = () => {
   const isPastor = profile?.role === 'pastor';
   const isLeader = profile?.role === 'leader';
 
-  // CRITICAL FIX: Get profile from authStore OR fall back to appStore.members
-  // This ensures the user always sees their correct profile data
+  // CRITICAL: Get profile from appStore.members (single source of truth for role, name, photo)
+  // The authStore.profile might not have the correct role, so we MUST check members table
   const currentUserMember = useMemo(() => {
-    // First try authStore profile
-    if (profile) return profile;
-    // Fall back to appStore members by matching email
     if (user?.email) {
+      // Find the member by email in appStore - this is the source of truth
       const member = members.find(m => m.email === user.email);
       if (member) return member;
     }
     return null;
-  }, [profile, user, members]);
+  }, [user, members]);
 
+  // Use authStore profile ONLY for fields not in members table (like auth metadata)
+  // For role, name, photo - ALWAYS use currentUserMember from appStore
   const displayName = currentUserMember?.name || profile?.name || user?.name || 'Usuario';
   const displayRole = currentUserMember?.role || profile?.role || 'member';
   const displayPhoto = currentUserMember?.avatar_url || currentUserMember?.avatarUrl || profile?.avatar_url || profile?.avatarUrl;
@@ -133,14 +133,14 @@ export const Header = () => {
     { verse: "Pero si andamos en luz, como él está en luz, tenemos comunión unos con otros.", reference: "1 Juan 1:7" },
   ];
 
-  // Daily devotional logic - shows at 6 AM or when app loads if after 6 AM
+  // Daily devotional logic - shows at 6 AM as a fixed banner (not modal)
   useEffect(() => {
     const checkDevocional = () => {
       const now = new Date();
       const today = now.toISOString().split('T')[0];
       const hour = now.getHours();
 
-      // Check if we should show devotional (6 AM - 8 AM) or if it's a new day
+      // Check if we should show devotional (6 AM - 8 AM) or if it's a new day after 6 AM
       const shouldShowAt6AM = hour >= 6 && hour < 8;
       const isNewDay = today !== lastDevocionalDate;
 
@@ -151,7 +151,7 @@ export const Header = () => {
         setDevocional(bibleVerses[verseIndex]);
 
         if (isNewDay) {
-          setShowDevocional(true);
+          setDevocionalVisible(true);
           setLastDevocionalDate(today);
           localStorage.setItem('lastDevocionalDate', today);
         }
@@ -536,10 +536,18 @@ export const Header = () => {
         localStorage.setItem('userPhoto', publicUrl);
         setUserPhoto(publicUrl);
 
+        // Update both Supabase and appStore.members for real-time sync
         await supabase
           .from('members')
           .update({ avatar_url: publicUrl })
           .eq('user_id', user?.id);
+
+        // Sync appStore.members immediately so Miembros section shows new photo
+        useAppStore.setState(state => ({
+          members: state.members.map(m =>
+            m.userId === user?.id ? { ...m, avatar_url: publicUrl } : m
+          )
+        }));
       }
 
       console.log('Photo saved successfully');
@@ -624,6 +632,31 @@ export const Header = () => {
           </div>
         </div>
       </header>
+
+      {/* Daily Devotional Banner - Shows at 6 AM as fixed orientation, not a popup */}
+      {devocional && devocionalVisible && (
+        <div className="bg-gradient-to-r from-blue-900/90 to-purple-900/90 border-b border-blue-500/30 px-6 py-3">
+          <div className="flex items-center justify-between max-w-4xl mx-auto">
+            <div className="flex items-center gap-3">
+              <div className="p-2 bg-amber-500/20 rounded-lg">
+                <Cross size={18} className="text-amber-400" />
+              </div>
+              <div>
+                <p className="text-xs text-blue-400 font-medium uppercase tracking-wider">Devocional del Día</p>
+                <p className="text-sm text-white italic">"{devocional.verse}"</p>
+                <cite className="text-xs text-blue-300">— {devocional.reference} RV1960</cite>
+              </div>
+            </div>
+            <button
+              onClick={() => setDevocionalVisible(false)}
+              className="p-1.5 hover:bg-white/10 rounded-lg transition-colors"
+              title="Cerrar devocional"
+            >
+              <X size={18} className="text-gray-400 hover:text-white" />
+            </button>
+          </div>
+        </div>
+      )}
 
       {/* Profile Modal */}
       <Modal
@@ -796,7 +829,7 @@ export const Header = () => {
               <div className="flex-1">
                 <p className="text-xs text-gray-400">Rol en el sistema</p>
                 <p className="font-medium capitalize">
-                  {profile?.role === 'pastor' ? 'Pastor' : profile?.role === 'leader' ? 'Líder' : 'Miembro'}
+                  {displayRole === 'pastor' ? 'Pastor' : displayRole === 'leader' ? 'Líder' : 'Miembro'}
                 </p>
               </div>
             </div>
@@ -1197,53 +1230,6 @@ export const Header = () => {
             </>
           )}
         </div>
-      </Modal>
-
-      {/* Daily Devotional Modal */}
-      <Modal
-        isOpen={showDevocional}
-        onClose={() => setShowDevocional(false)}
-        title="Devocional Diario"
-        size="md"
-      >
-        {devocional && (
-          <div className="space-y-6">
-            <div className="text-center">
-              <div className="inline-flex items-center gap-2 px-4 py-2 bg-amber-500/20 rounded-full mb-4">
-                <Cross size={16} className="text-amber-400" />
-                <span className="text-amber-400 text-sm font-medium">¿Ya hiciste tu devocional?</span>
-              </div>
-              <h3 className="text-2xl font-serif text-white mb-2">¡Buenos días, {displayName}!</h3>
-              <p className="text-gray-400 text-sm">Hoy es {new Date().toLocaleDateString('es-AR', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })}</p>
-            </div>
-
-            <div className="bg-gradient-to-br from-blue-900/30 to-purple-900/30 rounded-2xl p-6 border border-blue-500/20">
-              <div className="text-xs text-blue-400 uppercase tracking-wider mb-3">Versículo del día</div>
-              <blockquote className="text-lg text-white font-serif leading-relaxed mb-4 italic">
-                "{devocional.verse}"
-              </blockquote>
-              <cite className="text-blue-400 font-medium">— {devocional.reference}</cite>
-            </div>
-
-            <div className="flex gap-3">
-              <Button onClick={() => setShowDevocional(false)} className="flex-1">
-                <Check size={16} />
-                ¡Listo!
-              </Button>
-              <button
-                onClick={() => {
-                  // Show another verse
-                  const randomIndex = Math.floor(Math.random() * bibleVerses.length);
-                  setDevocional(bibleVerses[randomIndex]);
-                }}
-                className="px-4 py-3 bg-neutral-800 hover:bg-neutral-700 rounded-xl text-gray-300 hover:text-white transition-colors flex items-center gap-2"
-              >
-                <RotateCcw size={16} />
-                Otro versículo
-              </button>
-            </div>
-          </div>
-        )}
       </Modal>
     </>
   );
