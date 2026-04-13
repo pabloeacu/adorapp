@@ -1,6 +1,6 @@
 // AdorAPP - Centro de Avivamiento Familiar
 // Photo Cropper fix - Canvas API image processing
-import React, { useState, useRef, useEffect, useCallback } from 'react';
+import React, { useState, useRef, useEffect, useCallback, useMemo } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { Bell, Search, ChevronRight, User, Mail, Shield, Camera, X, RotateCcw, ZoomIn, ZoomOut, Check, Move, LogOut, Trash2, Phone, Cross, Users2, Calendar, Loader2, Lock, Eye, EyeOff, RefreshCw } from 'lucide-react';
 import { useAuthStore } from '../../stores/authStore';
@@ -55,15 +55,34 @@ export const Header = () => {
   const isPastor = profile?.role === 'pastor';
   const isLeader = profile?.role === 'leader';
 
+  // CRITICAL FIX: Get profile from authStore OR fall back to appStore.members
+  // This ensures the user always sees their correct profile data
+  const currentUserMember = useMemo(() => {
+    // First try authStore profile
+    if (profile) return profile;
+    // Fall back to appStore members by matching email
+    if (user?.email) {
+      const member = members.find(m => m.email === user.email);
+      if (member) return member;
+    }
+    return null;
+  }, [profile, user, members]);
+
+  const displayName = currentUserMember?.name || profile?.name || user?.name || 'Usuario';
+  const displayRole = currentUserMember?.role || profile?.role || 'member';
+  const displayPhoto = currentUserMember?.avatar_url || currentUserMember?.avatarUrl || profile?.avatar_url || profile?.avatarUrl;
+
   // Load saved photo on mount
   useEffect(() => {
     const savedPhoto = localStorage.getItem('userPhoto');
     if (savedPhoto) {
       setUserPhoto(savedPhoto);
+    } else if (displayPhoto) {
+      setUserPhoto(displayPhoto);
     } else if (profile?.avatar_url) {
       setUserPhoto(profile.avatar_url);
     }
-  }, [profile]);
+  }, [profile, displayPhoto]);
 
   // Listen for events from MobileNav
   useEffect(() => {
@@ -72,7 +91,11 @@ export const Header = () => {
     };
 
     const handleOpenEditProfile = () => {
-      setEditName(profile?.name || user?.name || '');
+      setEditName(currentUserMember?.name || profile?.name || user?.name || '');
+      setEditPhone(currentUserMember?.phone || profile?.phone || '');
+      setEditPastorArea(currentUserMember?.pastor_area || profile?.pastor_area || '');
+      setEditLeaderOf(currentUserMember?.leader_of || profile?.leader_of || '');
+      setEditBirthdate(currentUserMember?.birthdate || profile?.birthdate || '');
       setIsEditing(true);
       setShowProfile(true);
     };
@@ -84,14 +107,14 @@ export const Header = () => {
       window.removeEventListener('openPhotoUpload', handleOpenPhotoUpload);
       window.removeEventListener('openEditProfile', handleOpenEditProfile);
     };
-  }, [profile, user]);
+  }, [profile, user, currentUserMember]);
 
   const handleEditProfile = () => {
-    setEditName(user?.name || profile?.name || '');
-    setEditPhone(profile?.phone || '');
-    setEditPastorArea(profile?.pastor_area || '');
-    setEditLeaderOf(profile?.leader_of || '');
-    setEditBirthdate(profile?.birthdate || '');
+    setEditName(currentUserMember?.name || profile?.name || user?.name || '');
+    setEditPhone(currentUserMember?.phone || profile?.phone || '');
+    setEditPastorArea(currentUserMember?.pastor_area || profile?.pastor_area || '');
+    setEditLeaderOf(currentUserMember?.leader_of || profile?.leader_of || '');
+    setEditBirthdate(currentUserMember?.birthdate || profile?.birthdate || '');
     setIsEditing(true);
   };
 
@@ -421,8 +444,12 @@ export const Header = () => {
             onClick={async () => {
               setIsSyncing(true);
               try {
-                await authRefreshProfile();
+                // First load fresh data from appStore (members)
                 await useAppStore.getState().initialize();
+                // Then refresh auth profile
+                await authRefreshProfile();
+                // Force re-render by triggering a state update
+                useAuthStore.setState({ profile: useAuthStore.getState().profile });
               } finally {
                 setIsSyncing(false);
               }
@@ -443,15 +470,15 @@ export const Header = () => {
             title="Editar mi perfil en Miembros"
           >
             <div className="text-right hidden sm:block">
-              <p className="text-sm font-medium">{profile?.name || user?.name}</p>
+              <p className="text-sm font-medium">{displayName}</p>
               <p className="text-xs text-gray-500 capitalize">
-                {profile?.role === 'pastor' ? 'Pastor' : profile?.role === 'leader' ? 'Líder' : 'Miembro'}
+                {displayRole === 'pastor' ? 'Pastor' : displayRole === 'leader' ? 'Líder' : 'Miembro'}
               </p>
             </div>
             {userPhoto ? (
               <img src={userPhoto} alt="Perfil" className="w-10 h-10 rounded-full object-cover" />
             ) : (
-              <Avatar name={profile?.name || user?.name} size="md" />
+              <Avatar name={displayName} size="md" />
             )}
           </div>
         </div>
@@ -471,7 +498,7 @@ export const Header = () => {
               {userPhoto ? (
                 <img src={userPhoto} alt="Perfil" className="w-28 h-28 rounded-full object-cover border-4 border-neutral-700" />
               ) : (
-                <Avatar name={profile?.name || user?.name} size="xl" />
+                <Avatar name={displayName} size="xl" />
               )}
               <button
                 onClick={handleCameraClick}
@@ -488,9 +515,9 @@ export const Header = () => {
                 className="hidden"
               />
             </div>
-            <h3 className="mt-4 text-xl font-semibold">{profile?.name || user?.name}</h3>
+            <h3 className="mt-4 text-xl font-semibold">{displayName}</h3>
             <p className="text-gray-400 capitalize">
-              {profile?.role === 'pastor' ? 'Pastor' : profile?.role === 'leader' ? 'Líder' : 'Miembro'}
+              {displayRole === 'pastor' ? 'Pastor' : displayRole === 'leader' ? 'Líder' : 'Miembro'}
             </p>
           </div>
 
@@ -527,7 +554,7 @@ export const Header = () => {
                     </button>
                   </div>
                 ) : (
-                  <p className="font-medium">{profile?.name || user?.name}</p>
+                  <p className="font-medium">{displayName}</p>
                 )}
               </div>
             </div>
@@ -547,7 +574,7 @@ export const Header = () => {
                     placeholder="+54 11 1234-5678"
                   />
                 ) : (
-                  <p className="font-medium">{profile?.phone || 'No configurado'}</p>
+                  <p className="font-medium">{currentUserMember?.phone || profile?.phone || 'No configurado'}</p>
                 )}
               </div>
             </div>
@@ -567,7 +594,7 @@ export const Header = () => {
                     placeholder="Nombre del pastor"
                   />
                 ) : (
-                  <p className="font-medium">{profile?.pastor_area || 'No configurado'}</p>
+                  <p className="font-medium">{currentUserMember?.pastor_area || profile?.pastor_area || 'No configurado'}</p>
                 )}
               </div>
             </div>
@@ -587,7 +614,7 @@ export const Header = () => {
                     placeholder="Grupo o área"
                   />
                 ) : (
-                  <p className="font-medium">{profile?.leader_of || 'No configurado'}</p>
+                  <p className="font-medium">{currentUserMember?.leader_of || profile?.leader_of || 'No configurado'}</p>
                 )}
               </div>
             </div>
@@ -606,7 +633,7 @@ export const Header = () => {
                     className="w-full bg-neutral-700 border border-neutral-600 rounded-lg px-3 py-1.5 text-white focus:outline-none focus:border-blue-500"
                   />
                 ) : (
-                  <p className="font-medium">{profile?.birthdate ? new Date(profile.birthdate).toLocaleDateString('es-AR') : 'No configurada'}</p>
+                  <p className="font-medium">{(currentUserMember?.birthdate || profile?.birthdate) ? new Date(currentUserMember?.birthdate || profile?.birthdate).toLocaleDateString('es-AR') : 'No configurada'}</p>
                 )}
               </div>
             </div>

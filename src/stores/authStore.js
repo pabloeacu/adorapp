@@ -57,11 +57,31 @@ export const useAuthStore = create((set, get) => ({
       // ALWAYS clear cached profile to ensure fresh data from database
       localStorage.removeItem('user_profile');
 
-      const { data, error } = await supabase
+      // First try to find by user_id
+      let { data, error } = await supabase
         .from('members')
         .select('*')
         .eq('user_id', userId)
         .single();
+
+      // If not found by user_id, try to get from appStore by email
+      if ((error || !data) && get().user?.email) {
+        const appStore = useAppStore.getState();
+        const memberFromAppStore = appStore.members?.find(m => m.email === get().user.email);
+        if (memberFromAppStore) {
+          // Get fresh data from DB
+          const memberId = memberFromAppStore.id;
+          const { data: freshData } = await supabase
+            .from('members')
+            .select('*')
+            .eq('id', memberId)
+            .single();
+          if (freshData) {
+            data = freshData;
+            error = null;
+          }
+        }
+      }
 
       if (error) {
         console.log('Profile fetch error:', error.message);
