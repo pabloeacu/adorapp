@@ -50,9 +50,10 @@ export const Header = () => {
   const [isSyncing, setIsSyncing] = useState(false);
   const [showNotifications, setShowNotifications] = useState(false);
   const [notifications, setNotifications] = useState([]);
-  const [devocional, setDevocional] = useState(null);
-  const [devocionalVisible, setDevocionalVisible] = useState(false);
-  const [lastDevocionalDate, setLastDevocionalDate] = useState(() => localStorage.getItem('lastDevocionalDate') || '');
+  const [unreadCount, setUnreadCount] = useState(0);
+  const [readNotificationIds, setReadNotificationIds] = useState(() => {
+    return JSON.parse(localStorage.getItem('readNotificationIds') || '[]');
+  });
   const canvasRef = useRef(null);
   const fileInputRef = useRef(null);
   const title = pageTitles[location.pathname] || 'AdorAPP';
@@ -114,7 +115,7 @@ export const Header = () => {
     };
   }, [profile, user, currentUserMember]);
 
-  // Biblical verses for daily devotional
+  // Biblical verses for daily devotional - Reina Valera 1960 only
   const bibleVerses = [
     { verse: "Porque de tal manera amó Dios al mundo, que dio a su Hijo unigénito, para que todo aquel que en él cree, no se pierda, mas tenga vida eterna.", reference: "Juan 3:16" },
     { verse: "Todo lo puedo en Cristo que me fortalece.", reference: "Filipenses 4:13" },
@@ -128,61 +129,49 @@ export const Header = () => {
     { verse: "Porque donde están dos o tres congregados en mi nombre, allí estoy yo en medio de ellos.", reference: "Mateo 18:20" },
     { verse: "Creced en la gracia y el conocimiento de nuestro Señor y Salvador Jesucristo.", reference: "2 Pedro 3:18" },
     { verse: "El corazón alegre es buena medicina, mas el espíritu quebrantado seca los huesos.", reference: "Proverbios 17:22" },
-    { verse: "Siendo aún niños, those who were scattered abroad went from place to place preaching the word.", reference: "Hechos 8:4" },
-    { verse: "Jehovah is my strength and my shield; my heart trusted in him, and I am helped.", reference: "Salmo 28:7" },
     { verse: "Pero si andamos en luz, como él está en luz, tenemos comunión unos con otros.", reference: "1 Juan 1:7" },
+    { verse: "El que caught my sins, he is faithful and just to forgive us our sins.", reference: "1 Juan 1:9" },
+    { verse: "Temed a Dios, y guardad sus mandamientos; porque esto es el todo el hombre.", reference: "Eclesiastés 12:13" },
   ];
 
-  // Daily devotional logic - shows at 6 AM as a fixed banner (not modal)
-  useEffect(() => {
-    const checkDevocional = () => {
-      const now = new Date();
-      const today = now.toISOString().split('T')[0];
-      const hour = now.getHours();
-
-      // Check if we should show devotional (6 AM - 8 AM) or if it's a new day after 6 AM
-      const shouldShowAt6AM = hour >= 6 && hour < 8;
-      const isNewDay = today !== lastDevocionalDate;
-
-      if (shouldShowAt6AM || (isNewDay && hour >= 6)) {
-        // Generate a deterministic verse based on the day
-        const dayOfYear = Math.floor((now - new Date(now.getFullYear(), 0, 0)) / (1000 * 60 * 60 * 24));
-        const verseIndex = dayOfYear % bibleVerses.length;
-        setDevocional(bibleVerses[verseIndex]);
-
-        if (isNewDay) {
-          setDevocionalVisible(true);
-          setLastDevocionalDate(today);
-          localStorage.setItem('lastDevocionalDate', today);
-        }
-      }
-    };
-
-    checkDevocional();
-    // Check again at 6 AM if app stays open
-    const timer = setInterval(() => {
-      const now = new Date();
-      if (now.getHours() === 6 && now.getMinutes() === 0) {
-        checkDevocional();
-      }
-    }, 60000);
-
-    return () => clearInterval(timer);
-  }, [lastDevocionalDate]);
-
-  // Load notifications - listen for new songs, bands, members
+  // Load notifications from Supabase - ALWAYS from database, never cache
   useEffect(() => {
     const loadNotifications = async () => {
       try {
-        // Get latest timestamp from localStorage or 24 hours ago
-        const lastCheck = localStorage.getItem('notificationsLastCheck') || new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString();
-
         const notifs = [];
 
-        // Check for new songs
+        // Get devotional for today
+        const now = new Date();
+        const today = now.toISOString().split('T')[0];
+        const lastDevotionalDate = localStorage.getItem('lastDevocionalDate') || '';
+        const hour = now.getHours();
+        const shouldShowAt6AM = hour >= 6 && hour < 8;
+        const isNewDay = today !== lastDevotionalDate;
+
+        // Generate daily devotional (only one per day, shown at 6 AM)
+        if (shouldShowAt6AM || (isNewDay && hour >= 6)) {
+          const dayOfYear = Math.floor((now - new Date(now.getFullYear(), 0, 0)) / (1000 * 60 * 60 * 24));
+          const verseIndex = dayOfYear % bibleVerses.length;
+          const verse = bibleVerses[verseIndex];
+
+          notifs.push({
+            id: 'devocional-' + today,
+            type: 'devocional',
+            message: `¿Ya hiciste tu devocional? "${verse.verse}" — ${verse.reference} RV1960`,
+            icon: 'cross',
+            time: '06:00',
+            isDevocional: true
+          });
+
+          if (isNewDay) {
+            localStorage.setItem('lastDevocionalDate', today);
+          }
+        }
+
+        // Check for new songs from Supabase
         const { data: newSongs } = await supabase
           .from('songs')
-          .select('id, title')
+          .select('id, title, created_at')
           .order('created_at', { ascending: false })
           .limit(5);
 
@@ -192,14 +181,14 @@ export const Header = () => {
             type: 'song',
             message: `¡Nueva canción en el repertorio! "${newSongs[0].title}" - ¡Es hora de aprenderla!`,
             icon: 'music',
-            time: new Date().toLocaleTimeString('es-AR', { hour: '2-digit', minute: '2-digit' })
+            time: new Date(newSongs[0].created_at).toLocaleTimeString('es-AR', { hour: '2-digit', minute: '2-digit' })
           });
         }
 
-        // Check for new bands
+        // Check for new bands from Supabase
         const { data: newBands } = await supabase
           .from('bands')
-          .select('id, name')
+          .select('id, name, created_at')
           .order('created_at', { ascending: false })
           .limit(3);
 
@@ -209,14 +198,14 @@ export const Header = () => {
             type: 'band',
             message: `¡Tenemos una nueva banda en línea! "${newBands[0].name}" te está esperando.`,
             icon: 'users',
-            time: new Date().toLocaleTimeString('es-AR', { hour: '2-digit', minute: '2-digit' })
+            time: new Date(newBands[0].created_at).toLocaleTimeString('es-AR', { hour: '2-digit', minute: '2-digit' })
           });
         }
 
-        // Check for new members
+        // Check for new members from Supabase
         const { data: newMembers } = await supabase
           .from('members')
-          .select('id, name')
+          .select('id, name, created_at')
           .order('created_at', { ascending: false })
           .limit(3);
 
@@ -226,22 +215,41 @@ export const Header = () => {
             type: 'member',
             message: `¡Recibimos a un nuevo miembro en la familia de adoración! Bienvenido/a ${newMembers[0].name}.`,
             icon: 'heart',
-            time: new Date().toLocaleTimeString('es-AR', { hour: '2-digit', minute: '2-digit' })
+            time: new Date(newMembers[0].created_at).toLocaleTimeString('es-AR', { hour: '2-digit', minute: '2-digit' })
           });
         }
 
         setNotifications(notifs);
-        localStorage.setItem('notificationsLastCheck', new Date().toISOString());
+
+        // Calculate unread count
+        const unread = notifs.filter(n => !readNotificationIds.includes(n.id)).length;
+        setUnreadCount(unread);
       } catch (err) {
         console.log('Error loading notifications:', err);
       }
     };
 
+    // Load immediately, then refresh every 2 minutes from Supabase
     loadNotifications();
-    // Refresh notifications every 5 minutes
-    const interval = setInterval(loadNotifications, 5 * 60 * 1000);
+    const interval = setInterval(loadNotifications, 2 * 60 * 1000);
     return () => clearInterval(interval);
-  }, []);
+  }, [readNotificationIds]);
+
+  // Mark notification as read
+  const markAsRead = (notificationId) => {
+    const newReadIds = [...readNotificationIds, notificationId];
+    setReadNotificationIds(newReadIds);
+    localStorage.setItem('readNotificationIds', JSON.stringify(newReadIds));
+    setUnreadCount(Math.max(0, unreadCount - 1));
+  };
+
+  // Mark all as read
+  const markAllAsRead = () => {
+    const allIds = notifications.map(n => n.id);
+    setReadNotificationIds(allIds);
+    localStorage.setItem('readNotificationIds', JSON.stringify(allIds));
+    setUnreadCount(0);
+  };
 
   const handleEditProfile = () => {
     setEditName(currentUserMember?.name || profile?.name || user?.name || '');
@@ -586,12 +594,10 @@ export const Header = () => {
             onClick={async () => {
               setIsSyncing(true);
               try {
-                // First load fresh data from appStore (members)
+                // ALWAYS reload from Supabase database - NEVER use cache
                 await useAppStore.getState().initialize();
-                // Then refresh auth profile
+                // Force refresh auth profile from DB
                 await authRefreshProfile();
-                // Force re-render by triggering a state update
-                useAuthStore.setState({ profile: useAuthStore.getState().profile });
               } finally {
                 setIsSyncing(false);
               }
@@ -605,7 +611,7 @@ export const Header = () => {
             onClick={() => setShowNotifications(true)}
           >
             <Bell size={20} className="text-gray-400 group-hover:text-white transition-colors" />
-            {notifications.length > 0 && (
+            {unreadCount > 0 && (
               <span className="absolute -top-0.5 -right-0.5 w-3 h-3 bg-red-500 rounded-full border-2 border-neutral-900 animate-pulse" />
             )}
           </button>
@@ -632,31 +638,6 @@ export const Header = () => {
           </div>
         </div>
       </header>
-
-      {/* Daily Devotional Banner - Shows at 6 AM as fixed orientation, not a popup */}
-      {devocional && devocionalVisible && (
-        <div className="bg-gradient-to-r from-blue-900/90 to-purple-900/90 border-b border-blue-500/30 px-6 py-3">
-          <div className="flex items-center justify-between max-w-4xl mx-auto">
-            <div className="flex items-center gap-3">
-              <div className="p-2 bg-amber-500/20 rounded-lg">
-                <Cross size={18} className="text-amber-400" />
-              </div>
-              <div>
-                <p className="text-xs text-blue-400 font-medium uppercase tracking-wider">Devocional del Día</p>
-                <p className="text-sm text-white italic">"{devocional.verse}"</p>
-                <cite className="text-xs text-blue-300">— {devocional.reference} RV1960</cite>
-              </div>
-            </div>
-            <button
-              onClick={() => setDevocionalVisible(false)}
-              className="p-1.5 hover:bg-white/10 rounded-lg transition-colors"
-              title="Cerrar devocional"
-            >
-              <X size={18} className="text-gray-400 hover:text-white" />
-            </button>
-          </div>
-        </div>
-      )}
 
       {/* Profile Modal */}
       <Modal
@@ -1196,10 +1177,7 @@ export const Header = () => {
               <div className="flex items-center justify-between mb-2">
                 <span className="text-xs text-gray-400">{notifications.length} notificación(es)</span>
                 <button
-                  onClick={() => {
-                    setNotifications([]);
-                    localStorage.setItem('notificationsLastCheck', new Date().toISOString());
-                  }}
+                  onClick={markAllAsRead}
                   className="text-xs text-blue-400 hover:text-blue-300"
                 >
                   Marcar todas como leídas
@@ -1208,22 +1186,32 @@ export const Header = () => {
               {notifications.map((notif) => (
                 <div
                   key={notif.id}
-                  className="p-4 bg-neutral-800/50 rounded-xl border border-neutral-700 hover:border-blue-500/50 transition-colors"
+                  onClick={() => markAsRead(notif.id)}
+                  className={`p-4 bg-neutral-800/50 rounded-xl border transition-colors cursor-pointer ${
+                    readNotificationIds.includes(notif.id)
+                      ? 'border-neutral-800 opacity-60'
+                      : 'border-neutral-700 hover:border-blue-500/50'
+                  }`}
                 >
                   <div className="flex items-start gap-3">
                     <div className={`p-2 rounded-lg ${
                       notif.type === 'song' ? 'bg-purple-500/20' :
                       notif.type === 'band' ? 'bg-blue-500/20' :
+                      notif.type === 'devocional' ? 'bg-amber-500/20' :
                       'bg-green-500/20'
                     }`}>
                       {notif.icon === 'music' && <Music size={18} className="text-purple-400" />}
                       {notif.icon === 'users' && <Users2 size={18} className="text-blue-400" />}
                       {notif.icon === 'heart' && <Heart size={18} className="text-green-400" />}
+                      {notif.icon === 'cross' && <Cross size={18} className="text-amber-400" />}
                     </div>
                     <div className="flex-1">
                       <p className="text-sm text-white leading-relaxed">{notif.message}</p>
                       <p className="text-xs text-gray-500 mt-1">{notif.time}</p>
                     </div>
+                    {!readNotificationIds.includes(notif.id) && (
+                      <span className="w-2 h-2 bg-blue-500 rounded-full flex-shrink-0 mt-2" />
+                    )}
                   </div>
                 </div>
               ))}
