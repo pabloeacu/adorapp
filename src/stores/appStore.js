@@ -57,6 +57,9 @@ const convertMemberFromDB = (m) => ({
   name: m.name,
   email: m.email,
   phone: m.phone,
+  pastor_area: m.pastor_area,
+  leader_of: m.leader_of,
+  birthdate: m.birthdate,
   role: m.role,
   instruments: m.instruments || [],
   active: m.active,
@@ -110,6 +113,9 @@ const convertMemberToDB = (m) => ({
   name: m.name,
   email: m.email,
   phone: m.phone || null,
+  pastor_area: m.pastor_area || null,
+  leader_of: m.leader_of || null,
+  birthdate: m.birthdate || null,
   role: m.role || 'member',
   instruments: m.instruments || [],
   active: m.active ?? true,
@@ -615,6 +621,19 @@ export const useAppStore = create((set, get) => ({
     });
 
     return state.songs.filter(song => !recentlyUsedSongIds.has(song.id));
+  },
+
+  // Reset all data on logout
+  reset: () => {
+    set({
+      members: [],
+      bands: [],
+      songs: [],
+      orders: [],
+      loading: false,
+      error: null
+    });
+    console.log('✅ App store reset on logout');
   },
 }));
 

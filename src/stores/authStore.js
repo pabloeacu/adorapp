@@ -1,5 +1,6 @@
 import { create } from 'zustand';
 import { supabase } from '../lib/supabase';
+import { useAppStore } from './appStore';
 
 export const useAuthStore = create((set, get) => ({
   user: null,
@@ -159,12 +160,37 @@ export const useAuthStore = create((set, get) => ({
     return false;
   },
 
-  // Sign out
+  // Sign out - COMPLETE CLEANUP of all local data
   logout: async () => {
     try {
+      // 1. Clear Supabase auth session
       await supabase.auth.signOut();
-      set({ user: null, profile: null });
-      localStorage.removeItem('user_profile');
+
+      // 2. Clear ALL localStorage data related to auth and app
+      const keysToRemove = [
+        'user_profile',
+        'user',
+        'userPhoto',
+        'supabase-auth-token',
+        'supabase-session',
+        'sb-gvsoexomzfaimagnaqzm-auth-token',
+        'sb-gvsoexomzfaimagnaqzm-auth-token-change-token'
+      ];
+
+      keysToRemove.forEach(key => {
+        localStorage.removeItem(key);
+      });
+
+      // 3. Clear sessionStorage as well
+      sessionStorage.clear();
+
+      // 4. Reset app store data (members, bands, songs, orders)
+      useAppStore.getState().reset();
+
+      // 5. Reset auth store state
+      set({ user: null, profile: null, loading: false, error: null });
+
+      console.log('✅ Complete logout cleanup performed');
     } catch (err) {
       console.error('Logout error:', err);
     }
