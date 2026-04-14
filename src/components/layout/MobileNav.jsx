@@ -206,16 +206,72 @@ export const MobileNav = () => {
         return;
       }
 
-      // Generate unique filename
-      const fileExt = file.name.split('.').pop() || 'png';
-      const fileName = `avatars/${profile?.user_id}-${Date.now()}.${fileExt}`;
+      // Load the image
+      const img = new Image();
+      img.crossOrigin = 'anonymous';
 
-      // Upload original file directly to Supabase Storage (no processing, keep original size)
+      await new Promise((resolve, reject) => {
+        img.onload = resolve;
+        img.onerror = reject;
+        img.src = previewUrl;
+      });
+
+      // Create canvas for processing - 256x256 for good quality avatar
+      const canvasSize = 256;
+      const canvas = document.createElement('canvas');
+      canvas.width = canvasSize;
+      canvas.height = canvasSize;
+      const ctx = canvas.getContext('2d');
+
+      // Calculate scale to fill a 256x256 area (like object-cover)
+      const targetSize = 256;
+      const scale = Math.max(targetSize / img.width, targetSize / img.height) * zoom;
+
+      // Calculate scaled dimensions
+      const scaledWidth = img.width * scale;
+      const scaledHeight = img.height * scale;
+
+      // Calculate position offset to center and apply user drag
+      const offsetX = (targetSize - scaledWidth) / 2 + position.x;
+      const offsetY = (targetSize - scaledHeight) / 2 + position.y;
+
+      // Clear canvas
+      ctx.clearRect(0, 0, canvasSize, canvasSize);
+
+      // Create circular clipping path
+      ctx.beginPath();
+      ctx.arc(canvasSize / 2, canvasSize / 2, canvasSize / 2, 0, Math.PI * 2);
+      ctx.closePath();
+      ctx.clip();
+
+      // Save context before rotation
+      ctx.save();
+
+      // Translate to center, rotate, then draw
+      ctx.translate(canvasSize / 2, canvasSize / 2);
+      ctx.rotate((rotation * Math.PI) / 180);
+      ctx.translate(-canvasSize / 2, -canvasSize / 2);
+
+      // Draw the image with calculated position
+      ctx.drawImage(img, offsetX, offsetY, scaledWidth, scaledHeight);
+
+      // Restore context
+      ctx.restore();
+
+      // Convert canvas to blob
+      const blob = await new Promise(resolve => {
+        canvas.toBlob(resolve, 'image/png', 0.9);
+      });
+
+      // Generate unique filename
+      const fileName = `avatars/${profile?.user_id}-${Date.now()}.png`;
+
+      // Upload processed image to Supabase Storage
       const { data: uploadData, error: uploadError } = await supabase.storage
         .from('avatars')
-        .upload(fileName, file, {
+        .upload(fileName, blob, {
           upsert: true,
-          contentType: file.type
+          contentType: 'image/png'
         });
 
       if (uploadError) {
@@ -244,7 +300,7 @@ export const MobileNav = () => {
 
     } catch (err) {
       console.error('Photo upload error:', err);
-      alert('Error al subir la foto. Intentá de nuevo.');
+      alert('Error al procesar la foto. Intentá de nuevo.');
     } finally {
       setShowCropper(false);
       setPreviewUrl(null);
@@ -681,19 +737,16 @@ export const MobileNav = () => {
           </div>
 
           <div className="flex-1 flex flex-col items-center justify-center p-4" onClick={(e) => e.stopPropagation()}>
-            {/* Image Preview with Circular Mask */}
-            <div className="relative flex items-center justify-center" style={{ height: '300px', width: '100%', maxWidth: '300px' }}>
-              {/* Checkered Background */}
+            {/* Image Preview - Full image with overlay circle */}
+            <div className="relative flex items-center justify-center" style={{ height: '300px', width: '100%', maxWidth: '400px' }}>
+              {/* Dark Background */}
               <div
-                className="absolute inset-0 overflow-hidden rounded-2xl"
-                style={{
-                  background: 'repeating-conic-gradient(#2a2a2a 0% 25%, #1a1a1a 0% 50%) 50% / 20px 20px'
-                }}
+                className="absolute inset-0 rounded-2xl bg-neutral-800"
               />
 
-              {/* Circular Mask Container */}
+              {/* Full Image Container - shows complete image */}
               <div
-                className="relative w-64 h-64 rounded-full overflow-hidden cursor-move"
+                className="relative w-full h-full cursor-move overflow-hidden rounded-2xl"
                 onMouseDown={handleMouseDown}
                 style={{ cursor: isDragging ? 'grabbing' : 'grab' }}
               >
@@ -701,24 +754,31 @@ export const MobileNav = () => {
                   <img
                     src={previewUrl}
                     alt="Preview"
-                    className="w-full h-full object-cover"
+                    className="absolute w-full h-full object-contain"
                     style={{
-                      transform: `scale(${zoom}) rotate(${rotation}deg) translate(${position.x / zoom}px, ${position.y / zoom}px)`,
-                      transition: isDragging ? 'none' : 'transform 0.2s ease'
+                      transform: `scale(${zoom}) rotate(${rotation}deg)`,
+                      transition: isDragging ? 'none' : 'transform 0.2s ease',
+                      left: `calc(50% + ${position.x}px)`,
+                      top: `calc(50% + ${position.y}px)`,
+                      transformOrigin: 'center center'
                     }}
                     draggable={false}
                   />
                 )}
-
-                {/* Circle Border Overlay */}
-                <div className="absolute inset-0 border-[3px] border-white/60 rounded-full pointer-events-none" />
-
-                {/* Corner Handles */}
-                <div className="absolute top-0 left-0 w-6 h-6 border-t-4 border-l-4 border-white/60 rounded-tl-full pointer-events-none" />
-                <div className="absolute top-0 right-0 w-6 h-6 border-t-4 border-r-4 border-white/60 rounded-tr-full pointer-events-none" />
-                <div className="absolute bottom-0 left-0 w-6 h-6 border-b-4 border-l-4 border-white/60 rounded-bl-full pointer-events-none" />
-                <div className="absolute bottom-0 right-0 w-6 h-6 border-b-4 border-r-4 border-white/60 rounded-br-full pointer-events-none" />
               </div>
+
+              {/* Circle Overlay - shows the final circular crop area */}
+              <div
+                className="absolute pointer-events-none"
+                style={{
+                  width: '200px',
+                  height: '200px',
+                  borderRadius: '50%',
+                  border: '3px solid rgba(255, 255, 255, 0.8)',
+                  boxShadow: '0 0 0 9999px rgba(0, 0, 0, 0.6)',
+                  zIndex: 10
+                }}
+              />
 
               {/* Drag Hint */}
               {isDragging && (
@@ -727,6 +787,11 @@ export const MobileNav = () => {
                   Soltá para posicionar
                 </div>
               )}
+
+              {/* Help text */}
+              <div className="absolute bottom-2 left-1/2 -translate-x-1/2 text-neutral-400 text-xs text-center">
+                Arrastrá para posicionar. El círculo muestra el resultado final.
+              </div>
             </div>
 
             {/* Controls */}
