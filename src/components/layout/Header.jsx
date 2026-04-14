@@ -701,35 +701,42 @@ export const Header = () => {
       const canvasImgW = imgDisplayW * scaleToCanvas;
       const canvasImgH = imgDisplayH * scaleToCanvas;
 
-      // CRITICAL: Clip to circle BEFORE drawing
+      // CRITICAL: Match EXACTLY what CSS does
+      // CSS: transform: scale(zoom) rotate(rotation) translate(position.x/zoom, position.y/zoom)
+      // Canvas applies RIGHT-TO-LEFT, so order is: translate → rotate → scale (visually)
+
+      // First save state
       ctx.save();
-      ctx.beginPath();
-      ctx.arc(cropSize / 2, cropSize / 2, cropSize / 2, 0, Math.PI * 2);
-      ctx.clip();
 
       // Move to canvas center
       ctx.translate(cropSize / 2, cropSize / 2);
 
-      // Apply same transforms as CSS preview (but in canvas coordinate space)
-      // CSS: transform: scale(zoom) rotate(rotation) translate(position.x/zoom, position.y/zoom)
-      // Canvas transforms apply RIGHT-TO-LEFT, so we do: translate → rotate → scale (left-to-right visually)
+      // Apply transforms in canvas order (right-to-left = visual left-to-right)
+      // Visual order: 1) translate(position/zoom), 2) rotate, 3) scale(zoom)
 
-      // First apply rotation around center
+      // Translate by (position.x / zoom) scaled to canvas
+      ctx.translate(
+        (position.x / zoom) * scaleToCanvas,
+        (position.y / zoom) * scaleToCanvas
+      );
+
+      // Rotate around center
       ctx.rotate((rotation * Math.PI) / 180);
 
-      // Then scale (zoom)
+      // Scale (zoom)
       ctx.scale(zoom, zoom);
-
-      // Then translate by the drag position
-      // In CSS, position.x/y are in container coordinates, need to scale to canvas
-      ctx.translate(
-        position.x * scaleToCanvas,
-        position.y * scaleToCanvas
-      );
 
       // Draw image centered at origin
       ctx.drawImage(img, -canvasImgW / 2, -canvasImgH / 2, canvasImgW, canvasImgH);
 
+      ctx.restore();
+
+      // CRITICAL: Clip to circle AFTER drawing (outside the transformed area)
+      ctx.save();
+      ctx.globalCompositeOperation = 'destination-in';
+      ctx.beginPath();
+      ctx.arc(cropSize / 2, cropSize / 2, cropSize / 2, 0, Math.PI * 2);
+      ctx.fill();
       ctx.restore();
 
       // Convert to blob
@@ -764,112 +771,88 @@ export const Header = () => {
           contentType: 'image/jpeg'
         });
 
+      let publicUrl = null;
+
       if (uploadError) {
         console.error('Upload error:', uploadError);
         console.error('Error message:', uploadError.message);
         console.error('Error status:', uploadError.status);
 
-        // Check if it's a 406 error (usually permissions issue)
-        if (uploadError.status === 406 || uploadError.message?.includes('406')) {
-          setErrorModal({
-            isOpen: true,
-            title: 'Error de permisos',
-            message: 'No se pudo subir la foto. Verificá que el bucket "avatars" tenga permisos de escritura pública.'
-          });
-          return;
-        }
-
-        // Fallback: save as local data URL
-        const dataUrl = canvas.toDataURL('image/jpeg', 0.9);
-        localStorage.setItem('userPhoto', dataUrl);
-        setUserPhoto(dataUrl);
-
-        // Try to update member table anyway using currentUserMember.id
-        const memberIdToUpdate = currentUserMember?.id;
-        if (memberIdToUpdate) {
-          await supabase
-            .from('members')
-            .update({ avatar_url: dataUrl })
-            .eq('id', memberIdToUpdate);
-
-          // Sync appStore.members
-          useAppStore.setState(state => ({
-            members: state.members.map(m =>
-              m.id === memberIdToUpdate ? { ...m, avatar_url: dataUrl, avatarUrl: dataUrl } : m
-            )
-          }));
-
-          // Persist to localStorage for survival across refreshes
-          const currentMembers = JSON.parse(localStorage.getItem('appMembers') || '[]');
-          const updatedMembers = currentMembers.map(m =>
-            m.id === memberIdToUpdate ? { ...m, avatar_url: dataUrl, avatarUrl: dataUrl } : m
-          );
-          localStorage.setItem('appMembers', JSON.stringify(updatedMembers));
-
-          // Show success modal
-          setSuccessModal({
-            isOpen: true,
-            title: '¡Foto actualizada!',
-            message: 'Tu foto de perfil se ha guardado correctamente.'
-          });
-        }
+        // Log for debugging - RLS errors usually mean we need to fix bucket policies
+        console.warn('Storage upload failed. Will try fallback save. RLS may need configuration.');
       } else {
-        // Get public URL
-        const { data: { publicUrl } } = supabase.storage
+        // Get public URL on successful upload
+        const { data: { publicUrl: url } } = supabase.storage
           .from('avatars')
           .getPublicUrl(fileName);
+        publicUrl = url;
+      }
 
-        localStorage.setItem('userPhoto', publicUrl);
-        setUserPhoto(publicUrl);
+      // Save photo - either from storage URL or fallback data URL
+      const dataUrl = publicUrl || canvas.toDataURL('image/jpeg', 0.9);
 
-        // Update both Supabase and appStore.members for real-time sync
-        // Use currentUserMember.id to ensure we update the correct record
-        const memberIdToUpdate = currentUserMember?.id;
+      // Always save to localStorage
+      localStorage.setItem('userPhoto', dataUrl);
+      setUserPhoto(dataUrl);
 
-        if (memberIdToUpdate) {
-          await supabase
-            .from('members')
-            .update({ avatar_url: publicUrl })
-            .eq('id', memberIdToUpdate);
+      // Try to update member table using currentUserMember.id
+      const memberIdToUpdate = currentUserMember?.id;
+      if (memberIdToUpdate) {
+        console.log('Updating member record with avatar_url:', dataUrl.substring(0, 50) + '...');
 
-          // Sync appStore.members immediately so Miembros section shows new photo
-          // Update BOTH avatar_url and avatarUrl for compatibility
-          useAppStore.setState(state => ({
-            members: state.members.map(m =>
-              m.id === memberIdToUpdate ? { ...m, avatar_url: publicUrl, avatarUrl: publicUrl } : m
-            )
-          }));
+        const { error: updateError } = await supabase
+          .from('members')
+          .update({ avatar_url: dataUrl })
+          .eq('id', memberIdToUpdate);
 
-          // Persist to localStorage for survival across refreshes
-          const currentMembers = JSON.parse(localStorage.getItem('appMembers') || '[]');
-          const updatedMembers = currentMembers.map(m =>
-            m.id === memberIdToUpdate ? { ...m, avatar_url: publicUrl, avatarUrl: publicUrl } : m
-          );
-          localStorage.setItem('appMembers', JSON.stringify(updatedMembers));
+        if (updateError) {
+          console.error('Failed to update member avatar_url:', updateError);
+        } else {
+          console.log('Member avatar_url updated successfully');
         }
 
-        // Show success modal
-        setSuccessModal({
-          isOpen: true,
-          title: '¡Foto actualizada!',
-          message: 'Tu foto de perfil se ha guardado correctamente.'
-        });
+        // Sync appStore.members immediately so changes are visible everywhere
+        useAppStore.setState(state => ({
+          members: state.members.map(m =>
+            m.id === memberIdToUpdate ? { ...m, avatar_url: dataUrl, avatarUrl: dataUrl } : m
+          )
+        }));
+
+        // Persist to localStorage for survival across refreshes
+        const currentMembers = JSON.parse(localStorage.getItem('appMembers') || '[]');
+        const updatedMembers = currentMembers.map(m =>
+          m.id === memberIdToUpdate ? { ...m, avatar_url: dataUrl, avatarUrl: dataUrl } : m
+        );
+        localStorage.setItem('appMembers', JSON.stringify(updatedMembers));
+      } else {
+        console.error('Cannot update member: currentUserMember.id is null/undefined');
+        console.log('user?.id:', user?.id);
+        console.log('profile?.id:', profile?.id);
       }
+
+      // Show success modal
+      setSuccessModal({
+        isOpen: true,
+        title: '¡Foto actualizada!',
+        message: uploadError
+          ? 'La foto se guardó localmente. Puede que tarde en aparecer en todos los dispositivos.'
+          : 'Tu foto de perfil se ha guardado correctamente.'
+      });
     } catch (err) {
-        console.error('Photo save error:', err);
-        setErrorModal({
-          isOpen: true,
-          title: 'Error al guardar',
-          message: 'No se pudo guardar la foto. Por favor, intentá de nuevo.'
-        });
-      } finally {
-        setIsSaving(false);
-        setShowCropper(false);
-        setPreviewUrl(null);
-        if (fileInputRef.current) {
-          fileInputRef.current.value = '';
-        }
+      console.error('Photo save error:', err);
+      setErrorModal({
+        isOpen: true,
+        title: 'Error al guardar',
+        message: 'No se pudo guardar la foto. Por favor, intentá de nuevo.'
+      });
+    } finally {
+      setIsSaving(false);
+      setShowCropper(false);
+      setPreviewUrl(null);
+      if (fileInputRef.current) {
+        fileInputRef.current.value = '';
       }
+    }
   };
 
   return (
