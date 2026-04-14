@@ -195,17 +195,16 @@ export const Comunicaciones = () => {
       if (commError) throw commError;
 
       // Create individual notifications for each recipient
+      // Note: NOT including 'id' field - let Supabase generate UUID automatically
       const notifications = recipientIds.map(recipientId => ({
-        id: `comm-${commData.id}-${recipientId}-${Date.now()}`,
         communication_id: commData.id,
         recipient_id: recipientId,
-        sender_name: senderMember?.name || profile?.name || user?.name,
-        sender_photo: senderMember?.avatar_url || senderMember?.photo_url,
+        sender_name: senderMember?.name || profile?.name || user?.name || 'Pastor',
+        sender_photo: senderMember?.avatar_url || senderMember?.photo_url || null,
         subject: subject.trim(),
         preview: message.trim().substring(0, 100),
         full_message: message.trim(),
         is_read: false,
-        created_at: new Date().toISOString(),
       }));
 
       // Insert notifications in batches of 50
