@@ -6,20 +6,24 @@ import {
   Music2,
   Users,
   UserCircle,
-  LogOut
+  LogOut,
+  FileText
 } from 'lucide-react';
 import { useAuthStore } from '../../stores/authStore';
 
-const navItems = [
-  { path: '/', icon: LayoutDashboard, label: 'Dashboard' },
-  { path: '/ordenes', icon: CalendarDays, label: 'Órdenes' },
-  { path: '/repertorio', icon: Music2, label: 'Repertorio' },
-  { path: '/bandas', icon: Users, label: 'Bandas' },
-  { path: '/miembros', icon: UserCircle, label: 'Miembros' },
-];
-
 export const Sidebar = () => {
-  const { logout } = useAuthStore();
+  const { logout, profile } = useAuthStore();
+  const isPastor = profile?.role === 'pastor';
+
+  // Dynamic navigation items - Solicitudes only for pastors
+  const navItems = [
+    { path: '/', icon: LayoutDashboard, label: 'Dashboard' },
+    { path: '/ordenes', icon: CalendarDays, label: 'Órdenes' },
+    { path: '/repertorio', icon: Music2, label: 'Repertorio' },
+    { path: '/bandas', icon: Users, label: 'Bandas' },
+    { path: '/miembros', icon: UserCircle, label: 'Miembros' },
+    ...(isPastor ? [{ path: '/solicitudes', icon: FileText, label: 'Solicitudes' }] : []),
+  ];
 
   return (
     <aside className="w-64 border-r border-neutral-800 h-screen flex flex-col">
