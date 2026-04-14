@@ -2,7 +2,7 @@ import React, { useState, useMemo, useEffect } from 'react';
 import {
   Plus, Calendar, Music, Download, Clock, ChevronRight, Copy,
   MessageSquare, Eye, Edit, Trash2, Filter, Search, Check, X,
-  User, Zap, AlertCircle, ChevronDown, FileDown, History
+  User, Zap, AlertCircle, ChevronDown, FileDown, History, Award
 } from 'lucide-react';
 import { useAppStore, MEETING_TYPES, MUSICAL_KEYS, transposeSongStructure } from '../stores/appStore';
 import { useAuthStore } from '../stores/authStore';
@@ -262,8 +262,6 @@ export const Ordenes = () => {
 
   // Handle director change - fetch key history and update
   const handleDirectorChange = (index, directorId, songId) => {
-    console.log('handleDirectorChange:', { index, directorId, songId });
-
     // Update directorId immediately
     setFormData(prev => {
       const newSongs = prev.songs.map((s, i) =>
@@ -272,18 +270,33 @@ export const Ordenes = () => {
       return { ...prev, songs: newSongs };
     });
 
-    // Fetch key history asynchronously and update key
+    // Fetch key history asynchronously and update key/tooltip
     if (directorId && songId) {
-      fetchKeyHistory(directorId, songId).then(historyKey => {
+      fetchKeyHistory(directorId, songId).then(result => {
         const song = getSongById(songId);
-        const newKey = historyKey || song?.key || song?.originalKey || 'C';
-        setFormData(prev => ({
-          ...prev,
-          songs: prev.songs.map((s, i) =>
-            i === index ? { ...s, key: newKey } : s
-          )
-        }));
+
+        if (result.found) {
+          // Found history - use the saved key
+          setFormData(prev => ({
+            ...prev,
+            songs: prev.songs.map((s, i) =>
+              i === index ? { ...s, key: result.key } : s
+            )
+          }));
+        } else {
+          // First time - use original key from song
+          const originalKey = song?.key || song?.originalKey || 'C';
+          setFormData(prev => ({
+            ...prev,
+            songs: prev.songs.map((s, i) =>
+              i === index ? { ...s, key: originalKey } : s
+            )
+          }));
+        }
       });
+    } else {
+      // Director cleared - reset tooltip
+      setKeyHistoryTooltip(null);
     }
   };
 
@@ -326,7 +339,7 @@ export const Ordenes = () => {
 
   // Fetch key history for a director-song combination from database
   const fetchKeyHistory = async (directorId, songId) => {
-    if (!directorId || !songId) return null;
+    if (!directorId || !songId) return { found: false, key: null };
 
     setKeyHistoryLoading(true);
     setKeyHistoryTooltip(null);
@@ -345,7 +358,7 @@ export const Ordenes = () => {
       if (error && error.code !== 'PGRST116') { // PGRST116 = no rows returned
         console.error('Error fetching key history:', error);
         setKeyHistoryLoading(false);
-        return null;
+        return { found: false, key: null };
       }
 
       if (data) {
@@ -358,18 +371,26 @@ export const Ordenes = () => {
         setKeyHistoryTooltip({
           key: data.key,
           orderBand: order ? getBandById(order.bandId)?.name : '',
-          orderDate: formattedDate
+          orderDate: formattedDate,
+          found: true,
+          isFirstTime: false
         });
         setKeyHistoryLoading(false);
-        return data.key;
+        return { found: true, key: data.key, date: formattedDate };
       }
 
+      // No history found - it's the first time
+      setKeyHistoryTooltip({
+        found: false,
+        isFirstTime: true,
+        message: 'Esta es la primera vez que el director la va a cantar. Guardaremos el registro de su tonalidad.'
+      });
       setKeyHistoryLoading(false);
-      return null;
+      return { found: false, key: null };
     } catch (err) {
       console.error('Error in fetchKeyHistory:', err);
       setKeyHistoryLoading(false);
-      return null;
+      return { found: false, key: null };
     }
   };
 
@@ -674,7 +695,6 @@ export const Ordenes = () => {
                       value={songRef.directorId || ''}
                       onChange={(e) => {
                         const newDirectorId = e.target.value || null;
-                        console.log('Director selected:', { value: e.target.value, newDirectorId });
                         handleDirectorChange(index, newDirectorId, songRef.songId);
                       }}
                     >
@@ -699,23 +719,53 @@ export const Ordenes = () => {
                         <button
                           type="button"
                           onClick={() => fetchKeyHistory(songRef.directorId, songRef.songId)}
-                          className={`ml-1 p-1 text-gray-400 hover:text-purple-400 transition-colors ${keyHistoryLoading ? 'animate-spin' : ''}`}
-                          title="Buscar última tonalidad del director"
+                          className={`ml-1 p-1 transition-colors ${keyHistoryLoading ? 'animate-spin' : ''} ${
+                            keyHistoryTooltip?.found === true
+                              ? 'text-green-400 hover:text-green-300'
+                              : keyHistoryTooltip?.isFirstTime === true
+                              ? 'text-yellow-400 hover:text-yellow-300'
+                              : 'text-gray-400 hover:text-purple-400'
+                          }`}
+                          title={keyHistoryTooltip?.found === true
+                            ? `Tonalidad de ${keyHistoryTooltip.orderDate}`
+                            : keyHistoryTooltip?.isFirstTime === true
+                            ? keyHistoryTooltip.message
+                            : 'Buscar última tonalidad del director'
+                          }
                           disabled={keyHistoryLoading}
                         >
                           {keyHistoryLoading ? (
                             <Clock size={14} className="animate-pulse" />
+                          ) : keyHistoryTooltip?.found === true ? (
+                            // Found history - show green checkmark
+                            <Check size={14} />
+                          ) : keyHistoryTooltip?.isFirstTime === true ? (
+                            // First time - show medal/award icon
+                            <Award size={14} />
                           ) : (
+                            // No tooltip yet - show history icon
                             <History size={14} />
                           )}
                         </button>
                       )}
                       {/* Tooltip for key history */}
                       {keyHistoryTooltip && songRef.directorId && (
-                        <div className="absolute bottom-full mb-2 left-1/2 -translate-x-1/2 px-3 py-2 bg-neutral-700 text-xs rounded-lg shadow-lg whitespace-nowrap z-50">
-                          <p className="text-purple-400 font-mono">{keyHistoryTooltip.key}</p>
-                          <p className="text-gray-400 text-[10px]">Banda {keyHistoryTooltip.orderBand}</p>
-                          <p className="text-gray-500 text-[10px]">{keyHistoryTooltip.orderDate}</p>
+                        <div className="absolute bottom-full mb-2 left-1/2 -translate-x-1/2 px-3 py-2 bg-neutral-700 text-xs rounded-lg shadow-lg whitespace-nowrap z-50 max-w-xs">
+                          {keyHistoryTooltip.found === true ? (
+                            // Found history tooltip
+                            <>
+                              <p className="text-green-400 font-mono">Tonalidad de {keyHistoryTooltip.orderDate}</p>
+                              <p className="text-gray-400 font-mono">{keyHistoryTooltip.key}</p>
+                              {keyHistoryTooltip.orderBand && (
+                                <p className="text-gray-500 text-[10px]">Banda {keyHistoryTooltip.orderBand}</p>
+                              )}
+                            </>
+                          ) : keyHistoryTooltip.isFirstTime === true ? (
+                            // First time tooltip
+                            <p className="text-yellow-400 text-center">
+                              {keyHistoryTooltip.message}
+                            </p>
+                          ) : null}
                           <div className="absolute top-full left-1/2 -translate-x-1/2 border-4 border-transparent border-t-neutral-700"></div>
                         </div>
                       )}
