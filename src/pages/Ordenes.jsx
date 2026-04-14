@@ -63,7 +63,7 @@ export const Ordenes = () => {
   const filteredOrders = useMemo(() => {
     return orders.filter(order => {
       const matchesStatus = filterStatus === 'all' || order.status === filterStatus;
-      const matchesBand = filterBand === 'all' || order.bandId === Number(filterBand);
+      const matchesBand = filterBand === 'all' || order.bandId === filterBand;
       return matchesStatus && matchesBand;
     }).sort((a, b) => new Date(b.date) - new Date(a.date));
   }, [orders, filterStatus, filterBand]);
@@ -615,7 +615,7 @@ export const Ordenes = () => {
                 className="w-full"
                 value={formData.bandId || ''}
                 onChange={(e) => {
-                  const bandId = Number(e.target.value);
+                  const bandId = e.target.value || null;
                   const band = getBandById(bandId);
                   setFormData({
                     ...formData,
