@@ -23,14 +23,17 @@ export const Login = () => {
   const navigate = useNavigate();
 
   // Load saved credentials if "remember me" was checked
+  // SECURITY FIX: Only remember email, NEVER password
   useEffect(() => {
+    // Clear any leaked password from localStorage (legacy data)
+    localStorage.removeItem('rememberedPassword');
+
     const savedEmail = localStorage.getItem('rememberedEmail');
-    const savedPassword = localStorage.getItem('rememberedPassword');
     const savedRemember = localStorage.getItem('rememberMe') === 'true';
 
     if (savedRemember && savedEmail) {
       setEmail(savedEmail);
-      setPassword(savedPassword || '');
+      // Password should NEVER be stored - user must re-enter it
       setRememberMe(true);
     }
   }, []);
@@ -46,14 +49,14 @@ export const Login = () => {
     }
 
     // Save credentials if "remember me" is checked
+    // SECURITY FIX: Only remember email, NEVER password
     if (rememberMe) {
       localStorage.setItem('rememberedEmail', email);
-      localStorage.setItem('rememberedPassword', password);
+      // NEVER store password - security risk
       localStorage.setItem('rememberMe', 'true');
     } else {
       // Clear saved credentials if not checked
       localStorage.removeItem('rememberedEmail');
-      localStorage.removeItem('rememberedPassword');
       localStorage.setItem('rememberMe', 'false');
     }
 
@@ -137,7 +140,7 @@ export const Login = () => {
                     <div className={`w-5 h-5 bg-black rounded-full shadow-md transform transition-transform mt-0.5 ${rememberMe ? 'translate-x-5 ml-0.5' : 'translate-x-0.5'}`} />
                   </div>
                 </div>
-                <span className="text-sm text-gray-400">Recordar mis credenciales</span>
+                <span className="text-sm text-gray-400">Recordar mi email</span>
               </label>
             </div>
 
