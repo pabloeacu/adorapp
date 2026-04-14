@@ -54,6 +54,10 @@ export const Header = () => {
   const [readNotificationIds, setReadNotificationIds] = useState(() => {
     return JSON.parse(localStorage.getItem('readNotificationIds') || '[]');
   });
+
+  // Custom success/error modals - replaces browser alerts
+  const [successModal, setSuccessModal] = useState({ isOpen: false, title: '', message: '' });
+  const [errorModal, setErrorModal] = useState({ isOpen: false, title: '', message: '' });
   const canvasRef = useRef(null);
   const fileInputRef = useRef(null);
   const title = pageTitles[location.pathname] || 'AdorAPP';
@@ -347,7 +351,11 @@ export const Header = () => {
 
   const handleSaveExtendedProfile = async () => {
     if (!editName.trim()) {
-      alert('El nombre es obligatorio');
+      setErrorModal({
+        isOpen: true,
+        title: 'Campo requerido',
+        message: 'El nombre es obligatorio para guardar los cambios.'
+      });
       return;
     }
 
@@ -367,7 +375,11 @@ export const Header = () => {
 
       if (error) {
         console.error('Error updating profile:', error);
-        alert('Error al actualizar el perfil');
+        setErrorModal({
+          isOpen: true,
+          title: 'Error al guardar',
+          message: 'No se pudieron guardar los cambios. Por favor, intentá de nuevo.'
+        });
         return;
       }
 
@@ -375,42 +387,66 @@ export const Header = () => {
       await authRefreshProfile();
 
       // IMMEDIATE SYNC: Update appStore.members so Miembros page sees changes instantly
-      // This ensures the section reflects changes without page refresh
-      useAppStore.setState(state => ({
-        members: state.members.map(m =>
-          m.userId === user?.id ? {
-            ...m,
-            name: updateData.name,
-            phone: updateData.phone,
-            pastor_area: updateData.pastor_area,
-            leader_of: updateData.leader_of,
-            birthdate: updateData.birthdate,
-          } : m
-        )
-      }));
+      // Use currentUserMember.id to ensure we update the correct record
+      const memberIdToUpdate = currentUserMember?.id;
+
+      if (memberIdToUpdate) {
+        useAppStore.setState(state => ({
+          members: state.members.map(m =>
+            m.id === memberIdToUpdate ? {
+              ...m,
+              name: updateData.name,
+              phone: updateData.phone,
+              pastor_area: updateData.pastor_area,
+              leader_of: updateData.leader_of,
+              birthdate: updateData.birthdate,
+            } : m
+          )
+        }));
+      }
 
       setIsEditing(false);
 
-      // Show success feedback
-      alert('¡Cambios guardados correctamente!');
+      // Show custom success modal
+      setSuccessModal({
+        isOpen: true,
+        title: '¡Cambios guardados!',
+        message: 'Tu perfil se ha actualizado correctamente.'
+      });
     } catch (err) {
       console.error('Error saving profile:', err);
-      alert('Error al guardar los cambios');
+      setErrorModal({
+        isOpen: true,
+        title: 'Error',
+        message: 'Ocurrió un error al guardar los cambios. Por favor, intentá de nuevo.'
+      });
     }
   };
 
   // Change own password
   const handleChangePassword = async () => {
     if (!newPassword.trim()) {
-      alert('Ingresá la nueva contraseña');
+      setErrorModal({
+        isOpen: true,
+        title: 'Campo requerido',
+        message: 'Por favor, ingresá la nueva contraseña.'
+      });
       return;
     }
     if (newPassword.length < 6) {
-      alert('La contraseña debe tener al menos 6 caracteres');
+      setErrorModal({
+        isOpen: true,
+        title: 'Contraseña muy corta',
+        message: 'La contraseña debe tener al menos 6 caracteres.'
+      });
       return;
     }
     if (newPassword !== confirmPassword) {
-      alert('Las contraseñas no coinciden');
+      setErrorModal({
+        isOpen: true,
+        title: 'Contraseñas no coinciden',
+        message: 'Las contraseñas ingresadas no son iguales. Por favor, verificá.'
+      });
       return;
     }
     setPasswordSaving(true);
@@ -420,10 +456,18 @@ export const Header = () => {
       setShowPasswordChange(false);
       setNewPassword('');
       setConfirmPassword('');
-      alert('¡Contraseña actualizada correctamente!');
+      setSuccessModal({
+        isOpen: true,
+        title: '¡Contraseña actualizada!',
+        message: 'Tu contraseña se ha cambiado correctamente.'
+      });
     } catch (err) {
       console.error('Error changing password:', err);
-      alert('Error al cambiar la contraseña: ' + (err.message || 'Intentá de nuevo'));
+      setErrorModal({
+        isOpen: true,
+        title: 'Error',
+        message: 'No se pudo cambiar la contraseña. Por favor, intentá de nuevo.'
+      });
     } finally {
       setPasswordSaving(false);
     }
@@ -453,18 +497,29 @@ export const Header = () => {
       await supabase.storage.from('avatars').remove([fileName]);
     }
 
-    // Update Supabase
-    await supabase
-      .from('members')
-      .update({ avatar_url: null })
-      .eq('user_id', user?.id);
+    // Use currentUserMember.id to ensure we update the correct record
+    const memberIdToUpdate = currentUserMember?.id;
 
-    // IMMEDIATE SYNC: Update appStore.members so Miembros section reflects the change
-    useAppStore.setState(state => ({
-      members: state.members.map(m =>
-        m.userId === user?.id ? { ...m, avatar_url: null, avatarUrl: null } : m
-      )
-    }));
+    if (memberIdToUpdate) {
+      // Update Supabase
+      await supabase
+        .from('members')
+        .update({ avatar_url: null })
+        .eq('id', memberIdToUpdate);
+
+      // IMMEDIATE SYNC: Update appStore.members so Miembros section reflects the change
+      useAppStore.setState(state => ({
+        members: state.members.map(m =>
+          m.id === memberIdToUpdate ? { ...m, avatar_url: null, avatarUrl: null } : m
+        )
+      }));
+    }
+
+    setSuccessModal({
+      isOpen: true,
+      title: 'Foto eliminada',
+      message: 'La foto de perfil ha sido eliminada correctamente.'
+    });
   };
 
   const handleFileSelect = async (e) => {
@@ -472,12 +527,20 @@ export const Header = () => {
     if (!file) return;
 
     if (!file.type.startsWith('image/')) {
-      alert('Por favor selecciona una imagen válida.');
+      setErrorModal({
+        isOpen: true,
+        title: 'Archivo inválido',
+        message: 'Por favor, seleccioná una imagen válida (JPEG, PNG, etc.).'
+      });
       return;
     }
 
     if (file.size > 5 * 1024 * 1024) {
-      alert('La imagen es muy grande. Máximo 5MB.');
+      setErrorModal({
+        isOpen: true,
+        title: 'Imagen muy grande',
+        message: 'La imagen debe ser menor a 5MB. Por favor,选择了 una imagen más pequeña.'
+      });
       return;
     }
 
@@ -490,7 +553,11 @@ export const Header = () => {
       setPosition({ x: 0, y: 0 });
     } catch (err) {
       console.error('Error selecting file:', err);
-      alert('Error al seleccionar la imagen.');
+      setErrorModal({
+        isOpen: true,
+        title: 'Error',
+        message: 'No se pudo procesar la imagen. Por favor, intentá de nuevo.'
+      });
     }
   };
 
@@ -530,7 +597,11 @@ export const Header = () => {
   // Process and save photo with crop/zoom/rotation applied - FIXED VERSION
   const handleSavePhoto = async () => {
     if (!previewUrl) {
-      alert('No hay imagen para guardar');
+      setErrorModal({
+        isOpen: true,
+        title: 'Sin imagen',
+        message: 'No hay imagen para guardar. Por favor, seleccioná una foto primero.'
+      });
       return;
     }
 
@@ -619,11 +690,28 @@ export const Header = () => {
         localStorage.setItem('userPhoto', dataUrl);
         setUserPhoto(dataUrl);
 
-        // Try to update member table anyway
-        await supabase
-          .from('members')
-          .update({ avatar_url: dataUrl })
-          .eq('user_id', user?.id);
+        // Try to update member table anyway using currentUserMember.id
+        const memberIdToUpdate = currentUserMember?.id;
+        if (memberIdToUpdate) {
+          await supabase
+            .from('members')
+            .update({ avatar_url: dataUrl })
+            .eq('id', memberIdToUpdate);
+
+          // Sync appStore.members
+          useAppStore.setState(state => ({
+            members: state.members.map(m =>
+              m.id === memberIdToUpdate ? { ...m, avatar_url: dataUrl, avatarUrl: dataUrl } : m
+            )
+          }));
+
+          // Show success modal
+          setSuccessModal({
+            isOpen: true,
+            title: '¡Foto actualizada!',
+            message: 'Tu foto de perfil se ha guardado correctamente.'
+          });
+        }
       } else {
         // Get public URL
         const { data: { publicUrl } } = supabase.storage
@@ -634,33 +722,46 @@ export const Header = () => {
         setUserPhoto(publicUrl);
 
         // Update both Supabase and appStore.members for real-time sync
-        await supabase
-          .from('members')
-          .update({ avatar_url: publicUrl })
-          .eq('user_id', user?.id);
+        // Use currentUserMember.id to ensure we update the correct record
+        const memberIdToUpdate = currentUserMember?.id;
 
-        // Sync appStore.members immediately so Miembros section shows new photo
-        // Update BOTH avatar_url and avatarUrl for compatibility
-        useAppStore.setState(state => ({
-          members: state.members.map(m =>
-            m.userId === user?.id ? { ...m, avatar_url: publicUrl, avatarUrl: publicUrl } : m
-          )
-        }));
+        if (memberIdToUpdate) {
+          await supabase
+            .from('members')
+            .update({ avatar_url: publicUrl })
+            .eq('id', memberIdToUpdate);
+
+          // Sync appStore.members immediately so Miembros section shows new photo
+          // Update BOTH avatar_url and avatarUrl for compatibility
+          useAppStore.setState(state => ({
+            members: state.members.map(m =>
+              m.id === memberIdToUpdate ? { ...m, avatar_url: publicUrl, avatarUrl: publicUrl } : m
+            )
+          }));
+        }
+
+        // Show success modal
+        setSuccessModal({
+          isOpen: true,
+          title: '¡Foto actualizada!',
+          message: 'Tu foto de perfil se ha guardado correctamente.'
+        });
       }
-
-      console.log('Photo saved successfully');
-
     } catch (err) {
-      console.error('Photo save error:', err);
-      alert('Error al guardar la foto. Intentá de nuevo.');
-    } finally {
-      setIsSaving(false);
-      setShowCropper(false);
-      setPreviewUrl(null);
-      if (fileInputRef.current) {
-        fileInputRef.current.value = '';
+        console.error('Photo save error:', err);
+        setErrorModal({
+          isOpen: true,
+          title: 'Error al guardar',
+          message: 'No se pudo guardar la foto. Por favor, intentá de nuevo.'
+        });
+      } finally {
+        setIsSaving(false);
+        setShowCropper(false);
+        setPreviewUrl(null);
+        if (fileInputRef.current) {
+          fileInputRef.current.value = '';
+        }
       }
-    }
   };
 
   return (
@@ -1307,6 +1408,53 @@ export const Header = () => {
               ))}
             </>
           )}
+        </div>
+      </Modal>
+
+      {/* Custom Success Modal */}
+      <Modal
+        isOpen={successModal.isOpen}
+        onClose={() => setSuccessModal({ isOpen: false, title: '', message: '' })}
+        title={successModal.title}
+        size="sm"
+        footer={
+          <Button
+            onClick={() => setSuccessModal({ isOpen: false, title: '', message: '' })}
+            className="w-full"
+          >
+            Aceptar
+          </Button>
+        }
+      >
+        <div className="text-center py-4">
+          <div className="w-16 h-16 bg-green-500/20 rounded-full flex items-center justify-center mx-auto mb-4">
+            <Check size={32} className="text-green-400" />
+          </div>
+          <p className="text-gray-300">{successModal.message}</p>
+        </div>
+      </Modal>
+
+      {/* Custom Error Modal */}
+      <Modal
+        isOpen={errorModal.isOpen}
+        onClose={() => setErrorModal({ isOpen: false, title: '', message: '' })}
+        title={errorModal.title}
+        size="sm"
+        footer={
+          <Button
+            onClick={() => setErrorModal({ isOpen: false, title: '', message: '' })}
+            variant="secondary"
+            className="w-full"
+          >
+            Aceptar
+          </Button>
+        }
+      >
+        <div className="text-center py-4">
+          <div className="w-16 h-16 bg-red-500/20 rounded-full flex items-center justify-center mx-auto mb-4">
+            <X size={32} className="text-red-400" />
+          </div>
+          <p className="text-gray-300">{errorModal.message}</p>
         </div>
       </Modal>
     </>
