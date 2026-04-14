@@ -1454,65 +1454,70 @@ export const Header = () => {
         size="md"
       >
         <div className="space-y-4">
-          {notifications.length === 0 ? (
-            <div className="text-center py-12">
-              <Bell size={48} className="mx-auto text-gray-600 mb-4" />
-              <p className="text-gray-400 font-medium">No hay notificaciones nuevas</p>
-              <p className="text-xs text-gray-500 mt-2">Las notificaciones aparecen cuando hay nuevas canciones, bandas o miembros</p>
-            </div>
-          ) : (
-            <>
-              <div className="flex items-center justify-between mb-2">
-                <span className="text-xs text-gray-400">{notifications.length} notificación(es)</span>
-                <button
-                  onClick={markAllAsRead}
-                  className="text-xs text-blue-400 hover:text-blue-300"
-                >
-                  Marcar todas como leídas
-                </button>
-              </div>
-              {notifications.map((notif) => (
-                <div
-                  key={notif.id}
-                  onClick={() => {
-                    markAsRead(notif.id);
-                    if (notif.type === 'request') {
-                      setShowNotifications(false);
-                      navigate('/solicitudes');
-                    }
-                  }}
-                  className={`p-4 bg-neutral-800/50 rounded-xl border transition-colors cursor-pointer ${
-                    readNotificationIds.includes(notif.id)
-                      ? 'border-neutral-800 opacity-60'
-                      : 'border-neutral-700 hover:border-blue-500/50'
-                  }`}
-                >
-                  <div className="flex items-start gap-3">
-                    <div className={`p-2 rounded-lg ${
-                      notif.type === 'song' ? 'bg-purple-500/20' :
-                      notif.type === 'band' ? 'bg-blue-500/20' :
-                      notif.type === 'devocional' ? 'bg-amber-500/20' :
-                      notif.type === 'request' ? 'bg-yellow-500/20' :
-                      'bg-green-500/20'
-                    }`}>
-                      {notif.icon === 'music' && <Music size={18} className="text-purple-400" />}
-                      {notif.icon === 'users' && <Users2 size={18} className="text-blue-400" />}
-                      {notif.icon === 'heart' && <Heart size={18} className="text-green-400" />}
-                      {notif.icon === 'cross' && <Cross size={18} className="text-amber-400" />}
-                      {notif.icon === 'file' && <FileText size={18} className="text-yellow-400" />}
-                    </div>
-                    <div className="flex-1">
-                      <p className="text-sm text-white leading-relaxed">{notif.message}</p>
-                      <p className="text-xs text-gray-500 mt-1">{notif.time}</p>
-                    </div>
-                    {!readNotificationIds.includes(notif.id) && (
-                      <span className="w-2 h-2 bg-blue-500 rounded-full flex-shrink-0 mt-2" />
-                    )}
-                  </div>
+          {/* Filter to show only unread notifications */}
+          {(() => {
+            const unreadNotifications = notifications.filter(
+              notif => !readNotificationIds.includes(notif.id)
+            );
+
+            if (unreadNotifications.length === 0) {
+              return (
+                <div className="text-center py-12">
+                  <Bell size={48} className="mx-auto text-gray-600 mb-4" />
+                  <p className="text-gray-400 font-medium">No hay notificaciones nuevas</p>
+                  <p className="text-xs text-gray-500 mt-2">Las notificaciones aparecen cuando hay nuevas canciones, bandas o miembros</p>
                 </div>
-              ))}
-            </>
-          )}
+              );
+            }
+
+            return (
+              <>
+                <div className="flex items-center justify-between mb-2">
+                  <span className="text-xs text-gray-400">{unreadNotifications.length} notificación(es) sin leer</span>
+                  <button
+                    onClick={markAllAsRead}
+                    className="text-xs text-blue-400 hover:text-blue-300"
+                  >
+                    Marcar todas como leídas
+                  </button>
+                </div>
+                {unreadNotifications.map((notif) => (
+                  <div
+                    key={notif.id}
+                    onClick={() => {
+                      markAsRead(notif.id);
+                      if (notif.type === 'request') {
+                        setShowNotifications(false);
+                        navigate('/solicitudes');
+                      }
+                    }}
+                    className="p-4 bg-neutral-800/50 rounded-xl border border-neutral-700 hover:border-blue-500/50 transition-colors cursor-pointer"
+                  >
+                    <div className="flex items-start gap-3">
+                      <div className={`p-2 rounded-lg ${
+                        notif.type === 'song' ? 'bg-purple-500/20' :
+                        notif.type === 'band' ? 'bg-blue-500/20' :
+                        notif.type === 'devocional' ? 'bg-amber-500/20' :
+                        notif.type === 'request' ? 'bg-yellow-500/20' :
+                        'bg-green-500/20'
+                      }`}>
+                        {notif.icon === 'music' && <Music size={18} className="text-purple-400" />}
+                        {notif.icon === 'users' && <Users2 size={18} className="text-blue-400" />}
+                        {notif.icon === 'heart' && <Heart size={18} className="text-green-400" />}
+                        {notif.icon === 'cross' && <Cross size={18} className="text-amber-400" />}
+                        {notif.icon === 'file' && <FileText size={18} className="text-yellow-400" />}
+                      </div>
+                      <div className="flex-1">
+                        <p className="text-sm text-white leading-relaxed">{notif.message}</p>
+                        <p className="text-xs text-gray-500 mt-1">{notif.time}</p>
+                      </div>
+                      <span className="w-2 h-2 bg-blue-500 rounded-full flex-shrink-0 mt-2" />
+                    </div>
+                  </div>
+                ))}
+              </>
+            );
+          })()}
         </div>
       </Modal>
 
