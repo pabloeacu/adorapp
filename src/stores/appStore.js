@@ -10,34 +10,95 @@ const semitoneSteps = {
 
 const notes = ['C', 'C#', 'D', 'D#', 'E', 'F', 'F#', 'G', 'G#', 'A', 'A#', 'B'];
 
-const transposeChord = (chord, semitones) => {
-  if (!chord || chord === '') return chord;
+// Map for flat notes to their sharp equivalents
+const flatToSharp = {
+  'Db': 'C#', 'Eb': 'D#', 'Gb': 'F#', 'Ab': 'G#', 'Bb': 'A#'
+};
 
-  let baseNote = chord;
-  let suffix = '';
-  let bassNote = null;
+// Get the semitone index for a note (handles both sharp and flat)
+const getSemitoneIndex = (note) => {
+  if (semitoneSteps[note] !== undefined) return semitoneSteps[note];
+  if (flatToSharp[note]) return semitoneSteps[flatToSharp[note]];
+  const idx = notes.indexOf(note);
+  return idx >= 0 ? idx : null;
+};
 
-  if (chord.includes('/')) {
-    const parts = chord.split('/');
-    baseNote = parts[0];
-    bassNote = parts[1];
+// Get note name from semitone index
+const getNoteFromIndex = (index) => notes[(index + 12) % 12];
+
+// Transpose a single chord token (handles slash chords, suffixes, accidentals)
+const transposeChordToken = (token, semitones) => {
+  if (!token || token.trim() === '') return token;
+
+  // Handle slash chords
+  let mainPart = token;
+  let bassPart = null;
+
+  if (token.includes('/')) {
+    const parts = token.split('/');
+    mainPart = parts[0];
+    bassPart = parts[1];
   }
 
-  const match = baseNote.match(/^([A-G][#b]?)(.*)$/);
-  if (!match) return chord;
+  // Parse main chord: root + accidental + suffix
+  // Pattern: [A-G] + optional [#b] + optional suffix
+  const match = mainPart.match(/^([A-G])([#b]?)(.*)$/);
+  if (!match) return token;
 
-  baseNote = match[1];
-  suffix = match[2];
+  const rootNote = match[1];
+  const accidental = match[2];
+  const suffix = match[3];
 
-  const baseIndex = semitoneSteps[baseNote] !== undefined ? semitoneSteps[baseNote] : notes.indexOf(baseNote);
-  if (baseIndex === undefined) return chord;
+  // Get root with accidental for lookup
+  const rootWithAcc = accidental ? `${rootNote}${accidental}` : rootNote;
 
-  const newIndex = (baseIndex + semitones + 12) % 12;
-  const newBaseNote = notes[newIndex];
+  // Get semitone index and transpose
+  const rootIndex = getSemitoneIndex(rootWithAcc);
+  if (rootIndex === null) return token;
 
-  let newBassNote = bassNote ? notes[(semitoneSteps[bassNote] !== undefined ? semitoneSteps[bassNote] : notes.indexOf(bassNote) + semitones + 12) % 12] : null;
+  const newRootIndex = (rootIndex + semitones + 12) % 12;
+  const newRoot = getNoteFromIndex(newRootIndex);
 
-  return bassNote ? `${newBaseNote}${suffix}/${newBassNote}` : `${newBaseNote}${suffix}`;
+  // Handle bass note if present
+  let newBassNote = null;
+  if (bassPart) {
+    const bassMatch = bassPart.match(/^([A-G])([#b]?)(.*)$/);
+    if (bassMatch) {
+      const bassRoot = bassMatch[1];
+      const bassAcc = bassMatch[2];
+      const bassRootWithAcc = bassAcc ? `${bassRoot}${bassAcc}` : bassRoot;
+      const bassIndex = getSemitoneIndex(bassRootWithAcc);
+      if (bassIndex !== null) {
+        const newBassIndex = (bassIndex + semitones + 12) % 12;
+        newBassNote = getNoteFromIndex(newBassIndex);
+      }
+    }
+  }
+
+  // Reconstruct chord
+  if (newBassNote) {
+    return `${newRoot}${suffix}/${newBassNote}`;
+  }
+  return `${newRoot}${suffix}`;
+};
+
+// Transpose a string of chords separated by spaces
+const transposeChordString = (chordString, semitones) => {
+  if (!chordString || chordString.trim() === '') return chordString;
+
+  // Split by spaces to get individual chords
+  const chords = chordString.trim().split(/\s+/);
+
+  // Transpose each chord token individually
+  const transposedChords = chords.map(chord => transposeChordToken(chord, semitones));
+
+  // Rejoin with spaces
+  return transposedChords.join(' ');
+};
+
+// Legacy function for single chord (now uses the token function)
+const transposeChord = (chord, semitones) => {
+  return transposeChordToken(chord, semitones);
 };
 
 export const transposeSongStructure = (structure, fromKey, toKey) => {
@@ -47,7 +108,7 @@ export const transposeSongStructure = (structure, fromKey, toKey) => {
 
   return structure.map(section => ({
     ...section,
-    chords: transposeChord(section.chords, semitones)
+    chords: transposeChordString(section.chords, semitones)
   }));
 };
 

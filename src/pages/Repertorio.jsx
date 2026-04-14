@@ -156,11 +156,42 @@ export const Repertorio = () => {
     setIsViewerOpen(true);
   };
 
+  // Helper to get default label for a section type
+  const getDefaultSectionLabel = (type, existingSections, currentIndex = -1) => {
+    const labels = {
+      'intro': 'Intro',
+      'verse': 'Verso',
+      'pre-chorus': 'Pre Coro',
+      'chorus': 'Coro',
+      'bridge': 'Puente',
+      'interlude': 'Interludio',
+      'coda': 'Coda',
+      'ending': 'Final'
+    };
+
+    const baseLabel = labels[type] || type;
+
+    // Count existing sections of this type (excluding current section being edited)
+    const count = existingSections.filter((s, i) =>
+      i !== currentIndex && s.type === type
+    ).length + 1;
+
+    // Only add number for repeatable sections
+    if (['verse', 'chorus', 'bridge'].includes(type)) {
+      return `${baseLabel} ${count}`;
+    }
+
+    return baseLabel;
+  };
+
   const addStructureSection = () => {
-    setFormData(prev => ({
-      ...prev,
-      structure: [...prev.structure, { type: 'verse', label: 'Verso 2', content: '', chords: '' }]
-    }));
+    setFormData(prev => {
+      const newLabel = getDefaultSectionLabel('verse', prev.structure);
+      return {
+        ...prev,
+        structure: [...prev.structure, { type: 'verse', label: newLabel, content: '', chords: '' }]
+      };
+    });
   };
 
   const removeStructureSection = (index) => {
@@ -171,12 +202,20 @@ export const Repertorio = () => {
   };
 
   const updateStructureSection = (index, field, value) => {
-    setFormData(prev => ({
-      ...prev,
-      structure: prev.structure.map((s, i) =>
-        i === index ? { ...s, [field]: value } : s
-      )
-    }));
+    setFormData(prev => {
+      const updatedSections = prev.structure.map((s, i) => {
+        if (i === index) {
+          const updated = { ...s, [field]: value };
+          // When type changes, also update label to match the new type
+          if (field === 'type') {
+            updated.label = getDefaultSectionLabel(value, prev.structure, index);
+          }
+          return updated;
+        }
+        return s;
+      });
+      return { ...prev, structure: updatedSections };
+    });
   };
 
   const generateSongPDF = (song, key) => {
@@ -584,7 +623,7 @@ export const Repertorio = () => {
               <label className="text-xs text-gray-400 font-medium uppercase tracking-wide">
                 Estructura de la Canción
               </label>
-              <Button variant="ghost" size="sm" icon={Plus} onClick={addStructureSection}>
+              <Button variant="ghost" size="sm" icon={Plus} onClick={addStructureSection} type="button">
                 Agregar Sección
               </Button>
             </div>
