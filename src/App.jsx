@@ -8,6 +8,7 @@ import { Repertorio } from './pages/Repertorio';
 import { Bandas } from './pages/Bandas';
 import { Miembros } from './pages/Miembros';
 import { Solicitudes } from './pages/Solicitudes';
+import { Comunicaciones } from './pages/Comunicaciones';
 import { useAuthStore } from './stores/authStore';
 import { useAppStore } from './stores/appStore';
 
@@ -88,6 +89,7 @@ function App() {
             <Route path="bandas" element={<Bandas />} />
             <Route path="miembros" element={<Miembros />} />
             <Route path="solicitudes" element={<Solicitudes />} />
+            <Route path="comunicaciones" element={<Comunicaciones />} />
           </Route>
         </Routes>
       </RouteSync>

@@ -2,7 +2,7 @@
 // Photo Cropper fix - Canvas API image processing
 import React, { useState, useRef, useEffect, useCallback, useMemo } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
-import { Bell, Search, ChevronRight, User, Mail, Shield, Camera, X, RotateCcw, ZoomIn, ZoomOut, Check, Move, LogOut, Trash2, Phone, Cross, Users2, Calendar, Loader2, Lock, Eye, EyeOff, RefreshCw, Music, Heart, FileText } from 'lucide-react';
+import { Bell, Search, ChevronRight, User, Mail, Shield, Camera, X, RotateCcw, ZoomIn, ZoomOut, Check, Move, LogOut, Trash2, Phone, Cross, Users2, Calendar, Loader2, Lock, Eye, EyeOff, RefreshCw, Music, Heart, FileText, Send } from 'lucide-react';
 import { useAuthStore } from '../../stores/authStore';
 import { useAppStore } from '../../stores/appStore';
 import { supabase } from '../../lib/supabase';
@@ -341,6 +341,35 @@ export const Header = () => {
           }
         }
 
+        // Load communication notifications for current user
+        if (user?.id) {
+          const { data: commNotifs } = await supabase
+            .from('communication_notifications')
+            .select('id, communication_id, sender_name, sender_photo, subject, preview, full_message, is_read, created_at')
+            .eq('recipient_id', user.id)
+            .eq('is_read', false)
+            .order('created_at', { ascending: false })
+            .limit(10);
+
+          if (commNotifs && commNotifs.length > 0) {
+            commNotifs.forEach(cn => {
+              notifs.push({
+                id: cn.id,
+                type: 'communication',
+                communicationId: cn.communication_id,
+                senderName: cn.sender_name,
+                senderPhoto: cn.sender_photo,
+                subject: cn.subject,
+                preview: cn.preview,
+                fullMessage: cn.full_message,
+                message: cn.subject, // Display subject as main message
+                icon: 'send',
+                time: new Date(cn.created_at).toLocaleTimeString('es-AR', { hour: '2-digit', minute: '2-digit' })
+              });
+            });
+          }
+        }
+
         setNotifications(notifs);
 
         // Calculate unread count
@@ -358,13 +387,24 @@ export const Header = () => {
   }, [readNotificationIds]);
 
   // Mark notification as read (user-specific)
-  const markAsRead = (notificationId) => {
+  const markAsRead = async (notificationId) => {
     if (!user?.id) return;
     const userKey = `readNotificationIds_${user.id}`;
     const newReadIds = [...readNotificationIds, notificationId];
     setReadNotificationIds(newReadIds);
     localStorage.setItem(userKey, JSON.stringify(newReadIds));
     setUnreadCount(Math.max(0, unreadCount - 1));
+
+    // Find if this is a communication notification
+    const notif = notifications.find(n => n.id === notificationId);
+    if (notif?.type === 'communication' && notif?.communicationId) {
+      // Mark as read in database
+      await supabase
+        .from('communication_notifications')
+        .update({ is_read: true })
+        .eq('id', notificationId)
+        .eq('recipient_id', user.id);
+    }
   };
 
   // Mark all as read (user-specific)
@@ -1516,6 +1556,7 @@ export const Header = () => {
                         notif.type === 'band' ? 'bg-blue-500/20' :
                         notif.type === 'devocional' ? 'bg-amber-500/20' :
                         notif.type === 'request' ? 'bg-yellow-500/20' :
+                        notif.type === 'communication' ? 'bg-blue-500/20' :
                         'bg-green-500/20'
                       }`}>
                         {notif.icon === 'music' && <Music size={18} className="text-purple-400" />}
@@ -1523,10 +1564,37 @@ export const Header = () => {
                         {notif.icon === 'heart' && <Heart size={18} className="text-green-400" />}
                         {notif.icon === 'cross' && <Cross size={18} className="text-amber-400" />}
                         {notif.icon === 'file' && <FileText size={18} className="text-yellow-400" />}
+                        {notif.icon === 'send' && <Send size={18} className="text-blue-400" />}
                       </div>
                       <div className="flex-1">
-                        <p className="text-sm text-white leading-relaxed">{notif.message}</p>
-                        <p className="text-xs text-gray-500 mt-1">{notif.time}</p>
+                        {notif.type === 'communication' ? (
+                          <>
+                            <div className="flex items-center gap-2 mb-1">
+                              {notif.senderPhoto ? (
+                                <img
+                                  src={notif.senderPhoto}
+                                  alt={notif.senderName}
+                                  className="w-5 h-5 rounded-full object-cover"
+                                />
+                              ) : (
+                                <div className="w-5 h-5 rounded-full bg-blue-500/30 flex items-center justify-center">
+                                  <User size={12} className="text-blue-400" />
+                                </div>
+                              )}
+                              <span className="text-xs text-blue-400 font-medium">{notif.senderName}</span>
+                            </div>
+                            <p className="text-sm text-white font-medium leading-relaxed">{notif.subject}</p>
+                            <p className="text-xs text-gray-400 mt-1 leading-relaxed">{notif.preview}</p>
+                            <div className="mt-2 pt-2 border-t border-neutral-700">
+                              <p className="text-sm text-gray-300 leading-relaxed">{notif.fullMessage}</p>
+                            </div>
+                          </>
+                        ) : (
+                          <>
+                            <p className="text-sm text-white leading-relaxed">{notif.message}</p>
+                            <p className="text-xs text-gray-500 mt-1">{notif.time}</p>
+                          </>
+                        )}
                       </div>
                       <span className="w-2 h-2 bg-blue-500 rounded-full flex-shrink-0 mt-2" />
                     </div>

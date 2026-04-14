@@ -7,7 +7,8 @@ import {
   Users,
   UserCircle,
   LogOut,
-  FileText
+  FileText,
+  Send
 } from 'lucide-react';
 import { useAuthStore } from '../../stores/authStore';
 
@@ -15,14 +16,17 @@ export const Sidebar = () => {
   const { logout, profile } = useAuthStore();
   const isPastor = profile?.role === 'pastor';
 
-  // Dynamic navigation items - Solicitudes only for pastors
+  // Dynamic navigation items - Solicitudes & Comunicaciones only for pastors
   const navItems = [
     { path: '/', icon: LayoutDashboard, label: 'Dashboard' },
     { path: '/ordenes', icon: CalendarDays, label: 'Órdenes' },
     { path: '/repertorio', icon: Music2, label: 'Repertorio' },
     { path: '/bandas', icon: Users, label: 'Bandas' },
     { path: '/miembros', icon: UserCircle, label: 'Miembros' },
-    ...(isPastor ? [{ path: '/solicitudes', icon: FileText, label: 'Solicitudes' }] : []),
+    ...(isPastor ? [
+      { path: '/solicitudes', icon: FileText, label: 'Solicitudes' },
+      { path: '/comunicaciones', icon: Send, label: 'Comunicaciones' }
+    ] : []),
   ];
 
   return (

@@ -20,7 +20,8 @@ import {
   ZoomIn,
   ZoomOut,
   Move,
-  FileText
+  FileText,
+  Send
 } from 'lucide-react';
 import { useAuthStore } from '../../stores/authStore';
 import { supabase } from '../../lib/supabase';
@@ -58,11 +59,12 @@ export const MobileNav = () => {
   const { profile, logout, refreshProfile } = useAuthStore();
   const isPastor = profile?.role === 'pastor';
 
-  // Add Solicitudes for pastors only
+  // Add Solicitudes & Comunicaciones for pastors only
   const allNavItems = useMemo(() => {
     const items = [...navItems];
     if (isPastor) {
       items.push({ path: '/solicitudes', icon: FileText, label: 'Solicitudes' });
+      items.push({ path: '/comunicaciones', icon: Send, label: 'Comunicaciones' });
     }
     return items;
   }, [isPastor]);
