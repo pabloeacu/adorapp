@@ -4,6 +4,7 @@ import { useAuthStore } from '../stores/authStore';
 import { useNavigate, Navigate } from 'react-router-dom';
 import { Modal } from '../components/ui/Modal';
 import { Button } from '../components/ui/Button';
+import { INSTRUMENTS, MEMBER_ROLES } from '../stores/appStore';
 
 export const Login = () => {
   const [email, setEmail] = useState('');
@@ -228,8 +229,6 @@ const RegisterModal = ({ isOpen, onClose, onSuccess }) => {
   const [error, setError] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
-
-  const { INSTRUMENTS, MEMBER_ROLES } = require('../stores/appStore');
 
   const handleChange = (e) => {
     const { name, value } = e.target;
