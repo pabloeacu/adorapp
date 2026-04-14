@@ -92,11 +92,15 @@ export const Comunicaciones = () => {
 
   // Toggle user selection
   const toggleUser = (userId) => {
-    setSelectedUsers(prev =>
-      prev.includes(userId)
+    console.log('toggleUser called with:', userId);
+    console.log('Current selectedUsers:', selectedUsers);
+    setSelectedUsers(prev => {
+      const newSelection = prev.includes(userId)
         ? prev.filter(id => id !== userId)
-        : [...prev, userId]
-    );
+        : [...prev, userId];
+      console.log('New selectedUsers:', newSelection);
+      return newSelection;
+    });
   };
 
   // Reset form
@@ -594,7 +598,7 @@ export const Comunicaciones = () => {
             </div>
             <h3 className="text-lg font-semibold text-white mb-2">¡Comunicación Enviada!</h3>
             <p className="text-gray-400 mb-6">
-              La comunicación ha sido enviada a {getRecipientIds().length} destinatario(s).
+              La comunicación ha sido enviada a {window.lastSentCount || 0} destinatario(s).
             </p>
             <Button onClick={() => setShowSuccess(false)} className="w-full">
               Aceptar
