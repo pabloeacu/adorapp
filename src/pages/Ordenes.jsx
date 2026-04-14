@@ -2,7 +2,8 @@ import React, { useState, useMemo, useEffect } from 'react';
 import {
   Plus, Calendar, Music, Download, Clock, ChevronRight, Copy,
   MessageSquare, Eye, Edit, Trash2, Filter, Search, Check, X,
-  User, Zap, AlertCircle, ChevronDown, FileDown, History, Award
+  User, Zap, AlertCircle, ChevronDown, FileDown, History, Award,
+  FileText, Printer
 } from 'lucide-react';
 import { useAppStore, MEETING_TYPES, MUSICAL_KEYS, transposeSongStructure } from '../stores/appStore';
 import { useAuthStore } from '../stores/authStore';
@@ -138,6 +139,7 @@ export const Ordenes = () => {
     updateOrder(orderId, { feedback });
   };
 
+  // Export order summary (without chords)
   const generateOrderPDF = (order) => {
     const band = getBandById(order.bandId);
     const printWindow = window.open('', '_blank');
@@ -148,29 +150,17 @@ export const Ordenes = () => {
       const originalKey = song?.originalKey || song?.key || songRef.key;
       const key = songRef.key || originalKey;
 
-      // Transpose if needed
-      let chords = '';
-      if (song?.structure && key !== originalKey) {
-        const transposed = transposeSongStructure(song.structure, originalKey, key);
-        chords = transposed.map(s => s.chords).filter(Boolean).join(' | ');
-      } else if (song?.structure) {
-        chords = song.structure.map(s => s.chords).filter(Boolean).join(' | ');
-      }
-
       return `
         <tr>
-          <td style="padding:12px;border-bottom:1px solid #333">${index + 1}</td>
+          <td style="padding:12px;border-bottom:1px solid #333;text-align:center">${index + 1}</td>
           <td style="padding:12px;border-bottom:1px solid #333">
             <strong>${song?.title || 'Sin título'}</strong>
             <div style="color:#888;font-size:12px">${song?.artist || ''}</div>
           </td>
-          <td style="padding:12px;border-bottom:1px solid #333">
-            <select style="background:#333;border:1px solid #555;color:#a855f7;padding:6px 12px;border-radius:6px">
-              <option value="${key}" selected>${key}</option>
-            </select>
+          <td style="padding:12px;border-bottom:1px solid #333;text-align:center">
+            <span style="background:#333;border:1px solid #555;color:#a855f7;padding:6px 12px;border-radius:6px;font-weight:bold">${key}</span>
           </td>
           <td style="padding:12px;border-bottom:1px solid #333">${director?.name || '-'}</td>
-          <td style="padding:12px;border-bottom:1px solid #333;font-family:monospace;color:#a855f7">${chords}</td>
         </tr>
       `;
     }).join('');
@@ -190,7 +180,7 @@ export const Ordenes = () => {
           .meta span { background: #333; padding: 6px 14px; border-radius: 20px; font-size: 13px; }
           table { width: 100%; border-collapse: collapse; margin-top: 25px; }
           th { background: #252525; padding: 12px; text-align: left; font-size: 12px; color: #888; text-transform: uppercase; }
-          td { vertical-align: top; }
+          td { vertical-align: middle; }
           .footer { text-align: center; margin-top: 40px; color: #555; font-size: 11px; }
           .feedback-box { margin-top: 20px; background: #252525; padding: 15px; border-radius: 10px; }
           .feedback-box h3 { color: #f59e0b; font-size: 14px; margin-bottom: 8px; }
@@ -211,11 +201,10 @@ export const Ordenes = () => {
         <table>
           <thead>
             <tr>
-              <th style="width:50px">#</th>
+              <th style="width:50px;text-align:center">#</th>
               <th>Canción</th>
-              <th style="width:80px">Tono</th>
-              <th style="width:120px">Director</th>
-              <th>Acordes</th>
+              <th style="width:100px;text-align:center">Tono</th>
+              <th style="width:150px">Director</th>
             </tr>
           </thead>
           <tbody>
@@ -237,6 +226,141 @@ export const Ordenes = () => {
       </html>
     `;
 
+    printWindow.document.write(html);
+    printWindow.document.close();
+    printWindow.print();
+  };
+
+  // Print all songs with full content (one song per page with page break)
+  const generateSongsPDF = (order) => {
+    const band = getBandById(order.bandId);
+
+    const songsHtml = order.songs.map((songRef, index) => {
+      const song = getSongById(songRef.songId);
+      const director = getMemberById(songRef.directorId);
+      const originalKey = song?.originalKey || song?.key || 'C';
+      const key = songRef.key || originalKey;
+
+      // Transpose structure if needed
+      let structure = song?.structure || [];
+      if (song?.structure && key !== originalKey) {
+        structure = transposeSongStructure(song.structure, originalKey, key);
+      }
+
+      // Build chords display
+      const chordsHtml = structure.map((section, sIdx) => `
+        <div style="margin-bottom:16px">
+          <div style="color:#a855f7;font-weight:bold;font-size:12px;text-transform:uppercase;margin-bottom:8px">${section.label || 'Sección'}</div>
+          <div style="font-family:monospace;font-size:14px;line-height:1.8;white-space:pre-wrap">${section.chords || ''}</div>
+        </div>
+      `).join('');
+
+      return `
+        <div class="song-page">
+          <div class="song-header">
+            <div class="song-number">#${index + 1}</div>
+            <div class="song-meta">
+              <div class="meta-item"><span class="meta-label">Orden:</span> ${formatDate(order.date)}</div>
+              <div class="meta-item"><span class="meta-label">Banda:</span> ${band?.name || 'N/A'}</div>
+              <div class="meta-item"><span class="meta-label">Director:</span> ${director?.name || '-'}</div>
+              <div class="meta-item"><span class="meta-label">Tonalidad:</span> <span class="key-badge">${key}</span></div>
+            </div>
+          </div>
+          <h1 class="song-title">${song?.title || 'Sin título'}</h1>
+          ${song?.artist ? `<p class="song-artist">${song.artist}</p>` : ''}
+          <div class="song-content">
+            ${chordsHtml || '<p style="color:#888">Sin acordes disponibles</p>'}
+          </div>
+        </div>
+      `;
+    }).join('');
+
+    const html = `
+      <!DOCTYPE html>
+      <html>
+      <head>
+        <title>Canciones - Orden ${formatDate(order.date)} - AdorAPP</title>
+        <style>
+          * { margin: 0; padding: 0; box-sizing: border-box; }
+          body { font-family: 'Segoe UI', Arial, sans-serif; background: #1a1a1a; color: #fff; }
+          .song-page {
+            min-height: 100vh;
+            padding: 40px;
+            page-break-after: always;
+            display: flex;
+            flex-direction: column;
+          }
+          .song-page:last-child { page-break-after: auto; }
+          .song-header {
+            display: flex;
+            align-items: flex-start;
+            justify-content: space-between;
+            margin-bottom: 20px;
+            padding-bottom: 15px;
+            border-bottom: 2px solid #333;
+          }
+          .song-number {
+            font-size: 48px;
+            font-weight: bold;
+            color: #a855f7;
+            line-height: 1;
+          }
+          .song-meta {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 12px;
+            justify-content: flex-end;
+          }
+          .meta-item {
+            background: #252525;
+            padding: 6px 12px;
+            border-radius: 6px;
+            font-size: 13px;
+          }
+          .meta-label {
+            color: #888;
+            margin-right: 6px;
+          }
+          .key-badge {
+            background: #a855f7;
+            color: white;
+            padding: 2px 8px;
+            border-radius: 4px;
+            font-weight: bold;
+          }
+          .song-title {
+            font-size: 32px;
+            margin-bottom: 8px;
+          }
+          .song-artist {
+            color: #888;
+            font-size: 16px;
+            margin-bottom: 30px;
+          }
+          .song-content {
+            flex: 1;
+            background: #1f1f1f;
+            padding: 25px;
+            border-radius: 12px;
+          }
+          @media print {
+            body { background: #fff; color: #000; }
+            .song-page { min-height: 100vh; page-break-after: always; }
+            .song-number { color: #7c3aed; }
+            .key-badge { background: #7c3aed; color: white; }
+            .meta-item { background: #f3f4f6; }
+            .song-content { background: #fafafa; }
+          }
+          @page { margin: 0; }
+        </style>
+      </head>
+      <body>
+        ${songsHtml}
+      </body>
+      </html>
+    `;
+
+    const printWindow = window.open('', '_blank');
     printWindow.document.write(html);
     printWindow.document.close();
     printWindow.print();
@@ -508,8 +632,23 @@ export const Ordenes = () => {
                   <Button variant="ghost" size="sm" icon={Eye} onClick={() => handleViewOrder(order)}>
                     Ver
                   </Button>
-                  <Button variant="ghost" size="sm" icon={FileDown} onClick={() => generateOrderPDF(order)}>
-                    PDF
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    icon={FileText}
+                    onClick={() => generateOrderPDF(order)}
+                    title="Exportar orden de servicio (resumen sin acordes)"
+                  >
+                    Exportar
+                  </Button>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    icon={Printer}
+                    onClick={() => generateSongsPDF(order)}
+                    title="Imprimir canciones con acordes (una canción por página)"
+                  >
+                    Imprimir
                   </Button>
                   {(isPastor || isLeader) && (
                     <Button variant="ghost" size="sm" icon={Copy} onClick={() => handleCloneOrder(order.id)}>
