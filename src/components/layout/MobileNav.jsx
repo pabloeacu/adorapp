@@ -238,6 +238,8 @@ export const MobileNav = () => {
       console.log('Current zoom:', zoom);
       console.log('Current rotation:', rotation);
       console.log('Current position:', position);
+      console.log('profile.user_id:', profile?.user_id);
+      console.log('profile.id:', profile?.id);
 
       // Load the image
       const img = new Image();
@@ -320,8 +322,14 @@ export const MobileNav = () => {
         throw new Error('Error al procesar la imagen');
       }
 
-      // Generate unique filename
-      const fileName = `avatars/${profile?.user_id}-${Date.now()}.png`;
+      console.log('=== UPLOAD INFO ===');
+      console.log('Blob size:', blob.size, 'bytes');
+      console.log('Blob type:', blob.type);
+
+      // Generate unique filename - use profile.id as backup if user_id is null
+      const userId = profile?.user_id || profile?.id || `temp-${Date.now()}`;
+      const fileName = `avatars/${userId}-${Date.now()}.png`;
+      console.log('Filename:', fileName);
 
       // Upload processed image to Supabase Storage
       const { data: uploadData, error: uploadError } = await supabase.storage
@@ -342,14 +350,31 @@ export const MobileNav = () => {
         .from('avatars')
         .getPublicUrl(fileName);
 
-      // Update in members table
+      // Update in members table - use profile.id as backup if user_id is null
+      const memberUserId = profile?.user_id || profile?.id;
+      if (!memberUserId) {
+        console.error('ERROR: No se pudo determinar el ID del miembro para actualizar');
+        alert('Error: No se encontró el ID del usuario. Intentá de nuevo.');
+        return;
+      }
+
+      console.log('Updating members table with user_id/id:', memberUserId);
+
       const { error: updateError } = await supabase
         .from('members')
         .update({ avatar_url: publicUrl })
-        .eq('user_id', profile?.user_id);
+        .eq('user_id', memberUserId);
 
       if (updateError) {
         console.error('Update error:', updateError);
+        // Try alternative with id field
+        const { error: altError } = await supabase
+          .from('members')
+          .update({ avatar_url: publicUrl })
+          .eq('id', profile?.id);
+        if (altError) {
+          console.error('Alternative update error:', altError);
+        }
       }
 
       // Refresh profile
@@ -761,7 +786,7 @@ export const MobileNav = () => {
         </div>
       )}
 
-      {/* Image Cropper Modal */}
+      {/* Image Cropper Modal - Full Image Preview */}
       {showCropper && (
         <div
           className="lg:hidden fixed inset-0 z-[70] bg-black/95 backdrop-blur-sm animate-fade-in flex flex-col"
@@ -794,16 +819,16 @@ export const MobileNav = () => {
           </div>
 
           <div className="flex-1 flex flex-col items-center justify-center p-4" onClick={(e) => e.stopPropagation()}>
-            {/* Image Preview - Full image with overlay circle */}
+            {/* Image Preview - Full image with circular guide overlay */}
             <div className="relative flex items-center justify-center" style={{ height: '300px', width: '100%', maxWidth: '400px' }}>
               {/* Dark Background */}
               <div
-                className="absolute inset-0 rounded-2xl bg-neutral-800"
+                className="absolute inset-0 rounded-2xl bg-neutral-900"
               />
 
-              {/* Full Image Container - shows complete image */}
+              {/* Full Image Container - shows complete image WITHOUT clipping */}
               <div
-                className="relative w-full h-full cursor-move overflow-hidden rounded-2xl"
+                className="relative w-full h-full cursor-move"
                 onMouseDown={handleMouseDown}
                 style={{ cursor: isDragging ? 'grabbing' : 'grab' }}
               >
@@ -811,20 +836,25 @@ export const MobileNav = () => {
                   <img
                     src={previewUrl}
                     alt="Preview"
-                    className="absolute w-full h-full object-contain"
+                    className="absolute"
                     style={{
-                      transform: `scale(${zoom}) rotate(${rotation}deg)`,
+                      maxHeight: '280px',
+                      maxWidth: '100%',
+                      objectFit: 'contain',
+                      transform: `scale(${zoom}) rotate(${rotation}deg) translate(${position.x / zoom}px, ${position.y / zoom}px)`,
                       transition: isDragging ? 'none' : 'transform 0.2s ease',
-                      left: `calc(50% + ${position.x}px)`,
-                      top: `calc(50% + ${position.y}px)`,
-                      transformOrigin: 'center center'
+                      left: '50%',
+                      top: '50%',
+                      transformOrigin: 'center center',
+                      marginLeft: '-50%',
+                      marginTop: '-50%'
                     }}
                     draggable={false}
                   />
                 )}
               </div>
 
-              {/* Circle Overlay - shows the final circular crop area */}
+              {/* Circle Guide Overlay - Semi-transparent, shows crop area */}
               <div
                 className="absolute pointer-events-none"
                 style={{
@@ -832,23 +862,26 @@ export const MobileNav = () => {
                   height: '200px',
                   borderRadius: '50%',
                   border: '3px solid rgba(255, 255, 255, 0.8)',
-                  boxShadow: '0 0 0 9999px rgba(0, 0, 0, 0.6)',
+                  boxShadow: '0 0 0 9999px rgba(0, 0, 0, 0.7)',
                   zIndex: 10
                 }}
               />
 
+              {/* Corner Handles on the guide */}
+              <div className="absolute pointer-events-none" style={{ width: '200px', height: '200px', zIndex: 11 }}>
+                <div className="absolute -top-[3px] -left-[3px] w-6 h-6 border-t-4 border-l-4 border-white rounded-tl-full" />
+                <div className="absolute -top-[3px] -right-[3px] w-6 h-6 border-t-4 border-r-4 border-white rounded-tr-full" />
+                <div className="absolute -bottom-[3px] -left-[3px] w-6 h-6 border-b-4 border-l-4 border-white rounded-bl-full" />
+                <div className="absolute -bottom-[3px] -right-[3px] w-6 h-6 border-b-4 border-r-4 border-white rounded-br-full" />
+              </div>
+
               {/* Drag Hint */}
               {isDragging && (
-                <div className="absolute bottom-4 left-1/2 -translate-x-1/2 bg-black/70 text-white text-xs px-3 py-1.5 rounded-full flex items-center gap-1.5">
+                <div className="absolute bottom-4 left-1/2 -translate-x-1/2 bg-black/70 text-white text-xs px-3 py-1.5 rounded-full flex items-center gap-1.5 z-20">
                   <Move size={12} />
                   Soltá para posicionar
                 </div>
               )}
-
-              {/* Help text */}
-              <div className="absolute bottom-2 left-1/2 -translate-x-1/2 text-neutral-400 text-xs text-center">
-                Arrastrá para posicionar. El círculo muestra el resultado final.
-              </div>
             </div>
 
             {/* Controls */}
@@ -918,7 +951,7 @@ export const MobileNav = () => {
             </div>
 
             <p className="text-neutral-500 text-xs text-center mt-4 px-4">
-              Arrastrá la imagen para posicionarla. Ajustá el zoom y rotación.
+              Arrastrá la imagen para posicionarla dentro del círculo. Ajustá el zoom y rotación.
             </p>
           </div>
         </div>

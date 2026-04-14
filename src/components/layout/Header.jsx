@@ -1127,7 +1127,7 @@ export const Header = () => {
         </div>
       </Modal>
 
-      {/* Image Cropper Modal - Fixed Version */}
+      {/* Image Cropper Modal - Full Image Preview Version */}
       <Modal
         isOpen={showCropper}
         onClose={() => {
@@ -1174,19 +1174,14 @@ export const Header = () => {
         }
       >
         <div className="space-y-4">
-          {/* Image Preview with Circular Mask */}
+          {/* Image Preview - Full Image with Circular Guide Overlay */}
           <div className="relative flex items-center justify-center" style={{ height: '280px' }}>
-            {/* Checkered Background */}
-            <div
-              className="absolute inset-0 overflow-hidden rounded-xl"
-              style={{
-                background: 'repeating-conic-gradient(#2a2a2a 0% 25%, #1a1a1a 0% 50%) 50% / 20px 20px'
-              }}
-            />
+            {/* Dark Background for visibility */}
+            <div className="absolute inset-0 bg-neutral-900 rounded-xl" />
 
-            {/* Circular Mask Container */}
+            {/* Draggable Image Container - NO clipping, shows full image */}
             <div
-              className="relative w-64 h-64 rounded-full overflow-hidden cursor-move"
+              className="relative cursor-move"
               onMouseDown={handleMouseDown}
               style={{ cursor: isDragging ? 'grabbing' : 'grab' }}
             >
@@ -1194,28 +1189,39 @@ export const Header = () => {
                 <img
                   src={previewUrl}
                   alt="Preview"
-                  className="w-full h-full object-cover"
+                  className="max-w-none"
                   style={{
                     transform: `scale(${zoom}) rotate(${rotation}deg) translate(${position.x / zoom}px, ${position.y / zoom}px)`,
-                    transition: isDragging ? 'none' : 'transform 0.2s ease'
+                    transition: isDragging ? 'none' : 'transform 0.2s ease',
+                    maxHeight: '260px',
+                    maxWidth: '100%',
+                    objectFit: 'contain'
                   }}
                   draggable={false}
                 />
               )}
+            </div>
 
-              {/* Circle Border Overlay */}
-              <div className="absolute inset-0 border-[3px] border-white/60 rounded-full pointer-events-none" />
+            {/* Circular Guide Overlay - Semi-transparent, non-clipped */}
+            <div
+              className="absolute inset-0 flex items-center justify-center pointer-events-none"
+            >
+              <div
+                className="w-64 h-64 rounded-full border-[3px] border-white/60 shadow-[0_0_0_9999px_rgba(0,0,0,0.5)]"
+              />
+            </div>
 
-              {/* Corner Handles */}
-              <div className="absolute top-0 left-0 w-6 h-6 border-t-4 border-l-4 border-white/60 rounded-tl-full pointer-events-none" />
-              <div className="absolute top-0 right-0 w-6 h-6 border-t-4 border-r-4 border-white/60 rounded-tr-full pointer-events-none" />
-              <div className="absolute bottom-0 left-0 w-6 h-6 border-b-4 border-l-4 border-white/60 rounded-bl-full pointer-events-none" />
-              <div className="absolute bottom-0 right-0 w-6 h-6 border-b-4 border-r-4 border-white/60 rounded-br-full pointer-events-none" />
+            {/* Corner Handles on the guide */}
+            <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-64 h-64 pointer-events-none">
+              <div className="absolute -top-[3px] -left-[3px] w-6 h-6 border-t-4 border-l-4 border-white rounded-tl-full" />
+              <div className="absolute -top-[3px] -right-[3px] w-6 h-6 border-t-4 border-r-4 border-white rounded-tr-full" />
+              <div className="absolute -bottom-[3px] -left-[3px] w-6 h-6 border-b-4 border-l-4 border-white rounded-bl-full" />
+              <div className="absolute -bottom-[3px] -right-[3px] w-6 h-6 border-b-4 border-r-4 border-white rounded-br-full" />
             </div>
 
             {/* Drag Hint */}
             {isDragging && (
-              <div className="absolute bottom-4 left-1/2 -translate-x-1/2 bg-black/70 text-white text-xs px-3 py-1.5 rounded-full flex items-center gap-1.5">
+              <div className="absolute bottom-4 left-1/2 -translate-x-1/2 bg-black/70 text-white text-xs px-3 py-1.5 rounded-full flex items-center gap-1.5 z-10">
                 <Move size={12} />
                 Soltá para posicionar
               </div>
@@ -1293,7 +1299,7 @@ export const Header = () => {
           </div>
 
           <p className="text-xs text-gray-500 text-center">
-            Arrastrá la imagen para posicionarla. Ajustá el zoom y rotación según sea necesario.
+            Arrastrá la imagen para posicionarla dentro del círculo. Ajustá el zoom y rotación según sea necesario.
           </p>
         </div>
       </Modal>
