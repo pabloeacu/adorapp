@@ -235,11 +235,11 @@ export const Header = () => {
         const today = now.toISOString().split('T')[0];
         const lastDevotionalDate = localStorage.getItem('lastDevocionalDate') || '';
         const hour = now.getHours();
-        const shouldShowAt6AM = hour >= 6 && hour < 8;
         const isNewDay = today !== lastDevotionalDate;
 
-        // Generate daily devotional (only one per day, shown at 6 AM)
-        if (shouldShowAt6AM || (isNewDay && hour >= 6)) {
+        // Generate daily devotional (one per day, from 6 AM onwards)
+        // Show devotional if: it's a new day AND after 6 AM, OR we already showed it today
+        if ((isNewDay && hour >= 6) || lastDevotionalDate === today) {
           const dayOfYear = Math.floor((now - new Date(now.getFullYear(), 0, 0)) / (1000 * 60 * 60 * 24));
           const verseIndex = dayOfYear % bibleVerses.length;
           const verse = bibleVerses[verseIndex];
@@ -1455,10 +1455,10 @@ export const Header = () => {
       >
         <div className="space-y-4">
           {notifications.length === 0 ? (
-            <div className="text-center py-8">
-              <Bell size={48} className="mx-auto text-gray-600 mb-3" />
-              <p className="text-gray-400">No hay notificaciones nuevas</p>
-              <p className="text-xs text-gray-500 mt-1">Las notificaciones aparecen cuando hay nuevas canciones, bandas o miembros</p>
+            <div className="text-center py-12">
+              <Bell size={48} className="mx-auto text-gray-600 mb-4" />
+              <p className="text-gray-400 font-medium">No hay notificaciones nuevas</p>
+              <p className="text-xs text-gray-500 mt-2">Las notificaciones aparecen cuando hay nuevas canciones, bandas o miembros</p>
             </div>
           ) : (
             <>
