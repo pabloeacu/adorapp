@@ -371,9 +371,11 @@ export const Header = () => {
         return;
       }
 
+      // Refresh auth profile
       await authRefreshProfile();
 
-      // Sync appStore.members so Miembros page sees changes immediately
+      // IMMEDIATE SYNC: Update appStore.members so Miembros page sees changes instantly
+      // This ensures the section reflects changes without page refresh
       useAppStore.setState(state => ({
         members: state.members.map(m =>
           m.userId === user?.id ? {
@@ -388,6 +390,9 @@ export const Header = () => {
       }));
 
       setIsEditing(false);
+
+      // Show success feedback
+      alert('¡Cambios guardados correctamente!');
     } catch (err) {
       console.error('Error saving profile:', err);
       alert('Error al guardar los cambios');
@@ -437,14 +442,29 @@ export const Header = () => {
     fileInputRef.current?.click();
   };
 
-  const handleDeletePhoto = () => {
+  const handleDeletePhoto = async () => {
     localStorage.removeItem('userPhoto');
     setUserPhoto(null);
     setShowPhotoOptions(false);
+
+    // Delete from storage and database
     if (profile?.avatar_url) {
       const fileName = profile.avatar_url.split('/').pop();
-      supabase.storage.from('avatars').remove([fileName]);
+      await supabase.storage.from('avatars').remove([fileName]);
     }
+
+    // Update Supabase
+    await supabase
+      .from('members')
+      .update({ avatar_url: null })
+      .eq('user_id', user?.id);
+
+    // IMMEDIATE SYNC: Update appStore.members so Miembros section reflects the change
+    useAppStore.setState(state => ({
+      members: state.members.map(m =>
+        m.userId === user?.id ? { ...m, avatar_url: null, avatarUrl: null } : m
+      )
+    }));
   };
 
   const handleFileSelect = async (e) => {
@@ -620,9 +640,10 @@ export const Header = () => {
           .eq('user_id', user?.id);
 
         // Sync appStore.members immediately so Miembros section shows new photo
+        // Update BOTH avatar_url and avatarUrl for compatibility
         useAppStore.setState(state => ({
           members: state.members.map(m =>
-            m.userId === user?.id ? { ...m, avatar_url: publicUrl } : m
+            m.userId === user?.id ? { ...m, avatar_url: publicUrl, avatarUrl: publicUrl } : m
           )
         }));
       }
