@@ -163,6 +163,13 @@ export const MobileNav = () => {
     const file = e.target.files?.[0];
     if (!file) return;
 
+    // DEBUG: Log original file info
+    console.log('=== IMAGE DEBUG - ORIGINAL FILE ===');
+    console.log('File name:', file.name);
+    console.log('File size:', file.size, 'bytes');
+    console.log('File type:', file.type);
+    console.log('File dimensions will be checked after image load');
+
     // Validate file type
     if (!file.type.startsWith('image/')) {
       alert('Por favor selecciona una imagen válida.');
@@ -178,6 +185,24 @@ export const MobileNav = () => {
     try {
       // Show loading state in preview
       const url = URL.createObjectURL(file);
+      console.log('=== IMAGE DEBUG - PREVIEW URL CREATED ===');
+      console.log('Preview URL:', url);
+      console.log('This should be a blob URL pointing to the ORIGINAL file');
+
+      // Load image to verify dimensions
+      const img = new Image();
+      await new Promise((resolve, reject) => {
+        img.onload = () => {
+          console.log('=== IMAGE DEBUG - IMAGE LOADED IN BROWSER ===');
+          console.log('Natural width:', img.naturalWidth);
+          console.log('Natural height:', img.naturalHeight);
+          console.log('If this is MUCH smaller than original, something is wrong!');
+          resolve();
+        };
+        img.onerror = reject;
+        img.src = url;
+      });
+
       setPreviewUrl(url);
       setShowCropper(true);
       setShowPhotoModal(false);
@@ -206,62 +231,94 @@ export const MobileNav = () => {
         return;
       }
 
+      // DEBUG: Log file and image info before processing
+      console.log('=== SAVE PHOTO DEBUG ===');
+      console.log('Original file size:', file.size, 'bytes');
+      console.log('Preview URL:', previewUrl);
+      console.log('Current zoom:', zoom);
+      console.log('Current rotation:', rotation);
+      console.log('Current position:', position);
+
       // Load the image
       const img = new Image();
       img.crossOrigin = 'anonymous';
 
       await new Promise((resolve, reject) => {
-        img.onload = resolve;
+        img.onload = () => {
+          console.log('=== IMAGE DIMENSIONS ===');
+          console.log('Image natural width:', img.naturalWidth);
+          console.log('Image natural height:', img.naturalHeight);
+          console.log('If naturalWidth/naturalHeight is MUCH smaller than the container (300-400px), zoom won\'t work well!');
+          resolve();
+        };
         img.onerror = reject;
         img.src = previewUrl;
       });
 
-      // Create canvas for processing - 256x256 for good quality avatar
-      const canvasSize = 256;
+      // Create canvas for processing - 400x400 for high quality avatar
+      const canvasSize = 400;
       const canvas = document.createElement('canvas');
       canvas.width = canvasSize;
       canvas.height = canvasSize;
       const ctx = canvas.getContext('2d');
 
-      // Calculate scale to fill a 256x256 area (like object-cover)
-      const targetSize = 256;
-      const scale = Math.max(targetSize / img.width, targetSize / img.height) * zoom;
-
-      // Calculate scaled dimensions
-      const scaledWidth = img.width * scale;
-      const scaledHeight = img.height * scale;
-
-      // Calculate position offset to center and apply user drag
-      const offsetX = (targetSize - scaledWidth) / 2 + position.x;
-      const offsetY = (targetSize - scaledHeight) / 2 + position.y;
-
-      // Clear canvas
+      // Clear canvas with transparent background
       ctx.clearRect(0, 0, canvasSize, canvasSize);
+
+      // Calculate base scale to fill the canvas (like CSS object-cover)
+      // We want the image to fill the entire canvas before zoom
+      const baseScale = Math.max(canvasSize / img.width, canvasSize / img.height);
+
+      // Apply user zoom
+      const totalScale = baseScale * zoom;
+
+      // Calculate the scaled dimensions of the image
+      const scaledWidth = img.width * totalScale;
+      const scaledHeight = img.height * totalScale;
+
+      console.log('=== CANVAS CALCULATION ===');
+      console.log('Base scale:', baseScale);
+      console.log('Total scale (with zoom):', totalScale);
+      console.log('Scaled dimensions:', scaledWidth, 'x', scaledHeight);
+
+      // The image should be centered initially, then offset by user's drag
+      // When zoom=1, the image fills the canvas (object-cover behavior)
+      // The user drags to reposition the image within the visible area
+      const centerOffsetX = (img.width * baseScale - canvasSize) / 2;
+      const centerOffsetY = (img.height * baseScale - canvasSize) / 2;
+
+      // Apply user drag (position.x and position.y are in display coordinates)
+      // Scale the drag offset to match the canvas scale
+      const dragScale = baseScale;
+      const finalX = -centerOffsetX + position.x * dragScale;
+      const finalY = -centerOffsetY + position.y * dragScale;
+
+      // Save context for clipping
+      ctx.save();
 
       // Create circular clipping path
       ctx.beginPath();
       ctx.arc(canvasSize / 2, canvasSize / 2, canvasSize / 2, 0, Math.PI * 2);
-      ctx.closePath();
       ctx.clip();
 
-      // Save context before rotation
-      ctx.save();
-
-      // Translate to center, rotate, then draw
+      // Apply transformations: translate to center, rotate, translate back, then position
       ctx.translate(canvasSize / 2, canvasSize / 2);
       ctx.rotate((rotation * Math.PI) / 180);
       ctx.translate(-canvasSize / 2, -canvasSize / 2);
 
-      // Draw the image with calculated position
-      ctx.drawImage(img, offsetX, offsetY, scaledWidth, scaledHeight);
+      // Draw the image with the calculated position
+      ctx.drawImage(img, finalX, finalY, scaledWidth, scaledHeight);
 
-      // Restore context
       ctx.restore();
 
       // Convert canvas to blob
       const blob = await new Promise(resolve => {
-        canvas.toBlob(resolve, 'image/png', 0.9);
+        canvas.toBlob(resolve, 'image/png', 0.95);
       });
+
+      if (!blob) {
+        throw new Error('Error al procesar la imagen');
+      }
 
       // Generate unique filename
       const fileName = `avatars/${profile?.user_id}-${Date.now()}.png`;
