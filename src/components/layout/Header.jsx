@@ -687,8 +687,8 @@ export const Header = () => {
           <div
             className="flex items-center gap-3 pl-4 border-l border-neutral-800 cursor-pointer hover:bg-neutral-800/50 rounded-lg p-2 -m-2 transition-colors"
             onClick={() => {
-              // Open profile modal for editing own profile
-              handleEditProfile();
+              // Open profile modal in READ mode first
+              setIsEditing(false);
               setShowProfile(true);
             }}
             title="Mi Perfil"
@@ -754,29 +754,13 @@ export const Header = () => {
               <div className="flex-1">
                 <p className="text-xs text-gray-400">Nombre</p>
                 {isEditing ? (
-                  <div className="flex items-center gap-2">
-                    <input
-                      type="text"
-                      value={editName}
-                      onChange={(e) => setEditName(e.target.value)}
-                      className="flex-1 bg-neutral-700 border border-neutral-600 rounded-lg px-3 py-1.5 text-white focus:outline-none focus:border-blue-500"
-                      placeholder="Tu nombre"
-                    />
-                    <button
-                      onClick={handleSaveExtendedProfile}
-                      className="p-1.5 bg-green-600 rounded-lg hover:bg-green-500 transition-colors"
-                      title="Guardar"
-                    >
-                      <Check size={16} className="text-white" />
-                    </button>
-                    <button
-                      onClick={() => setIsEditing(false)}
-                      className="p-1.5 bg-neutral-600 rounded-lg hover:bg-neutral-500 transition-colors"
-                      title="Cancelar"
-                    >
-                      <X size={16} className="text-white" />
-                    </button>
-                  </div>
+                  <input
+                    type="text"
+                    value={editName}
+                    onChange={(e) => setEditName(e.target.value)}
+                    className="w-full bg-neutral-700 border border-neutral-600 rounded-lg px-3 py-1.5 text-white focus:outline-none focus:border-blue-500"
+                    placeholder="Tu nombre"
+                  />
                 ) : (
                   <p className="font-medium">{displayName}</p>
                 )}
@@ -885,22 +869,38 @@ export const Header = () => {
             </div>
           </div>
 
-          {/* Edit Button - ALL users can edit their profile */}
-          {!isEditing && (
-            <div className="flex flex-col gap-2">
-              <Button onClick={handleEditProfile} variant="secondary" className="w-full">
-                <User size={16} />
-                Editar Perfil
-              </Button>
-              <button
-                onClick={() => { setShowPasswordChange(true); setShowProfile(false); }}
-                className="w-full flex items-center justify-center gap-2 px-4 py-3 bg-neutral-800 hover:bg-neutral-700 rounded-xl text-gray-300 hover:text-white transition-colors text-sm font-medium"
-              >
-                <Lock size={16} />
-                Cambiar Contraseña
-              </button>
-            </div>
-          )}
+          {/* Edit / Save Buttons */}
+          <div className="flex flex-col gap-3 pt-2">
+            {!isEditing ? (
+              <>
+                <Button onClick={handleEditProfile} className="w-full" size="lg">
+                  <User size={18} />
+                  Editar Perfil
+                </Button>
+                <button
+                  onClick={() => { setShowPasswordChange(true); setShowProfile(false); }}
+                  className="w-full flex items-center justify-center gap-2 px-4 py-3 bg-neutral-800 hover:bg-neutral-700 rounded-xl text-gray-300 hover:text-white transition-colors text-sm font-medium"
+                >
+                  <Lock size={16} />
+                  Cambiar Contraseña
+                </button>
+              </>
+            ) : (
+              <>
+                <Button onClick={handleSaveExtendedProfile} className="w-full" size="lg">
+                  <Check size={18} />
+                  Guardar Cambios
+                </Button>
+                <button
+                  onClick={() => setIsEditing(false)}
+                  className="w-full flex items-center justify-center gap-2 px-4 py-3 bg-neutral-800 hover:bg-neutral-700 rounded-xl text-gray-400 hover:text-white transition-colors text-sm font-medium"
+                >
+                  <X size={16} />
+                  Cancelar
+                </button>
+              </>
+            )}
+          </div>
 
           {/* Logout Button */}
           <button
