@@ -2,11 +2,11 @@
 // Communications Page - Send messages to members
 import React, { useState, useEffect, useMemo } from 'react';
 import { Send, Users, X, Check, Loader2, AlertCircle } from 'lucide-react';
-import { useAuthStore } from '../../stores/authStore';
-import { useAppStore } from '../../stores/appStore';
-import { supabase } from '../../lib/supabase';
-import { Card } from '../../components/ui/Card';
-import { Button } from '../../components/ui/Button';
+import { useAuthStore } from '../stores/authStore';
+import { useAppStore } from '../stores/appStore';
+import { supabase } from '../lib/supabase';
+import { Card } from '../components/ui/Card';
+import { Button } from '../components/ui/Button';
 
 export const Comunicaciones = () => {
   const { user, profile } = useAuthStore();
