@@ -231,85 +231,67 @@ export const MobileNav = () => {
         return;
       }
 
-      // DEBUG: Log file and image info before processing
-      console.log('=== SAVE PHOTO DEBUG ===');
-      console.log('Original file size:', file.size, 'bytes');
-      console.log('Preview URL:', previewUrl);
-      console.log('Current zoom:', zoom);
-      console.log('Current rotation:', rotation);
-      console.log('Current position:', position);
-      console.log('profile.user_id:', profile?.user_id);
-      console.log('profile.id:', profile?.id);
+      console.log('=== SAVE PHOTO ===');
+      console.log('zoom:', zoom, 'rotation:', rotation, 'position:', position);
 
       // Load the image
       const img = new Image();
-      img.crossOrigin = 'anonymous';
 
       await new Promise((resolve, reject) => {
-        img.onload = () => {
-          console.log('=== IMAGE DIMENSIONS ===');
-          console.log('Image natural width:', img.naturalWidth);
-          console.log('Image natural height:', img.naturalHeight);
-          console.log('If naturalWidth/naturalHeight is MUCH smaller than the container (300-400px), zoom won\'t work well!');
-          resolve();
-        };
+        img.onload = resolve;
         img.onerror = reject;
         img.src = previewUrl;
       });
 
-      // Create canvas for processing - 400x400 for high quality avatar
+      // Create canvas - 400x400 for high quality avatar
       const canvasSize = 400;
       const canvas = document.createElement('canvas');
       canvas.width = canvasSize;
       canvas.height = canvasSize;
       const ctx = canvas.getContext('2d');
 
-      // Clear canvas with transparent background
-      ctx.clearRect(0, 0, canvasSize, canvasSize);
+      // Preview uses maxHeight: 280px, maxWidth: 100%, objectFit: contain
+      // Calculate display dimensions to match CSS behavior
+      const previewMaxHeight = 280;
+      const imgAspect = img.width / img.height;
 
-      // Calculate base scale to fill the canvas (like CSS object-cover)
-      // We want the image to fill the entire canvas before zoom
-      const baseScale = Math.max(canvasSize / img.width, canvasSize / img.height);
+      let displayW, displayH;
+      if (imgAspect > 1) {
+        // Wide image: height = previewMaxHeight, width proportionally
+        displayH = previewMaxHeight;
+        displayW = displayH * imgAspect;
+      } else {
+        // Tall/square: width = 400px max, height proportionally
+        displayW = 400;
+        displayH = displayW / imgAspect;
+        if (displayH > previewMaxHeight) {
+          displayH = previewMaxHeight;
+          displayW = displayH * imgAspect;
+        }
+      }
 
-      // Apply user zoom
-      const totalScale = baseScale * zoom;
+      // Scale from display to canvas
+      const scaleToCanvas = canvasSize / previewMaxHeight;
 
-      // Calculate the scaled dimensions of the image
-      const scaledWidth = img.width * totalScale;
-      const scaledHeight = img.height * totalScale;
-
-      console.log('=== CANVAS CALCULATION ===');
-      console.log('Base scale:', baseScale);
-      console.log('Total scale (with zoom):', totalScale);
-      console.log('Scaled dimensions:', scaledWidth, 'x', scaledHeight);
-
-      // The image should be centered initially, then offset by user's drag
-      // When zoom=1, the image fills the canvas (object-cover behavior)
-      // The user drags to reposition the image within the visible area
-      const centerOffsetX = (img.width * baseScale - canvasSize) / 2;
-      const centerOffsetY = (img.height * baseScale - canvasSize) / 2;
-
-      // Apply user drag (position.x and position.y are in display coordinates)
-      // Scale the drag offset to match the canvas scale
-      const dragScale = baseScale;
-      const finalX = -centerOffsetX + position.x * dragScale;
-      const finalY = -centerOffsetY + position.y * dragScale;
-
-      // Save context for clipping
+      // Clip to circle
       ctx.save();
-
-      // Create circular clipping path
       ctx.beginPath();
       ctx.arc(canvasSize / 2, canvasSize / 2, canvasSize / 2, 0, Math.PI * 2);
       ctx.clip();
 
-      // Apply transformations: translate to center, rotate, translate back, then position
+      // Apply same transform as CSS preview
       ctx.translate(canvasSize / 2, canvasSize / 2);
       ctx.rotate((rotation * Math.PI) / 180);
-      ctx.translate(-canvasSize / 2, -canvasSize / 2);
+      ctx.scale(zoom, zoom);
+      ctx.translate(
+        position.x * scaleToCanvas,
+        position.y * scaleToCanvas
+      );
 
-      // Draw the image with the calculated position
-      ctx.drawImage(img, finalX, finalY, scaledWidth, scaledHeight);
+      // Draw image centered
+      const canvasW = displayW * scaleToCanvas;
+      const canvasH = displayH * scaleToCanvas;
+      ctx.drawImage(img, -canvasW / 2, -canvasH / 2, canvasW, canvasH);
 
       ctx.restore();
 
