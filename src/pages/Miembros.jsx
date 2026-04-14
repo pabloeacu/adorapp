@@ -15,6 +15,20 @@ import { Modal } from '../components/ui/Modal';
 import { Input } from '../components/ui/Input';
 import { ConfirmModal, SuccessModal, ErrorModal } from '../components/ui/ConfirmModal';
 
+// Helper to format dates WITHOUT timezone shift (for birthdates and stored dates)
+const formatDateLocal = (dateStr) => {
+  if (!dateStr) return '';
+  const parts = dateStr.split('T')[0].split('-');
+  if (parts.length !== 3) return dateStr;
+  const [year, month, day] = parts;
+  const date = new Date(parseInt(year), parseInt(month) - 1, parseInt(day));
+  return date.toLocaleDateString('es-AR', {
+    year: 'numeric',
+    month: 'short',
+    day: 'numeric'
+  });
+};
+
 const roleConfig = {
   pastor: { label: 'Pastor', color: 'text-purple-400', bg: 'bg-purple-500/20' },
   leader: { label: 'Líder', color: 'text-blue-400', bg: 'bg-blue-500/20' },
@@ -561,7 +575,7 @@ export const Miembros = () => {
                 {member.birthdate && (
                   <div className="flex items-center gap-2 text-gray-400">
                     <Calendar size={14} />
-                    <span>{new Date(member.birthdate).toLocaleDateString('es-AR')}</span>
+                    <span>{formatDateLocal(member.birthdate)}</span>
                   </div>
                 )}
               </div>

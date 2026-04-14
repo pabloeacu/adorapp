@@ -10,6 +10,23 @@ import { Avatar } from '../ui/Avatar';
 import { Modal } from '../ui/Modal';
 import { Button } from '../ui/Button';
 
+// Helper to format dates WITHOUT timezone shift (for birthdates and stored dates)
+// When we store YYYY-MM-DD, we want to display it as-is, not shifted by timezone
+const formatDateLocal = (dateStr) => {
+  if (!dateStr) return '';
+  // Handle both YYYY-MM-DD and ISO formats
+  const parts = dateStr.split('T')[0].split('-');
+  if (parts.length !== 3) return dateStr;
+  const [year, month, day] = parts;
+  // Parse manually to avoid timezone shift
+  const date = new Date(parseInt(year), parseInt(month) - 1, parseInt(day));
+  return date.toLocaleDateString('es-AR', {
+    year: 'numeric',
+    month: 'long',
+    day: 'numeric'
+  });
+};
+
 const pageTitles = {
   '/': 'Dashboard',
   '/ordenes': 'Órdenes de Servicio',
@@ -991,7 +1008,7 @@ export const Header = () => {
                     className="w-full bg-neutral-700 border border-neutral-600 rounded-lg px-3 py-1.5 text-white focus:outline-none focus:border-blue-500"
                   />
                 ) : (
-                  <p className="font-medium">{(currentUserMember?.birthdate || profile?.birthdate) ? new Date(currentUserMember?.birthdate || profile?.birthdate).toLocaleDateString('es-AR') : 'No configurada'}</p>
+                  <p className="font-medium">{(currentUserMember?.birthdate || profile?.birthdate) ? formatDateLocal(currentUserMember?.birthdate || profile?.birthdate) : 'No configurada'}</p>
                 )}
               </div>
             </div>
