@@ -278,6 +278,15 @@ export const useAppStore = create((set, get) => ({
 
   updateMember: async (id, updates) => {
     try {
+      // CRITICAL: Preserve avatar_url if not provided in updates
+      // This prevents losing the avatar when only role/name/etc is changed
+      if (updates.avatar_url === undefined && updates.avatarUrl === undefined) {
+        const existingMember = get().members.find(m => m.id === id);
+        if (existingMember?.avatar_url || existingMember?.avatarUrl) {
+          updates.avatar_url = existingMember.avatar_url || existingMember.avatarUrl;
+        }
+      }
+
       const { data, error } = await supabase
         .from('members')
         .update(convertMemberToDB(updates))
@@ -287,9 +296,21 @@ export const useAppStore = create((set, get) => ({
 
       if (error) throw error;
 
+      // Get the updated member with any preserved fields
+      const updatedData = convertMemberFromDB(data);
+
       set((state) => ({
-        members: state.members.map(m => m.id === id ? convertMemberFromDB(data) : m),
+        members: state.members.map(m => m.id === id ? updatedData : m),
       }));
+
+      // Also update localStorage cache to persist changes
+      try {
+        const cachedMembers = JSON.parse(localStorage.getItem('appMembers') || '[]');
+        const updatedCache = cachedMembers.map(m => m.id === id ? updatedData : m);
+        localStorage.setItem('appMembers', JSON.stringify(updatedCache));
+      } catch (cacheErr) {
+        console.error('Cache update error:', cacheErr);
+      }
 
       return data;
     } catch (err) {

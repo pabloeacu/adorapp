@@ -124,7 +124,8 @@ export const Miembros = () => {
         role: member.role,
         instruments: member.instruments || [],
         active: member.active,
-        password: member.password || '' // Don't show existing password
+        avatar_url: member.avatar_url || member.avatarUrl || null, // PRESERVE avatar when editing
+        password: '' // Don't show existing password
       });
     } else {
       setEditingMember(null);
@@ -138,6 +139,7 @@ export const Miembros = () => {
         role: 'member',
         instruments: [],
         active: true,
+        avatar_url: null,
         password: ''
       });
     }
