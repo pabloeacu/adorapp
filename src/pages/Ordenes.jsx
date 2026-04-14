@@ -247,11 +247,13 @@ export const Ordenes = () => {
         structure = transposeSongStructure(song.structure, originalKey, key);
       }
 
-      // Build chords display
-      const chordsHtml = structure.map((section, sIdx) => `
-        <div style="margin-bottom:16px">
-          <div style="color:#a855f7;font-weight:bold;font-size:12px;text-transform:uppercase;margin-bottom:8px">${section.label || 'Sección'}</div>
-          <div style="font-family:monospace;font-size:14px;line-height:1.8;white-space:pre-wrap">${section.chords || ''}</div>
+      // Build sections with chords AND lyrics (like generateSongPDF in Repertorio)
+      const sectionsHtml = structure.map((section) => `
+        <div class="section">
+          <div class="section-label">${section.label || 'Sección'}</div>
+          ${section.chords ? `<div class="chords">${section.chords}</div>` : ''}
+          ${section.content ? `<div class="lyrics">${section.content}</div>` : ''}
+          ${!section.chords && !section.content ? `<div class="lyrics" style="color:#666;font-style:italic">Silencio musical</div>` : ''}
         </div>
       `).join('');
 
@@ -269,7 +271,7 @@ export const Ordenes = () => {
           <h1 class="song-title">${song?.title || 'Sin título'}</h1>
           ${song?.artist ? `<p class="song-artist">${song.artist}</p>` : ''}
           <div class="song-content">
-            ${chordsHtml || '<p style="color:#888">Sin acordes disponibles</p>'}
+            ${sectionsHtml || '<p style="color:#888">Sin contenido disponible</p>'}
           </div>
         </div>
       `;
@@ -343,6 +345,30 @@ export const Ordenes = () => {
             padding: 25px;
             border-radius: 12px;
           }
+          .section {
+            margin-bottom: 24px;
+            padding: 20px;
+            background: #252525;
+            border-radius: 12px;
+          }
+          .section-label {
+            color: #a855f7;
+            font-size: 14px;
+            font-weight: 600;
+            margin-bottom: 10px;
+          }
+          .chords {
+            color: #a855f7;
+            font-size: 22px;
+            font-family: monospace;
+            margin-bottom: 10px;
+          }
+          .lyrics {
+            color: #ccc;
+            font-size: 16px;
+            line-height: 1.8;
+            white-space: pre-wrap;
+          }
           @media print {
             body { background: #fff; color: #000; }
             .song-page { min-height: 100vh; page-break-after: always; }
@@ -350,6 +376,10 @@ export const Ordenes = () => {
             .key-badge { background: #7c3aed; color: white; }
             .meta-item { background: #f3f4f6; }
             .song-content { background: #fafafa; }
+            .section { background: #f5f5f5; }
+            .section-label { color: #7c3aed; }
+            .chords { color: #7c3aed; }
+            .lyrics { color: #333; }
           }
           @page { margin: 0; }
         </style>
