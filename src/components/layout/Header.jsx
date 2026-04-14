@@ -722,9 +722,12 @@ export const Header = () => {
         throw new Error('Error al procesar la imagen');
       }
 
-      // Upload to Supabase
+      // Upload to Supabase - use currentUserMember.id for reliable identification
       const fileExt = 'jpg';
-      const fileName = `avatars/${user?.id}-${Date.now()}.${fileExt}`;
+      // Use currentUserMember.id as primary ID, fallback to user?.id
+      const memberId = currentUserMember?.id || user?.id || 'unknown';
+      const fileName = `avatars/${memberId}-${Date.now()}.${fileExt}`;
+      console.log('Uploading photo with fileName:', fileName, 'memberId:', memberId);
 
       const { data: uploadData, error: uploadError } = await supabase.storage
         .from('avatars')
@@ -735,6 +738,19 @@ export const Header = () => {
 
       if (uploadError) {
         console.error('Upload error:', uploadError);
+        console.error('Error message:', uploadError.message);
+        console.error('Error status:', uploadError.status);
+
+        // Check if it's a 406 error (usually permissions issue)
+        if (uploadError.status === 406 || uploadError.message?.includes('406')) {
+          setErrorModal({
+            isOpen: true,
+            title: 'Error de permisos',
+            message: 'No se pudo subir la foto. Verificá que el bucket "avatars" tenga permisos de escritura pública.'
+          });
+          return;
+        }
+
         // Fallback: save as local data URL
         const dataUrl = canvas.toDataURL('image/jpeg', 0.9);
         localStorage.setItem('userPhoto', dataUrl);
