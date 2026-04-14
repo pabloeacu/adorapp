@@ -64,7 +64,8 @@ const convertMemberFromDB = (m) => ({
   instruments: m.instruments || [],
   active: m.active,
   userId: m.user_id,
-  avatarUrl: m.avatar_url,
+  avatar_url: m.avatar_url, // Keep BOTH for compatibility
+  avatarUrl: m.avatar_url,   // Both fields point to same value
   createdAt: m.created_at,
   updatedAt: m.updated_at,
 });
@@ -278,13 +279,16 @@ export const useAppStore = create((set, get) => ({
 
   updateMember: async (id, updates) => {
     try {
-      // CRITICAL: Preserve avatar_url if not provided in updates
+      // CRITICAL: Preserve avatar_url if not explicitly provided in updates
       // This prevents losing the avatar when only role/name/etc is changed
-      if (updates.avatar_url === undefined && updates.avatarUrl === undefined) {
-        const existingMember = get().members.find(m => m.id === id);
-        if (existingMember?.avatar_url || existingMember?.avatarUrl) {
-          updates.avatar_url = existingMember.avatar_url || existingMember.avatarUrl;
-        }
+      const existingMember = get().members.find(m => m.id === id);
+
+      // Only preserve if avatar is not being explicitly changed to a new value
+      if (!updates.avatar_url && !updates.avatarUrl && existingMember?.avatar_url) {
+        updates.avatar_url = existingMember.avatar_url;
+      }
+      if (!updates.avatarUrl && !updates.avatar_url && existingMember?.avatarUrl) {
+        updates.avatarUrl = existingMember.avatarUrl;
       }
 
       const { data, error } = await supabase

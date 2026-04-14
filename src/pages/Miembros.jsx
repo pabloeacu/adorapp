@@ -124,7 +124,9 @@ export const Miembros = () => {
         role: member.role,
         instruments: member.instruments || [],
         active: member.active,
-        avatar_url: member.avatar_url || member.avatarUrl || null, // PRESERVE avatar when editing
+        // NOTE: Do NOT include avatar_url here - let the store preserve it
+        // The store's updateMember function will preserve the existing avatar
+        // unless avatar_url is explicitly set to a new value
         password: '' // Don't show existing password
       });
     } else {
@@ -139,7 +141,6 @@ export const Miembros = () => {
         role: 'member',
         instruments: [],
         active: true,
-        avatar_url: null,
         password: ''
       });
     }
@@ -508,7 +509,7 @@ export const Miembros = () => {
             >
               <div className="flex items-start justify-between mb-4">
                 <div className="flex items-center gap-3">
-                  <Avatar name={member.name} size="lg" src={member.avatarUrl} />
+                  <Avatar name={member.name} size="lg" src={member.avatar_url || member.avatarUrl} />
                   <div>
                     <div className="flex items-center gap-2">
                       <h3 className="font-semibold">{member.name}</h3>
@@ -648,7 +649,7 @@ export const Miembros = () => {
                   >
                     <td className="px-4 py-3">
                       <div className="flex items-center gap-3">
-                        <Avatar name={member.name} size="sm" src={member.avatarUrl} />
+                        <Avatar name={member.name} size="sm" src={member.avatar_url || member.avatarUrl} />
                         <span className="font-medium">{member.name}</span>
                       </div>
                     </td>
