@@ -284,11 +284,10 @@ export const useAppStore = create((set, get) => ({
       const existingMember = get().members.find(m => m.id === id);
 
       // Only preserve if avatar is not being explicitly changed to a new value
+      // convertMemberToDB uses avatarUrl, so we must set that field
       if (!updates.avatar_url && !updates.avatarUrl && existingMember?.avatar_url) {
         updates.avatar_url = existingMember.avatar_url;
-      }
-      if (!updates.avatarUrl && !updates.avatar_url && existingMember?.avatarUrl) {
-        updates.avatarUrl = existingMember.avatarUrl;
+        updates.avatarUrl = existingMember.avatar_url; // <-- This is the fix!
       }
 
       const { data, error } = await supabase
