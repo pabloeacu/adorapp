@@ -31,27 +31,52 @@ export const Comunicaciones = () => {
   const [showBandSelector, setShowBandSelector] = useState(false);
   const [showUserSelector, setShowUserSelector] = useState(false);
 
-  // Active members only
+  // Debug: Log raw data to see structure
+  useEffect(() => {
+    console.log('=== DEBUG COMMUNICATIONS ===');
+    console.log('Total members:', members.length);
+    console.log('Total bands:', bands.length);
+    console.log('Sample member:', members[0]);
+    console.log('Sample band:', bands[0]);
+  }, [members, bands]);
+
+  // Active members with user accounts (can receive notifications)
   const activeMembers = useMemo(() => {
-    return members.filter(m => m.status === 'active');
+    const active = members.filter(m => m.active === true);
+    console.log('Active members (with active=true):', active.length);
+    return active;
   }, [members]);
+
+  // Members with user accounts (can receive notifications)
+  const membersWithAccounts = useMemo(() => {
+    const withAccounts = activeMembers.filter(m => m.userId);
+    console.log('Members with userId:', withAccounts.length);
+    return withAccounts;
+  }, [activeMembers]);
 
   // Active bands only
   const activeBands = useMemo(() => {
-    return bands.filter(b => b.status === 'active');
+    const active = bands.filter(b => b.active === true);
+    console.log('Active bands (with active=true):', active.length);
+    return active;
   }, [bands]);
 
-  // Get members by selected bands
+  // Get members by selected bands (from band's members array)
   const membersInSelectedBands = useMemo(() => {
     if (selectedBands.length === 0) return [];
 
-    const bandIds = new Set(selectedBands);
-    return activeMembers.filter(m => {
-      // Check if member is in any selected band
-      const memberBandIds = m.band_id ? [m.band_id] : (m.bandIds || []);
-      return memberBandIds.some(bid => bandIds.has(bid));
+    // Get all member IDs from selected bands
+    const bandMemberIds = new Set();
+    selectedBands.forEach(bandId => {
+      const band = bands.find(b => b.id === bandId);
+      if (band?.members) {
+        band.members.forEach(memberId => bandMemberIds.add(memberId));
+      }
     });
-  }, [activeMembers, selectedBands]);
+
+    // Filter active members that are in those bands AND have user accounts
+    return membersWithAccounts.filter(m => bandMemberIds.has(m.id));
+  }, [selectedBands, bands, membersWithAccounts]);
 
   // Toggle band selection
   const toggleBand = (bandId) => {
@@ -86,25 +111,25 @@ export const Comunicaciones = () => {
     const recipientIds = new Set();
 
     if (recipientType === 'all') {
-      // All active members
-      activeMembers.forEach(m => {
-        if (m.user_id) recipientIds.add(m.user_id);
+      // All active members with user accounts
+      membersWithAccounts.forEach(m => {
+        if (m.userId) recipientIds.add(m.userId);
       });
     } else if (recipientType === 'bands') {
       // Members from selected bands
       membersInSelectedBands.forEach(m => {
-        if (m.user_id) recipientIds.add(m.user_id);
+        if (m.userId) recipientIds.add(m.userId);
       });
     } else if (recipientType === 'users') {
-      // Selected users
+      // Selected users (these are userIds)
       selectedUsers.forEach(uid => recipientIds.add(uid));
     } else if (recipientType === 'roles') {
-      // Members with selected roles
+      // Members with selected roles and user accounts
       selectedRoles.forEach(role => {
-        activeMembers
+        membersWithAccounts
           .filter(m => m.role === role)
           .forEach(m => {
-            if (m.user_id) recipientIds.add(m.user_id);
+            if (m.userId) recipientIds.add(m.userId);
           });
       });
     }
@@ -133,7 +158,7 @@ export const Comunicaciones = () => {
 
     const recipientIds = getRecipientIds();
     if (recipientIds.length === 0) {
-      setErrorMessage('No hay destinatarios disponibles');
+      setErrorMessage('No hay destinatarios disponibles. Verificá que los miembros tengan cuentas de usuario.');
       setShowError(true);
       return;
     }
@@ -148,7 +173,7 @@ export const Comunicaciones = () => {
       const { data: commData, error: commError } = await supabase
         .from('communications')
         .insert({
-          sender_id: senderMember?.user_id || senderMember?.id,
+          sender_id: senderMember?.userId || senderMember?.id,
           sender_name: senderMember?.name || profile?.name || user?.name,
           sender_photo: senderMember?.avatar_url || senderMember?.photo_url,
           subject: subject.trim(),
@@ -307,7 +332,7 @@ export const Comunicaciones = () => {
                 <Users size={24} className={recipientType === 'all' ? 'text-blue-400' : 'text-gray-400'} />
                 <p className="font-medium text-white mt-2">Todos</p>
                 <p className="text-xs text-gray-400 mt-1">
-                  {activeMembers.length} miembro(s) activo(s)
+                  {membersWithAccounts.length} miembro(s) con cuenta
                 </p>
               </button>
             </div>
@@ -450,7 +475,7 @@ export const Comunicaciones = () => {
                     <div className="flex-1 text-left">
                       <p className="text-white font-medium">{band.name}</p>
                       <p className="text-xs text-gray-400">
-                        {activeMembers.filter(m => m.band_id === band.id).length} miembros
+                        {membersWithAccounts.filter(m => band.members?.includes(m.id)).length} miembros con cuenta
                       </p>
                     </div>
                   </button>
@@ -474,7 +499,7 @@ export const Comunicaciones = () => {
         </div>
       )}
 
-      {/* User Selector Modal */}
+      {/* User Selector Modal - Only shows members with user accounts */}
       {showUserSelector && (
         <div
           className="fixed inset-0 bg-black/80 backdrop-blur-sm z-50 flex items-center justify-center p-4"
@@ -495,26 +520,26 @@ export const Comunicaciones = () => {
             </div>
             <div className="p-4 overflow-y-auto max-h-[60vh]">
               <div className="space-y-2">
-                {activeMembers.map(member => (
+                {membersWithAccounts.map(member => (
                   <button
                     key={member.id}
                     onClick={() => {
-                      if (member.user_id || member.id) {
-                        toggleUser(member.user_id || member.id);
+                      if (member.userId) {
+                        toggleUser(member.userId);
                       }
                     }}
                     className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl transition-colors ${
-                      selectedUsers.includes(member.user_id || member.id)
+                      selectedUsers.includes(member.userId)
                         ? 'bg-blue-500/20 border-2 border-blue-500'
                         : 'bg-neutral-800 hover:bg-neutral-700 border-2 border-transparent'
                     }`}
                   >
                     <div className={`w-5 h-5 rounded border-2 flex items-center justify-center ${
-                      selectedUsers.includes(member.user_id || member.id)
+                      selectedUsers.includes(member.userId)
                         ? 'bg-blue-500 border-blue-500'
                         : 'border-neutral-600'
                     }`}>
-                      {selectedUsers.includes(member.user_id || member.id) && (
+                      {selectedUsers.includes(member.userId) && (
                         <Check size={14} className="text-white" />
                       )}
                     </div>
@@ -526,9 +551,9 @@ export const Comunicaciones = () => {
                     </div>
                   </button>
                 ))}
-                {activeMembers.length === 0 && (
+                {membersWithAccounts.length === 0 && (
                   <p className="text-center text-gray-500 py-8">
-                    No hay miembros activos
+                    No hay miembros con cuentas de usuario
                   </p>
                 )}
               </div>
