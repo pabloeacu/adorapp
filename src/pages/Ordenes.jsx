@@ -46,13 +46,9 @@ export const Ordenes = () => {
   const [keyHistoryLoading, setKeyHistoryLoading] = useState(false);
   const [keyHistoryTooltip, setKeyHistoryTooltip] = useState(null);
 
-  // Members who can be directors (only those with 'Voz' in instruments)
+  // Members who can be directors (only active members with "Voz" instrument)
   const singers = useMemo(() => {
-    return members.filter(m =>
-      m.active &&
-      m.instruments &&
-      m.instruments.includes('Voz')
-    );
+    return members.filter(m => m.active && m.instruments?.includes('Voz'));
   }, [members]);
 
   const [formData, setFormData] = useState({
@@ -265,18 +261,30 @@ export const Ordenes = () => {
   };
 
   // Handle director change - fetch key history and update
-  const handleDirectorChange = async (index, directorId) => {
-    const songRef = formData.songs[index];
-    const song = getSongById(songRef.songId);
+  const handleDirectorChange = (index, directorId, songId) => {
+    console.log('handleDirectorChange:', { index, directorId, songId });
 
-    // Try to fetch key history
-    const historyKey = directorId ? await fetchKeyHistory(directorId, songRef.songId) : null;
+    // Update directorId immediately
+    setFormData(prev => {
+      const newSongs = prev.songs.map((s, i) =>
+        i === index ? { ...s, directorId } : s
+      );
+      return { ...prev, songs: newSongs };
+    });
 
-    // Use history key if found, otherwise use original key
-    const newKey = historyKey || song?.key || song?.originalKey || 'C';
-
-    updateSongInOrder(index, 'directorId', directorId);
-    updateSongInOrder(index, 'key', newKey);
+    // Fetch key history asynchronously and update key
+    if (directorId && songId) {
+      fetchKeyHistory(directorId, songId).then(historyKey => {
+        const song = getSongById(songId);
+        const newKey = historyKey || song?.key || song?.originalKey || 'C';
+        setFormData(prev => ({
+          ...prev,
+          songs: prev.songs.map((s, i) =>
+            i === index ? { ...s, key: newKey } : s
+          )
+        }));
+      });
+    }
   };
 
   // Handle key change - save to history when a song is saved
@@ -664,7 +672,11 @@ export const Ordenes = () => {
                     <select
                       className="bg-neutral-900 border border-neutral-700 rounded-lg px-2 py-1.5 text-sm w-40 shrink-0"
                       value={songRef.directorId || ''}
-                      onChange={(e) => handleDirectorChange(index, Number(e.target.value) || null)}
+                      onChange={(e) => {
+                        const newDirectorId = e.target.value || null;
+                        console.log('Director selected:', { value: e.target.value, newDirectorId });
+                        handleDirectorChange(index, newDirectorId, songRef.songId);
+                      }}
                     >
                       <option value="">Director</option>
                       {singers.map(member => (
