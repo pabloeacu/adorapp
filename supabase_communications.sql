@@ -92,3 +92,71 @@ CREATE INDEX IF NOT EXISTS idx_communications_sender
 
 CREATE INDEX IF NOT EXISTS idx_communications_created
   ON communications(created_at DESC);
+
+-- =============================================
+-- STEP 0: Create auth users for existing members
+-- =============================================
+-- Run this ONLY for members who need auth accounts
+-- The following users need accounts:
+-- - Olga (olga@example.com)
+-- - Paul (paul@example.com)
+-- - Any other member with user_id NULL
+
+-- IMPORTANT: Replace 'TempPassword123!' with actual temporary passwords
+-- and communicate them securely to the users
+
+-- For Olga (adjust email as per your data):
+-- INSERT INTO auth.users (id, email, encrypted_password, email_confirmed_at, user_metadata)
+-- SELECT gen_random_uuid(), email,
+--        crypto.gen_salt('bf'), NOW(),
+--        jsonb_build_object('name', name)
+-- FROM members WHERE email = 'olga@example.com' AND user_id IS NULL;
+
+-- For Paul:
+-- INSERT INTO auth.users (id, email, encrypted_password, email_confirmed_at, user_metadata)
+-- SELECT gen_random_uuid(), email,
+--        crypto.gen_salt('bf'), NOW(),
+--        jsonb_build_object('name', name)
+-- FROM members WHERE email = 'paul@example.com' AND user_id IS NULL;
+
+-- =============================================
+-- MIGRATION: Link existing members to auth.users
+-- =============================================
+-- This migration fixes members who don't have user_id set
+-- It matches members to auth.users by email address
+-- Run this AFTER creating auth.users for existing members
+
+-- Step 1: Update members with matching email from auth.users
+UPDATE members
+SET user_id = au.id
+FROM auth.users au
+WHERE members.email = au.email
+  AND members.user_id IS NULL;
+
+-- Step 2: Verify the update (you can check rows affected)
+-- This is informational only
+DO $$
+DECLARE
+  linked_count INTEGER;
+  total_without_user_id INTEGER;
+BEGIN
+  SELECT COUNT(*) INTO total_without_user_id FROM members WHERE user_id IS NULL;
+  SELECT COUNT(*) INTO linked_count FROM members WHERE user_id IS NOT NULL;
+  RAISE NOTICE 'Members linked: % remaining without user_id: %', linked_count, total_without_user_id;
+END $$;
+
+-- =============================================
+-- VIEW: View for checking member-user relationships
+-- =============================================
+CREATE OR REPLACE VIEW member_user_relationships AS
+SELECT
+  m.id,
+  m.name,
+  m.email,
+  m.role,
+  m.active,
+  m.user_id,
+  CASE WHEN au.id IS NOT NULL THEN 'Linked' ELSE 'Not Linked' END as link_status,
+  au.email as auth_email
+FROM members m
+LEFT JOIN auth.users au ON m.user_id = au.id;

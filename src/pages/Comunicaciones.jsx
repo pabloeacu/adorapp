@@ -31,13 +31,16 @@ export const Comunicaciones = () => {
   const [showBandSelector, setShowBandSelector] = useState(false);
   const [showUserSelector, setShowUserSelector] = useState(false);
 
-  // Debug: Log raw data to see structure
+  // Debug: Log ALL member data to see if Olga is there
   useEffect(() => {
     console.log('=== DEBUG COMMUNICATIONS ===');
     console.log('Total members:', members.length);
     console.log('Total bands:', bands.length);
-    console.log('Sample member:', members[0]);
-    console.log('Sample band:', bands[0]);
+    console.log('--- ALL MEMBERS ---');
+    members.forEach((m, i) => {
+      console.log(`${i+1}. ${m.name} | email: ${m.email} | userId: ${m.userId} | active: ${m.active} | role: ${m.role}`);
+    });
+    console.log('--- END MEMBERS ---');
   }, [members, bands]);
 
   // Active members with user accounts (can receive notifications)
@@ -214,8 +217,14 @@ export const Comunicaciones = () => {
         }
       }
 
+      // Store recipient count before resetting
+      const sentCount = recipientIds.length;
+
       setShowSuccess(true);
       resetForm();
+
+      // Pass count to success modal via data attribute
+      window.lastSentCount = sentCount;
     } catch (err) {
       console.error('Error sending communication:', err);
       setErrorMessage('Error al enviar la comunicación. Por favor, intentá de nuevo.');
