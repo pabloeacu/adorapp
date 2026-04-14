@@ -665,35 +665,41 @@ export const Header = () => {
         img.src = previewUrl;
       });
 
-      // Output canvas size - 400x400 for high quality avatar
+      // Output canvas size
       const cropSize = 400;
       const canvas = document.createElement('canvas');
       canvas.width = cropSize;
       canvas.height = cropSize;
       const ctx = canvas.getContext('2d');
 
-      // Preview uses maxHeight: 260px, maxWidth: 100%, objectFit: contain
-      // Calculate display dimensions to match CSS behavior
+      // Preview uses maxHeight: 260px, maxWidth: 100%, objectFit: contain, in a 256x256 circle
+      // We need to calculate the image dimensions as the browser does for object-fit: contain
+      const previewCircleSize = 256; // w-64 h-64 in CSS
       const previewMaxHeight = 260;
-      const imgAspect = img.width / img.height;
 
-      let displayW, displayH;
-      if (imgAspect > 1) {
-        // Wide image: height = previewMaxHeight, width proportionally
-        displayH = previewMaxHeight;
-        displayW = displayH * imgAspect;
+      const imgAspect = img.width / img.height;
+      let imgDisplayW, imgDisplayH;
+
+      // object-fit: contain calculation
+      // Compare image aspect with container aspect (using preview dimensions)
+      const containerAspect = 1; // square container
+      if (imgAspect > containerAspect) {
+        // Wide image: width = previewCircleSize, height proportionally
+        imgDisplayW = previewCircleSize;
+        imgDisplayH = previewCircleSize / imgAspect;
       } else {
-        // Tall/square image: width = 100% of container (~400px max), height proportionally
-        displayW = 400; // container width
-        displayH = displayW / imgAspect;
-        if (displayH > previewMaxHeight) {
-          displayH = previewMaxHeight;
-          displayW = displayH * imgAspect;
-        }
+        // Tall/square image: height = previewMaxHeight, width proportionally
+        imgDisplayH = previewMaxHeight;
+        imgDisplayW = previewMaxHeight * imgAspect;
       }
 
-      // Scale from display (CSS pixels) to canvas (400px)
-      const scaleToCanvas = cropSize / 260; // 400/260 ≈ 1.538
+      // Scale from preview pixels to canvas pixels
+      // previewCircleSize (256) maps to cropSize (400)
+      const scaleToCanvas = cropSize / previewCircleSize;
+
+      // Draw image centered, scaled to canvas
+      const canvasImgW = imgDisplayW * scaleToCanvas;
+      const canvasImgH = imgDisplayH * scaleToCanvas;
 
       // CRITICAL: Clip to circle BEFORE drawing
       ctx.save();
@@ -704,23 +710,25 @@ export const Header = () => {
       // Move to canvas center
       ctx.translate(cropSize / 2, cropSize / 2);
 
-      // Apply same transform as CSS preview
+      // Apply same transforms as CSS preview (but in canvas coordinate space)
       // CSS: transform: scale(zoom) rotate(rotation) translate(position.x/zoom, position.y/zoom)
-      // Canvas applies transforms in reverse order, so: translate → rotate → scale
+      // Canvas transforms apply RIGHT-TO-LEFT, so we do: translate → rotate → scale (left-to-right visually)
+
+      // First apply rotation around center
       ctx.rotate((rotation * Math.PI) / 180);
+
+      // Then scale (zoom)
       ctx.scale(zoom, zoom);
 
-      // Position offset (already divided by zoom in CSS, so multiply back)
-      // But we need to scale from display coords to canvas coords
+      // Then translate by the drag position
+      // In CSS, position.x/y are in container coordinates, need to scale to canvas
       ctx.translate(
         position.x * scaleToCanvas,
         position.y * scaleToCanvas
       );
 
-      // Draw image centered - dimensions scaled to canvas
-      const canvasW = displayW * scaleToCanvas;
-      const canvasH = displayH * scaleToCanvas;
-      ctx.drawImage(img, -canvasW / 2, -canvasH / 2, canvasW, canvasH);
+      // Draw image centered at origin
+      ctx.drawImage(img, -canvasImgW / 2, -canvasImgH / 2, canvasImgW, canvasImgH);
 
       ctx.restore();
 
@@ -733,7 +741,14 @@ export const Header = () => {
         throw new Error('Error al procesar la imagen');
       }
 
-      console.log('Canvas processed: zoom=', zoom, 'rotation=', rotation, 'position=', position);
+      console.log('Canvas processed:', {
+        originalSize: `${img.width}x${img.height}`,
+        displaySize: `${imgDisplayW}x${imgDisplayH}`,
+        canvasSize: `${canvasImgW}x${canvasImgH}`,
+        zoom, rotation,
+        position,
+        scaleToCanvas
+      });
 
       // Upload to Supabase - use currentUserMember.id for reliable identification
       const fileExt = 'jpg';

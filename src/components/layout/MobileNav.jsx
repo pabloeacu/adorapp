@@ -250,28 +250,27 @@ export const MobileNav = () => {
       canvas.height = canvasSize;
       const ctx = canvas.getContext('2d');
 
-      // Preview uses maxHeight: 280px, maxWidth: 100%, objectFit: contain
-      // Calculate display dimensions to match CSS behavior
+      // Mobile preview uses maxHeight: 280px, circle is 200px
+      const previewCircleSize = 200;
       const previewMaxHeight = 280;
       const imgAspect = img.width / img.height;
 
-      let displayW, displayH;
-      if (imgAspect > 1) {
-        // Wide image: height = previewMaxHeight, width proportionally
-        displayH = previewMaxHeight;
-        displayW = displayH * imgAspect;
+      let imgDisplayW, imgDisplayH;
+      const containerAspect = 1; // square container
+      if (imgAspect > containerAspect) {
+        // Wide image: width = previewCircleSize, height proportionally
+        imgDisplayW = previewCircleSize;
+        imgDisplayH = previewCircleSize / imgAspect;
       } else {
-        // Tall/square: width = 400px max, height proportionally
-        displayW = 400;
-        displayH = displayW / imgAspect;
-        if (displayH > previewMaxHeight) {
-          displayH = previewMaxHeight;
-          displayW = displayH * imgAspect;
-        }
+        // Tall/square image: height = previewMaxHeight, width proportionally
+        imgDisplayH = previewMaxHeight;
+        imgDisplayW = previewMaxHeight * imgAspect;
       }
 
-      // Scale from display to canvas
-      const scaleToCanvas = canvasSize / previewMaxHeight;
+      // Scale from preview pixels to canvas pixels
+      const scaleToCanvas = canvasSize / previewCircleSize;
+      const canvasImgW = imgDisplayW * scaleToCanvas;
+      const canvasImgH = imgDisplayH * scaleToCanvas;
 
       // Clip to circle
       ctx.save();
@@ -279,8 +278,10 @@ export const MobileNav = () => {
       ctx.arc(canvasSize / 2, canvasSize / 2, canvasSize / 2, 0, Math.PI * 2);
       ctx.clip();
 
-      // Apply same transform as CSS preview
+      // Move to canvas center
       ctx.translate(canvasSize / 2, canvasSize / 2);
+
+      // Apply same transforms as CSS preview
       ctx.rotate((rotation * Math.PI) / 180);
       ctx.scale(zoom, zoom);
       ctx.translate(
@@ -289,9 +290,7 @@ export const MobileNav = () => {
       );
 
       // Draw image centered
-      const canvasW = displayW * scaleToCanvas;
-      const canvasH = displayH * scaleToCanvas;
-      ctx.drawImage(img, -canvasW / 2, -canvasH / 2, canvasW, canvasH);
+      ctx.drawImage(img, -canvasImgW / 2, -canvasImgH / 2, canvasImgW, canvasImgH);
 
       ctx.restore();
 
