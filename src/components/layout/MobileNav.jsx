@@ -19,10 +19,12 @@ import {
   RotateCcw,
   ZoomIn,
   ZoomOut,
-  Move
+  Move,
+  FileText
 } from 'lucide-react';
 import { useAuthStore } from '../../stores/authStore';
 import { supabase } from '../../lib/supabase';
+import { useMemo } from 'react';
 
 const navItems = [
   { path: '/', icon: LayoutDashboard, label: 'Inicio' },
@@ -54,6 +56,17 @@ export const MobileNav = () => {
 
   const location = useLocation();
   const { profile, logout, refreshProfile } = useAuthStore();
+  const isPastor = profile?.role === 'pastor';
+
+  // Add Solicitudes for pastors only
+  const allNavItems = useMemo(() => {
+    const items = [...navItems];
+    if (isPastor) {
+      items.push({ path: '/solicitudes', icon: FileText, label: 'Solicitudes' });
+    }
+    return items;
+  }, [isPastor]);
+
   const profileSheetRef = useRef(null);
   const fileInputRef = useRef(null);
   const imageContainerRef = useRef(null);
@@ -829,7 +842,7 @@ export const MobileNav = () => {
             </div>
 
             <nav className="flex-1 px-4 space-y-2">
-              {navItems.map(({ path, icon: Icon, label }) => {
+              {allNavItems.map(({ path, icon: Icon, label }) => {
                 const isActive = location.pathname === path;
                 return (
                   <NavLink
@@ -858,7 +871,7 @@ export const MobileNav = () => {
         style={{ paddingBottom: 'env(safe-area-inset-bottom)' }}
       >
         <div className="flex items-center justify-around h-16 px-2">
-          {navItems.map(({ path, icon: Icon, label }) => {
+          {allNavItems.map(({ path, icon: Icon, label }) => {
             const isActive = location.pathname === path;
             return (
               <NavLink

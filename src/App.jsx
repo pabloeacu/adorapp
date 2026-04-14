@@ -7,6 +7,7 @@ import { Ordenes } from './pages/Ordenes';
 import { Repertorio } from './pages/Repertorio';
 import { Bandas } from './pages/Bandas';
 import { Miembros } from './pages/Miembros';
+import { Solicitudes } from './pages/Solicitudes';
 import { useAuthStore } from './stores/authStore';
 import { useAppStore } from './stores/appStore';
 
@@ -86,6 +87,7 @@ function App() {
             <Route path="repertorio" element={<Repertorio />} />
             <Route path="bandas" element={<Bandas />} />
             <Route path="miembros" element={<Miembros />} />
+            <Route path="solicitudes" element={<Solicitudes />} />
           </Route>
         </Routes>
       </RouteSync>

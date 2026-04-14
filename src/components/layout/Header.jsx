@@ -2,7 +2,7 @@
 // Photo Cropper fix - Canvas API image processing
 import React, { useState, useRef, useEffect, useCallback, useMemo } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
-import { Bell, Search, ChevronRight, User, Mail, Shield, Camera, X, RotateCcw, ZoomIn, ZoomOut, Check, Move, LogOut, Trash2, Phone, Cross, Users2, Calendar, Loader2, Lock, Eye, EyeOff, RefreshCw, Music, Heart } from 'lucide-react';
+import { Bell, Search, ChevronRight, User, Mail, Shield, Camera, X, RotateCcw, ZoomIn, ZoomOut, Check, Move, LogOut, Trash2, Phone, Cross, Users2, Calendar, Loader2, Lock, Eye, EyeOff, RefreshCw, Music, Heart, FileText } from 'lucide-react';
 import { useAuthStore } from '../../stores/authStore';
 import { useAppStore } from '../../stores/appStore';
 import { supabase } from '../../lib/supabase';
@@ -307,6 +307,25 @@ export const Header = () => {
             icon: 'heart',
             time: new Date(newMembers[0].created_at).toLocaleTimeString('es-AR', { hour: '2-digit', minute: '2-digit' })
           });
+        }
+
+        // Check for pending registration requests (pastors only)
+        if (isPastor) {
+          const { data: pendingRequests } = await supabase
+            .from('pending_registrations')
+            .select('id, name, created_at')
+            .eq('status', 'pending')
+            .order('created_at', { ascending: false });
+
+          if (pendingRequests && pendingRequests.length > 0) {
+            notifs.push({
+              id: 'pending-request-' + pendingRequests[0].id,
+              type: 'request',
+              message: `${pendingRequests.length} nueva${pendingRequests.length > 1 ? 's' : ''} solicitud${pendingRequests.length > 1 ? 'es' : ''} de registro pendiente${pendingRequests.length > 1 ? 's' : ''}.`,
+              icon: 'file',
+              time: new Date(pendingRequests[0].created_at).toLocaleTimeString('es-AR', { hour: '2-digit', minute: '2-digit' })
+            });
+          }
         }
 
         setNotifications(notifs);
@@ -1422,7 +1441,13 @@ export const Header = () => {
               {notifications.map((notif) => (
                 <div
                   key={notif.id}
-                  onClick={() => markAsRead(notif.id)}
+                  onClick={() => {
+                    markAsRead(notif.id);
+                    if (notif.type === 'request') {
+                      setShowNotifications(false);
+                      navigate('/solicitudes');
+                    }
+                  }}
                   className={`p-4 bg-neutral-800/50 rounded-xl border transition-colors cursor-pointer ${
                     readNotificationIds.includes(notif.id)
                       ? 'border-neutral-800 opacity-60'
@@ -1434,12 +1459,14 @@ export const Header = () => {
                       notif.type === 'song' ? 'bg-purple-500/20' :
                       notif.type === 'band' ? 'bg-blue-500/20' :
                       notif.type === 'devocional' ? 'bg-amber-500/20' :
+                      notif.type === 'request' ? 'bg-yellow-500/20' :
                       'bg-green-500/20'
                     }`}>
                       {notif.icon === 'music' && <Music size={18} className="text-purple-400" />}
                       {notif.icon === 'users' && <Users2 size={18} className="text-blue-400" />}
                       {notif.icon === 'heart' && <Heart size={18} className="text-green-400" />}
                       {notif.icon === 'cross' && <Cross size={18} className="text-amber-400" />}
+                      {notif.icon === 'file' && <FileText size={18} className="text-yellow-400" />}
                     </div>
                     <div className="flex-1">
                       <p className="text-sm text-white leading-relaxed">{notif.message}</p>

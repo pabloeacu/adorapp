@@ -28,6 +28,27 @@ CREATE TABLE IF NOT EXISTS members (
   updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 );
 
+-- Pending Registrations table
+CREATE TABLE IF NOT EXISTS pending_registrations (
+  id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
+  name TEXT NOT NULL,
+  email TEXT UNIQUE NOT NULL,
+  phone TEXT,
+  birthdate DATE,
+  pastor_area TEXT,
+  leader_of TEXT,
+  instruments TEXT[] DEFAULT '{}',
+  password_hash TEXT NOT NULL,
+  status TEXT DEFAULT 'pending' CHECK (status IN ('pending', 'approved', 'rejected')),
+  assigned_role TEXT CHECK (assigned_role IN ('pastor', 'leader', 'member')),
+  approved_by UUID REFERENCES members(id),
+  approved_at TIMESTAMP WITH TIME ZONE,
+  rejected_by UUID REFERENCES members(id),
+  rejected_at TIMESTAMP WITH TIME ZONE,
+  created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+  updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+);
+
 -- Bands table
 CREATE TABLE IF NOT EXISTS bands (
   id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
@@ -75,6 +96,7 @@ ALTER TABLE members ENABLE ROW LEVEL SECURITY;
 ALTER TABLE bands ENABLE ROW LEVEL SECURITY;
 ALTER TABLE songs ENABLE ROW LEVEL SECURITY;
 ALTER TABLE orders ENABLE ROW LEVEL SECURITY;
+ALTER TABLE pending_registrations ENABLE ROW LEVEL SECURITY;
 
 -- RLS Policies (allow all operations for authenticated users)
 CREATE POLICY "Enable read access for authenticated users" ON members FOR SELECT TO authenticated USING (true);
@@ -96,6 +118,13 @@ CREATE POLICY "Enable read access for authenticated users" ON orders FOR SELECT 
 CREATE POLICY "Enable insert for authenticated users" ON orders FOR INSERT TO authenticated WITH CHECK (true);
 CREATE POLICY "Enable update for authenticated users" ON orders FOR UPDATE TO authenticated USING (true);
 CREATE POLICY "Enable delete for authenticated users" ON orders FOR DELETE TO authenticated USING (true);
+
+-- Pending Registrations Policies
+-- Anyone can insert (for registration), but only authenticated users can read/update/delete
+CREATE POLICY "Enable insert for anonymous users" ON pending_registrations FOR INSERT TO anon WITH CHECK (true);
+CREATE POLICY "Enable read for authenticated users" ON pending_registrations FOR SELECT TO authenticated USING (true);
+CREATE POLICY "Enable update for authenticated users" ON pending_registrations FOR UPDATE TO authenticated USING (true);
+CREATE POLICY "Enable delete for authenticated users" ON pending_registrations FOR DELETE TO authenticated USING (true);
 
 -- Insert sample data
 INSERT INTO members (name, email, role, instruments, active) VALUES
