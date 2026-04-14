@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import {
   Plus, Users, Calendar, Clock, MoreVertical, Edit, Trash2,
-  Music, Check, X, UserPlus, Shield, ChevronDown
+  Music, Check, X, UserPlus, Shield, ChevronDown, AlertTriangle
 } from 'lucide-react';
 import { useAppStore, MEETING_TYPES } from '../stores/appStore';
 import { useAuthStore } from '../stores/authStore';
@@ -11,6 +11,7 @@ import { Badge } from '../components/ui/Badge';
 import { Avatar } from '../components/ui/Avatar';
 import { Modal } from '../components/ui/Modal';
 import { Input } from '../components/ui/Input';
+import { ConfirmModal, SuccessModal, ErrorModal } from '../components/ui/ConfirmModal';
 
 const dayLabels = {
   domingo: 'Domingo',
@@ -39,6 +40,28 @@ export const Bandas = () => {
     meetingDay: 'domingo',
     meetingTime: '20:00',
     members: []
+  });
+
+  // Confirmation modals
+  const [confirmModal, setConfirmModal] = useState({
+    isOpen: false,
+    title: '',
+    message: '',
+    type: 'warning',
+    onConfirm: null,
+    loading: false
+  });
+
+  const [successModal, setSuccessModal] = useState({
+    isOpen: false,
+    title: '',
+    message: ''
+  });
+
+  const [errorModal, setErrorModal] = useState({
+    isOpen: false,
+    title: '',
+    message: ''
   });
 
   const activeBands = bands.filter(b => b.active);
@@ -92,10 +115,26 @@ export const Bandas = () => {
     handleCloseModal();
   };
 
-  const handleDelete = (bandId) => {
-    if (window.confirm('¿Estás seguro de eliminar esta banda?')) {
-      deleteBand(bandId);
-    }
+  const handleDelete = (band) => {
+    setConfirmModal({
+      isOpen: true,
+      title: 'Eliminar Banda',
+      message: `¿Querés eliminar "${band.name}"? Esta banda tiene ${getBandSongCount(band.id)} ordenes asociadas. Se eliminará la banda pero las ordenes permanecerán.`,
+      type: 'warning',
+      confirmText: 'Sí, eliminar',
+      cancelText: 'Mejor no',
+      icon: AlertTriangle,
+      onConfirm: async () => {
+        setConfirmModal(prev => ({ ...prev, loading: true }));
+        deleteBand(band.id);
+        setConfirmModal(prev => ({ ...prev, loading: false, isOpen: false }));
+        setSuccessModal({
+          isOpen: true,
+          title: 'Banda eliminada',
+          message: `"${band.name}" fue eliminada correctamente.`
+        });
+      }
+    });
   };
 
   const toggleMemberSelection = (memberId) => {
@@ -206,7 +245,7 @@ export const Bandas = () => {
                           icon={Trash2}
                           onClick={(e) => {
                             e.stopPropagation();
-                            handleDelete(band.id);
+                            handleDelete(band);
                           }}
                         >
                           Eliminar
@@ -369,6 +408,36 @@ export const Bandas = () => {
           </div>
         </form>
       </Modal>
+
+      {/* Confirmation Modal */}
+      <ConfirmModal
+        isOpen={confirmModal.isOpen}
+        onClose={() => setConfirmModal(prev => ({ ...prev, isOpen: false }))}
+        onConfirm={confirmModal.onConfirm}
+        title={confirmModal.title}
+        message={confirmModal.message}
+        type={confirmModal.type}
+        confirmText={confirmModal.confirmText}
+        cancelText={confirmModal.cancelText}
+        icon={confirmModal.icon}
+        loading={confirmModal.loading}
+      />
+
+      {/* Success Modal */}
+      <SuccessModal
+        isOpen={successModal.isOpen}
+        onClose={() => setSuccessModal(prev => ({ ...prev, isOpen: false }))}
+        title={successModal.title}
+        message={successModal.message}
+      />
+
+      {/* Error Modal */}
+      <ErrorModal
+        isOpen={errorModal.isOpen}
+        onClose={() => setErrorModal(prev => ({ ...prev, isOpen: false }))}
+        title={errorModal.title}
+        message={errorModal.message}
+      />
     </div>
   );
 };

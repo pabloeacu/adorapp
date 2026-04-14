@@ -2,7 +2,7 @@ import React, { useState, useMemo } from 'react';
 import {
   Plus, Search, Music, Download, Edit, Trash2, Clock, MoreVertical,
   Eye, ExternalLink, Filter, X, GripVertical, Music2, Save,
-  LayoutGrid, List, FileDown
+  LayoutGrid, List, FileDown, AlertTriangle
 } from 'lucide-react';
 import { useAppStore, SONG_CATEGORIES, MUSICAL_KEYS, transposeSongStructure } from '../stores/appStore';
 import { useAuthStore } from '../stores/authStore';
@@ -11,6 +11,7 @@ import { Button } from '../components/ui/Button';
 import { Badge } from '../components/ui/Badge';
 import { Modal } from '../components/ui/Modal';
 import { Input } from '../components/ui/Input';
+import { ConfirmModal, SuccessModal, ErrorModal } from '../components/ui/ConfirmModal';
 
 const sectionTypes = [
   { id: 'intro', label: 'Intro' },
@@ -58,6 +59,28 @@ export const Repertorio = () => {
     category: 'adoracion',
     youtubeUrl: '',
     structure: [{ type: 'verse', label: 'Verso 1', content: '', chords: '' }]
+  });
+
+  // Confirmation modals
+  const [confirmModal, setConfirmModal] = useState({
+    isOpen: false,
+    title: '',
+    message: '',
+    type: 'warning',
+    onConfirm: null,
+    loading: false
+  });
+
+  const [successModal, setSuccessModal] = useState({
+    isOpen: false,
+    title: '',
+    message: ''
+  });
+
+  const [errorModal, setErrorModal] = useState({
+    isOpen: false,
+    title: '',
+    message: ''
   });
 
   const unusedSongs = getUnusedSongs(4);
@@ -144,10 +167,26 @@ export const Repertorio = () => {
     handleCloseModal();
   };
 
-  const handleDelete = (songId) => {
-    if (window.confirm('¿Estás seguro de eliminar esta canción?')) {
-      deleteSong(songId);
-    }
+  const handleDelete = (song) => {
+    setConfirmModal({
+      isOpen: true,
+      title: 'Eliminar Canción',
+      message: `¿Querés eliminar "${song.title}"? La canción se borra de todos los servicios donde esté cargada.`,
+      type: 'danger',
+      confirmText: 'Sí, eliminar',
+      cancelText: 'Mejor no',
+      icon: AlertTriangle,
+      onConfirm: async () => {
+        setConfirmModal(prev => ({ ...prev, loading: true }));
+        deleteSong(song.id);
+        setConfirmModal(prev => ({ ...prev, loading: false, isOpen: false }));
+        setSuccessModal({
+          isOpen: true,
+          title: 'Canción eliminada',
+          message: `"${song.title}" fue eliminada del repertorio.`
+        });
+      }
+    });
   };
 
   const handleViewSong = (song) => {
@@ -425,7 +464,7 @@ export const Repertorio = () => {
                       variant="ghost"
                       size="sm"
                       icon={Trash2}
-                      onClick={() => handleDelete(song.id)}
+                      onClick={() => handleDelete(song)}
                     >
                       Eliminar
                     </Button>
@@ -515,7 +554,7 @@ export const Repertorio = () => {
                               <Edit size={14} />
                             </button>
                             <button
-                              onClick={() => handleDelete(song.id)}
+                              onClick={() => handleDelete(song)}
                               className="p-1.5 rounded hover:bg-neutral-800 transition-colors text-gray-400 hover:text-red-400"
                               title="Eliminar"
                             >
@@ -851,6 +890,36 @@ export const Repertorio = () => {
           </div>
         )}
       </Modal>
+
+      {/* Confirmation Modal */}
+      <ConfirmModal
+        isOpen={confirmModal.isOpen}
+        onClose={() => setConfirmModal(prev => ({ ...prev, isOpen: false }))}
+        onConfirm={confirmModal.onConfirm}
+        title={confirmModal.title}
+        message={confirmModal.message}
+        type={confirmModal.type}
+        confirmText={confirmModal.confirmText}
+        cancelText={confirmModal.cancelText}
+        icon={confirmModal.icon}
+        loading={confirmModal.loading}
+      />
+
+      {/* Success Modal */}
+      <SuccessModal
+        isOpen={successModal.isOpen}
+        onClose={() => setSuccessModal(prev => ({ ...prev, isOpen: false }))}
+        title={successModal.title}
+        message={successModal.message}
+      />
+
+      {/* Error Modal */}
+      <ErrorModal
+        isOpen={errorModal.isOpen}
+        onClose={() => setErrorModal(prev => ({ ...prev, isOpen: false }))}
+        title={errorModal.title}
+        message={errorModal.message}
+      />
     </div>
   );
 };

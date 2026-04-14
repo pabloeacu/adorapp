@@ -3,7 +3,7 @@ import {
   Plus, Calendar, Music, Download, Clock, ChevronRight, Copy,
   MessageSquare, Eye, Edit, Trash2, Filter, Search, Check, X,
   User, Zap, AlertCircle, ChevronDown, FileDown, History, Award,
-  FileText, Printer
+  FileText, Printer, Copy as CopyIcon
 } from 'lucide-react';
 import { useAppStore, MEETING_TYPES, MUSICAL_KEYS, transposeSongStructure } from '../stores/appStore';
 import { useAuthStore } from '../stores/authStore';
@@ -14,6 +14,7 @@ import { Badge } from '../components/ui/Badge';
 import { Avatar } from '../components/ui/Avatar';
 import { Modal } from '../components/ui/Modal';
 import { Input } from '../components/ui/Input';
+import { ConfirmModal, SuccessModal, ErrorModal } from '../components/ui/ConfirmModal';
 
 const dayLabels = {
   domingo: 'Domingo', lunes: 'Lunes', martes: 'Martes',
@@ -59,6 +60,28 @@ export const Ordenes = () => {
     meetingType: 'culto_general',
     songs: [],
     feedback: ''
+  });
+
+  // Confirmation modals
+  const [confirmModal, setConfirmModal] = useState({
+    isOpen: false,
+    title: '',
+    message: '',
+    type: 'warning',
+    onConfirm: null,
+    loading: false
+  });
+
+  const [successModal, setSuccessModal] = useState({
+    isOpen: false,
+    title: '',
+    message: ''
+  });
+
+  const [errorModal, setErrorModal] = useState({
+    isOpen: false,
+    title: '',
+    message: ''
   });
 
   const filteredOrders = useMemo(() => {
@@ -123,16 +146,48 @@ export const Ordenes = () => {
     setIsDetailOpen(true);
   };
 
-  const handleCloneOrder = (orderId) => {
-    if (window.confirm('¿Deseas duplicar esta orden?')) {
-      cloneOrder(orderId);
-    }
+  const handleCloneOrder = (order) => {
+    setConfirmModal({
+      isOpen: true,
+      title: 'Duplicar Orden',
+      message: `¿Querés duplicar la orden del ${formatDate(order.date)}? Se creará una copia que podés editar después.`,
+      type: 'success',
+      confirmText: 'Sí, duplicar',
+      cancelText: 'Mejor no',
+      icon: CopyIcon,
+      onConfirm: async () => {
+        setConfirmModal(prev => ({ ...prev, loading: true }));
+        cloneOrder(order.id);
+        setConfirmModal(prev => ({ ...prev, loading: false, isOpen: false }));
+        setSuccessModal({
+          isOpen: true,
+          title: 'Orden duplicada',
+          message: 'La nueva orden fue creada. Podés editarla cuando quieras.'
+        });
+      }
+    });
   };
 
-  const handleDeleteOrder = (orderId) => {
-    if (window.confirm('¿Estás seguro de eliminar esta orden?')) {
-      deleteOrder(orderId);
-    }
+  const handleDeleteOrder = (order) => {
+    setConfirmModal({
+      isOpen: true,
+      title: 'Eliminar Orden',
+      message: `¿Querés eliminar la orden del ${formatDate(order.date)}? Esta acción no se puede deshacer.`,
+      type: 'danger',
+      confirmText: 'Sí, eliminar',
+      cancelText: 'Mejor no',
+      icon: AlertCircle,
+      onConfirm: async () => {
+        setConfirmModal(prev => ({ ...prev, loading: true }));
+        deleteOrder(order.id);
+        setConfirmModal(prev => ({ ...prev, loading: false, isOpen: false }));
+        setSuccessModal({
+          isOpen: true,
+          title: 'Orden eliminada',
+          message: 'La orden fue eliminada correctamente.'
+        });
+      }
+    });
   };
 
   const handleUpdateFeedback = (orderId, feedback) => {
@@ -681,12 +736,12 @@ export const Ordenes = () => {
                     Imprimir
                   </Button>
                   {(isPastor || isLeader) && (
-                    <Button variant="ghost" size="sm" icon={Copy} onClick={() => handleCloneOrder(order.id)}>
+                    <Button variant="ghost" size="sm" icon={Copy} onClick={() => handleCloneOrder(order)}>
                       Repetir
                     </Button>
                   )}
                   {isPastor && (
-                    <Button variant="ghost" size="sm" icon={Trash2} onClick={() => handleDeleteOrder(order.id)}>
+                    <Button variant="ghost" size="sm" icon={Trash2} onClick={() => handleDeleteOrder(order)}>
                       Eliminar
                     </Button>
                   )}
@@ -1102,6 +1157,36 @@ export const Ordenes = () => {
           </div>
         )}
       </Modal>
+
+      {/* Confirmation Modal */}
+      <ConfirmModal
+        isOpen={confirmModal.isOpen}
+        onClose={() => setConfirmModal(prev => ({ ...prev, isOpen: false }))}
+        onConfirm={confirmModal.onConfirm}
+        title={confirmModal.title}
+        message={confirmModal.message}
+        type={confirmModal.type}
+        confirmText={confirmModal.confirmText}
+        cancelText={confirmModal.cancelText}
+        icon={confirmModal.icon}
+        loading={confirmModal.loading}
+      />
+
+      {/* Success Modal */}
+      <SuccessModal
+        isOpen={successModal.isOpen}
+        onClose={() => setSuccessModal(prev => ({ ...prev, isOpen: false }))}
+        title={successModal.title}
+        message={successModal.message}
+      />
+
+      {/* Error Modal */}
+      <ErrorModal
+        isOpen={errorModal.isOpen}
+        onClose={() => setErrorModal(prev => ({ ...prev, isOpen: false }))}
+        title={errorModal.title}
+        message={errorModal.message}
+      />
     </div>
   );
 };
