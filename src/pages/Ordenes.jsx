@@ -1,11 +1,12 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import {
   Plus, Calendar, Music, Download, Clock, ChevronRight, Copy,
   MessageSquare, Eye, Edit, Trash2, Filter, Search, Check, X,
-  User, Zap, AlertCircle, ChevronDown, FileDown
+  User, Zap, AlertCircle, ChevronDown, FileDown, History
 } from 'lucide-react';
 import { useAppStore, MEETING_TYPES, MUSICAL_KEYS, transposeSongStructure } from '../stores/appStore';
 import { useAuthStore } from '../stores/authStore';
+import { supabase } from '../lib/supabase';
 import { Card } from '../components/ui/Card';
 import { Button } from '../components/ui/Button';
 import { Badge } from '../components/ui/Badge';
@@ -40,6 +41,19 @@ export const Ordenes = () => {
   const [songSearchTerm, setSongSearchTerm] = useState('');
   const [showSongDropdown, setShowSongDropdown] = useState(false);
   const [songDropdownPosition, setSongDropdownPosition] = useState('bottom');
+
+  // Key history feature
+  const [keyHistoryLoading, setKeyHistoryLoading] = useState(false);
+  const [keyHistoryTooltip, setKeyHistoryTooltip] = useState(null);
+
+  // Members who can be directors (only those with 'Voz' in instruments)
+  const singers = useMemo(() => {
+    return members.filter(m =>
+      m.active &&
+      m.instruments &&
+      m.instruments.includes('Voz')
+    );
+  }, [members]);
 
   const [formData, setFormData] = useState({
     date: '',
@@ -89,9 +103,19 @@ export const Ordenes = () => {
     setSelectedBandForUnused(null);
   };
 
-  const handleSubmit = (e) => {
+  const handleSubmit = async (e) => {
     e.preventDefault();
     if (!formData.date || !formData.bandId) return;
+
+    // Save key history for all songs with directors
+    const orderId = crypto.randomUUID(); // Generate ID for history tracking
+
+    // Save key history for each song with a director
+    await Promise.all(
+      formData.songs
+        .filter(s => s.directorId)
+        .map(s => saveKeyHistory(s.directorId, s.songId, s.key, orderId))
+    );
 
     addOrder(formData);
     handleCloseModal();
@@ -222,12 +246,42 @@ export const Ordenes = () => {
     printWindow.print();
   };
 
-  const addSongToOrder = (song) => {
+  const addSongToOrder = async (song) => {
+    // Start with the original key of the song
+    let defaultKey = song.key || song.originalKey || 'C';
+
+    // Try to find key history for no director (fallback to original key)
+    // The actual key history will be fetched when a director is selected
     setFormData(prev => ({
       ...prev,
-      songs: [...prev.songs, { songId: song.id, directorId: null, key: song.key || song.originalKey }]
+      songs: [...prev.songs, {
+        songId: song.id,
+        directorId: null,
+        key: defaultKey,
+        _pendingHistory: true // Flag to indicate we should check history when director is set
+      }]
     }));
     setShowUnused(false);
+  };
+
+  // Handle director change - fetch key history and update
+  const handleDirectorChange = async (index, directorId) => {
+    const songRef = formData.songs[index];
+    const song = getSongById(songRef.songId);
+
+    // Try to fetch key history
+    const historyKey = directorId ? await fetchKeyHistory(directorId, songRef.songId) : null;
+
+    // Use history key if found, otherwise use original key
+    const newKey = historyKey || song?.key || song?.originalKey || 'C';
+
+    updateSongInOrder(index, 'directorId', directorId);
+    updateSongInOrder(index, 'key', newKey);
+  };
+
+  // Handle key change - save to history when a song is saved
+  const handleKeyChange = (index, newKey) => {
+    updateSongInOrder(index, 'key', newKey);
   };
 
   const removeSongFromOrder = (index) => {
@@ -235,6 +289,7 @@ export const Ordenes = () => {
       ...prev,
       songs: prev.songs.filter((_, i) => i !== index)
     }));
+    setKeyHistoryTooltip(null);
   };
 
   const updateSongInOrder = (index, field, value) => {
@@ -259,6 +314,82 @@ export const Ordenes = () => {
   const getMeetingTypeLabel = (typeId) => {
     const type = MEETING_TYPES.find(t => t.id === typeId);
     return type?.label || typeId;
+  };
+
+  // Fetch key history for a director-song combination from database
+  const fetchKeyHistory = async (directorId, songId) => {
+    if (!directorId || !songId) return null;
+
+    setKeyHistoryLoading(true);
+    setKeyHistoryTooltip(null);
+
+    try {
+      // Query the song_key_history table
+      const { data, error } = await supabase
+        .from('song_key_history')
+        .select('*')
+        .eq('member_id', directorId)
+        .eq('song_id', songId)
+        .order('order_date', { ascending: false })
+        .limit(1)
+        .single();
+
+      if (error && error.code !== 'PGRST116') { // PGRST116 = no rows returned
+        console.error('Error fetching key history:', error);
+        setKeyHistoryLoading(false);
+        return null;
+      }
+
+      if (data) {
+        // Get the order info for the tooltip
+        const order = orders.find(o => o.id === data.order_id);
+        const formattedDate = order
+          ? new Date(order.date).toLocaleDateString('es-ES', { day: '2-digit', month: '2-digit', year: 'numeric' })
+          : 'fecha no disponible';
+
+        setKeyHistoryTooltip({
+          key: data.key,
+          orderBand: order ? getBandById(order.bandId)?.name : '',
+          orderDate: formattedDate
+        });
+        setKeyHistoryLoading(false);
+        return data.key;
+      }
+
+      setKeyHistoryLoading(false);
+      return null;
+    } catch (err) {
+      console.error('Error in fetchKeyHistory:', err);
+      setKeyHistoryLoading(false);
+      return null;
+    }
+  };
+
+  // Save key selection to history
+  const saveKeyHistory = async (directorId, songId, key, orderId) => {
+    if (!directorId || !songId || !key) return;
+
+    try {
+      // Upsert: insert or update if exists
+      const { error } = await supabase
+        .from('song_key_history')
+        .upsert({
+          member_id: directorId,
+          song_id: songId,
+          key: key,
+          order_id: orderId,
+          order_date: new Date().toISOString().split('T')[0],
+          updated_at: new Date().toISOString()
+        }, {
+          onConflict: 'member_id,song_id'
+        });
+
+      if (error) {
+        console.error('Error saving key history:', error);
+      }
+    } catch (err) {
+      console.error('Error in saveKeyHistory:', err);
+    }
   };
 
   return (
@@ -522,35 +653,64 @@ export const Ordenes = () => {
                 const song = getSongById(songRef.songId);
                 return (
                   <div key={index} className="flex items-center gap-3 p-3 bg-neutral-800 rounded-xl">
-                    <span className="w-6 h-6 rounded-full bg-neutral-700 flex items-center justify-center text-xs">
+                    <span className="w-6 h-6 rounded-full bg-neutral-700 flex items-center justify-center text-xs shrink-0">
                       {index + 1}
                     </span>
-                    <div className="flex-1">
-                      <p className="font-medium">{song?.title}</p>
-                      <p className="text-xs text-gray-400">{song?.artist}</p>
+                    <div className="flex-1 min-w-0">
+                      <p className="font-medium truncate">{song?.title}</p>
+                      <p className="text-xs text-gray-400 truncate">{song?.artist}</p>
                     </div>
+                    {/* Director selector - filtered to singers only */}
                     <select
-                      className="bg-neutral-900 border border-neutral-700 rounded-lg px-2 py-1 text-sm"
-                      value={songRef.key}
-                      onChange={(e) => updateSongInOrder(index, 'key', e.target.value)}
-                    >
-                      {MUSICAL_KEYS.map(key => (
-                        <option key={key} value={key}>{key}</option>
-                      ))}
-                    </select>
-                    <select
-                      className="bg-neutral-900 border border-neutral-700 rounded-lg px-2 py-1 text-sm"
+                      className="bg-neutral-900 border border-neutral-700 rounded-lg px-2 py-1.5 text-sm w-40 shrink-0"
                       value={songRef.directorId || ''}
-                      onChange={(e) => updateSongInOrder(index, 'directorId', Number(e.target.value) || null)}
+                      onChange={(e) => handleDirectorChange(index, Number(e.target.value) || null)}
                     >
                       <option value="">Director</option>
-                      {members.filter(m => m.active).map(member => (
+                      {singers.map(member => (
                         <option key={member.id} value={member.id}>{member.name}</option>
                       ))}
                     </select>
+                    {/* Key selector with history lookup icon */}
+                    <div className="relative flex items-center shrink-0">
+                      <select
+                        className="bg-neutral-900 border border-neutral-700 rounded-lg px-2 py-1.5 text-sm w-20 text-center font-mono"
+                        value={songRef.key}
+                        onChange={(e) => handleKeyChange(index, e.target.value)}
+                        title="Tonalidad"
+                      >
+                        {MUSICAL_KEYS.map(key => (
+                          <option key={key} value={key}>{key}</option>
+                        ))}
+                      </select>
+                      {songRef.directorId && (
+                        <button
+                          type="button"
+                          onClick={() => fetchKeyHistory(songRef.directorId, songRef.songId)}
+                          className={`ml-1 p-1 text-gray-400 hover:text-purple-400 transition-colors ${keyHistoryLoading ? 'animate-spin' : ''}`}
+                          title="Buscar última tonalidad del director"
+                          disabled={keyHistoryLoading}
+                        >
+                          {keyHistoryLoading ? (
+                            <Clock size={14} className="animate-pulse" />
+                          ) : (
+                            <History size={14} />
+                          )}
+                        </button>
+                      )}
+                      {/* Tooltip for key history */}
+                      {keyHistoryTooltip && songRef.directorId && (
+                        <div className="absolute bottom-full mb-2 left-1/2 -translate-x-1/2 px-3 py-2 bg-neutral-700 text-xs rounded-lg shadow-lg whitespace-nowrap z-50">
+                          <p className="text-purple-400 font-mono">{keyHistoryTooltip.key}</p>
+                          <p className="text-gray-400 text-[10px]">Banda {keyHistoryTooltip.orderBand}</p>
+                          <p className="text-gray-500 text-[10px]">{keyHistoryTooltip.orderDate}</p>
+                          <div className="absolute top-full left-1/2 -translate-x-1/2 border-4 border-transparent border-t-neutral-700"></div>
+                        </div>
+                      )}
+                    </div>
                     <button
                       onClick={() => removeSongFromOrder(index)}
-                      className="p-2 text-gray-400 hover:text-red-400"
+                      className="p-2 text-gray-400 hover:text-red-400 shrink-0"
                     >
                       <X size={16} />
                     </button>
