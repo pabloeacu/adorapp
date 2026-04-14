@@ -178,15 +178,47 @@ export const useAppStore = create((set, get) => ({
       if (songsRes.error) throw songsRes.error;
       if (ordersRes.error) throw ordersRes.error;
 
+      const members = membersRes.data.map(convertMemberFromDB);
+      const bands = bandsRes.data.map(convertBandFromDB);
+      const songs = songsRes.data.map(convertSongFromDB);
+      const orders = ordersRes.data.map(convertOrderFromDB);
+
+      // Persist to localStorage for survival across page refreshes
+      localStorage.setItem('appMembers', JSON.stringify(members));
+      localStorage.setItem('appBands', JSON.stringify(bands));
+      localStorage.setItem('appSongs', JSON.stringify(songs));
+      localStorage.setItem('appOrders', JSON.stringify(orders));
+
       set({
-        members: membersRes.data.map(convertMemberFromDB),
-        bands: bandsRes.data.map(convertBandFromDB),
-        songs: songsRes.data.map(convertSongFromDB),
-        orders: ordersRes.data.map(convertOrderFromDB),
+        members,
+        bands,
+        songs,
+        orders,
         loading: false,
       });
     } catch (err) {
       console.error('Error loading data from Supabase:', err);
+      // Fallback to localStorage if Supabase fails
+      try {
+        const cachedMembers = JSON.parse(localStorage.getItem('appMembers') || '[]');
+        const cachedBands = JSON.parse(localStorage.getItem('appBands') || '[]');
+        const cachedSongs = JSON.parse(localStorage.getItem('appSongs') || '[]');
+        const cachedOrders = JSON.parse(localStorage.getItem('appOrders') || '[]');
+
+        if (cachedMembers.length > 0 || cachedBands.length > 0 || cachedSongs.length > 0) {
+          console.log('📦 Loading from localStorage cache...');
+          set({
+            members: cachedMembers,
+            bands: cachedBands,
+            songs: cachedSongs,
+            orders: cachedOrders,
+            loading: false,
+          });
+          return;
+        }
+      } catch (cacheErr) {
+        console.error('Cache error:', cacheErr);
+      }
       set({ error: err.message, loading: false });
     }
   },
@@ -633,7 +665,7 @@ export const useAppStore = create((set, get) => ({
       loading: false,
       error: null
     });
-    console.log('✅ App store reset on logout');
+    console.log('✅ App store reset on logout (localStorage preserved)');
   },
 }));
 

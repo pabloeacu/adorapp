@@ -368,29 +368,26 @@ export const Header = () => {
         birthdate: editBirthdate || null
       };
 
-      const { error } = await supabase
-        .from('members')
-        .update(updateData)
-        .eq('user_id', user?.id);
-
-      if (error) {
-        console.error('Error updating profile:', error);
-        setErrorModal({
-          isOpen: true,
-          title: 'Error al guardar',
-          message: 'No se pudieron guardar los cambios. Por favor, intentá de nuevo.'
-        });
-        return;
-      }
-
-      // Refresh auth profile
-      await authRefreshProfile();
-
-      // IMMEDIATE SYNC: Update appStore.members so Miembros page sees changes instantly
-      // Use currentUserMember.id to ensure we update the correct record
+      // IMMEDIATE SYNC: Update Supabase database FIRST with member's ID
       const memberIdToUpdate = currentUserMember?.id;
 
       if (memberIdToUpdate) {
+        const { error } = await supabase
+          .from('members')
+          .update(updateData)
+          .eq('id', memberIdToUpdate);
+
+        if (error) {
+          console.error('Error updating profile in DB:', error);
+          setErrorModal({
+            isOpen: true,
+            title: 'Error al guardar',
+            message: 'No se pudieron guardar los cambios en la base de datos.'
+          });
+          return;
+        }
+
+        // Then update appStore.members so Miembros page sees changes instantly
         useAppStore.setState(state => ({
           members: state.members.map(m =>
             m.id === memberIdToUpdate ? {
@@ -403,7 +400,24 @@ export const Header = () => {
             } : m
           )
         }));
+
+        // Also persist to localStorage for survival across page refreshes
+        const currentMembers = JSON.parse(localStorage.getItem('appMembers') || '[]');
+        const updatedMembers = currentMembers.map(m =>
+          m.id === memberIdToUpdate ? {
+            ...m,
+            name: updateData.name,
+            phone: updateData.phone,
+            pastor_area: updateData.pastor_area,
+            leader_of: updateData.leader_of,
+            birthdate: updateData.birthdate,
+          } : m
+        );
+        localStorage.setItem('appMembers', JSON.stringify(updatedMembers));
       }
+
+      // Refresh auth profile
+      await authRefreshProfile();
 
       setIsEditing(false);
 
@@ -705,6 +719,13 @@ export const Header = () => {
             )
           }));
 
+          // Persist to localStorage for survival across refreshes
+          const currentMembers = JSON.parse(localStorage.getItem('appMembers') || '[]');
+          const updatedMembers = currentMembers.map(m =>
+            m.id === memberIdToUpdate ? { ...m, avatar_url: dataUrl, avatarUrl: dataUrl } : m
+          );
+          localStorage.setItem('appMembers', JSON.stringify(updatedMembers));
+
           // Show success modal
           setSuccessModal({
             isOpen: true,
@@ -738,6 +759,13 @@ export const Header = () => {
               m.id === memberIdToUpdate ? { ...m, avatar_url: publicUrl, avatarUrl: publicUrl } : m
             )
           }));
+
+          // Persist to localStorage for survival across refreshes
+          const currentMembers = JSON.parse(localStorage.getItem('appMembers') || '[]');
+          const updatedMembers = currentMembers.map(m =>
+            m.id === memberIdToUpdate ? { ...m, avatar_url: publicUrl, avatarUrl: publicUrl } : m
+          );
+          localStorage.setItem('appMembers', JSON.stringify(updatedMembers));
         }
 
         // Show success modal
