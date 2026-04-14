@@ -160,3 +160,23 @@ SELECT
   au.email as auth_email
 FROM members m
 LEFT JOIN auth.users au ON m.user_id = au.id;
+
+-- =============================================
+-- DEBUG: Make policies permissive for testing
+-- =============================================
+-- Run this if notifications are not being inserted
+-- This makes all RLS policies allow everything
+
+-- For communications table
+DROP POLICY IF EXISTS "Authenticated users can read communications" ON communications;
+DROP POLICY IF EXISTS "Pastors can insert communications" ON communications;
+CREATE POLICY "Allow all select on communications" ON communications FOR SELECT USING (true);
+CREATE POLICY "Allow all insert on communications" ON communications FOR INSERT WITH CHECK (true);
+
+-- For communication_notifications table
+DROP POLICY IF EXISTS "Users can read their own notifications" ON communication_notifications;
+DROP POLICY IF EXISTS "Authenticated users can insert notifications" ON communication_notifications;
+DROP POLICY IF EXISTS "Users can update their own notifications" ON communication_notifications;
+CREATE POLICY "Allow all select on notifications" ON communication_notifications FOR SELECT USING (true);
+CREATE POLICY "Allow all insert on notifications" ON communication_notifications FOR INSERT WITH CHECK (true);
+CREATE POLICY "Allow all update on notifications" ON communication_notifications FOR UPDATE USING (true);

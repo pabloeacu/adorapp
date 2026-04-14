@@ -210,19 +210,29 @@ export const Comunicaciones = () => {
 
       // Insert notifications in batches of 50
       const batchSize = 50;
+      let notificationsInserted = 0;
       for (let i = 0; i < notifications.length; i += batchSize) {
         const batch = notifications.slice(i, i + batchSize);
-        const { error: notifError } = await supabase
+        const { data, error: notifError } = await supabase
           .from('communication_notifications')
-          .insert(batch);
+          .insert(batch)
+          .select();
 
         if (notifError) {
-          console.error('Error inserting notifications batch:', notifError);
+          console.error('Error inserting notifications:', notifError);
+          throw new Error(`Error al crear notificaciones: ${notifError.message}`);
+        }
+
+        if (data) {
+          notificationsInserted += data.length;
+          console.log(`Inserted ${data.length} notifications`);
         }
       }
 
+      console.log(`Total notifications inserted: ${notificationsInserted}`);
+
       // Store recipient count before resetting
-      const sentCount = recipientIds.length;
+      const sentCount = notificationsInserted;
 
       setShowSuccess(true);
       resetForm();
