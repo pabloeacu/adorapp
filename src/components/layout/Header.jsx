@@ -68,9 +68,22 @@ export const Header = () => {
   const [showNotifications, setShowNotifications] = useState(false);
   const [notifications, setNotifications] = useState([]);
   const [unreadCount, setUnreadCount] = useState(0);
-  const [readNotificationIds, setReadNotificationIds] = useState(() => {
-    return JSON.parse(localStorage.getItem('readNotificationIds') || '[]');
-  });
+  const [readNotificationIds, setReadNotificationIds] = useState([]);
+
+  // Load read notification IDs specific to current user
+  useEffect(() => {
+    if (user?.id) {
+      const userKey = `readNotificationIds_${user.id}`;
+      const saved = JSON.parse(localStorage.getItem(userKey) || '[]');
+      setReadNotificationIds(saved);
+      // Clean up old global key if exists (migration)
+      const oldKey = localStorage.getItem('readNotificationIds');
+      if (oldKey && !localStorage.getItem(userKey)) {
+        localStorage.setItem(userKey, oldKey);
+        localStorage.removeItem('readNotificationIds');
+      }
+    }
+  }, [user?.id]);
 
   // Custom success/error modals - replaces browser alerts
   const [successModal, setSuccessModal] = useState({ isOpen: false, title: '', message: '' });
@@ -344,19 +357,23 @@ export const Header = () => {
     return () => clearInterval(interval);
   }, [readNotificationIds]);
 
-  // Mark notification as read
+  // Mark notification as read (user-specific)
   const markAsRead = (notificationId) => {
+    if (!user?.id) return;
+    const userKey = `readNotificationIds_${user.id}`;
     const newReadIds = [...readNotificationIds, notificationId];
     setReadNotificationIds(newReadIds);
-    localStorage.setItem('readNotificationIds', JSON.stringify(newReadIds));
+    localStorage.setItem(userKey, JSON.stringify(newReadIds));
     setUnreadCount(Math.max(0, unreadCount - 1));
   };
 
-  // Mark all as read
+  // Mark all as read (user-specific)
   const markAllAsRead = () => {
+    if (!user?.id) return;
+    const userKey = `readNotificationIds_${user.id}`;
     const allIds = notifications.map(n => n.id);
     setReadNotificationIds(allIds);
-    localStorage.setItem('readNotificationIds', JSON.stringify(allIds));
+    localStorage.setItem(userKey, JSON.stringify(allIds));
     setUnreadCount(0);
   };
 
