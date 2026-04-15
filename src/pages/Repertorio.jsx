@@ -2,7 +2,7 @@ import React, { useState, useMemo } from 'react';
 import {
   Plus, Search, Music, Download, Edit, Trash2, Clock, MoreVertical,
   Eye, ExternalLink, Filter, X, GripVertical, Music2, Save,
-  LayoutGrid, List, FileDown, AlertTriangle
+  LayoutGrid, List, FileDown, AlertTriangle, ChevronDown
 } from 'lucide-react';
 import { useAppStore, SONG_CATEGORIES, MUSICAL_KEYS, transposeSongStructure } from '../stores/appStore';
 import { useAuthStore } from '../stores/authStore';
