@@ -31,6 +31,13 @@ const categoryConfig = {
   rapida: { label: 'Rápida', color: 'text-yellow-400', bg: 'bg-yellow-500/20' },
   lenta: { label: 'Lenta', color: 'text-blue-400', bg: 'bg-blue-500/20' },
   alabanza: { label: 'Alabanza', color: 'text-green-400', bg: 'bg-green-500/20' },
+  humillacion: { label: 'Humillación', color: 'text-orange-400', bg: 'bg-orange-500/20' },
+  pascua: { label: 'Pascua', color: 'text-cyan-400', bg: 'bg-cyan-500/20' },
+  santa_cena: { label: 'Santa Cena', color: 'text-red-400', bg: 'bg-red-500/20' },
+  testimonial: { label: 'Testimonial', color: 'text-teal-400', bg: 'bg-teal-500/20' },
+  ofrenda: { label: 'Ofrenda', color: 'text-amber-400', bg: 'bg-amber-500/20' },
+  coritos: { label: 'Coritos', color: 'text-yellow-300', bg: 'bg-yellow-500/20' },
+  festivas: { label: 'Festivas', color: 'text-fuchsia-400', bg: 'bg-fuchsia-500/20' },
 };
 
 export const Repertorio = () => {
@@ -40,7 +47,7 @@ export const Repertorio = () => {
   const isLeader = profile?.role === 'leader';
 
   const [searchTerm, setSearchTerm] = useState('');
-  const [filterCategory, setFilterCategory] = useState('all');
+  const [filterCategories, setFilterCategories] = useState([]); // Multiselect
   const [showUnused, setShowUnused] = useState(false);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [isViewerOpen, setIsViewerOpen] = useState(false);
@@ -51,12 +58,13 @@ export const Repertorio = () => {
   const [exportKey, setExportKey] = useState('C'); // Key for PDF export
   const [exportModalSong, setExportModalSong] = useState(null);
   const [exportSongKey, setExportSongKey] = useState('C');
+  const [showCategoryDropdown, setShowCategoryDropdown] = useState(false);
 
   const [formData, setFormData] = useState({
     title: '',
     artist: '',
     key: 'C',
-    category: 'adoracion',
+    categories: ['adoracion'],
     youtubeUrl: '',
     structure: [{ type: 'verse', label: 'Verso 1', content: '', chords: '' }]
   });
@@ -107,8 +115,12 @@ export const Repertorio = () => {
       });
     }
 
-    if (filterCategory !== 'all') {
-      result = result.filter(s => s.category === filterCategory);
+    // Multi-category filter - song must match ALL selected categories
+    if (filterCategories.length > 0) {
+      result = result.filter(s => {
+        const songCats = s.categories || [];
+        return filterCategories.every(cat => songCats.includes(cat));
+      });
     }
 
     if (showUnused) {
@@ -117,7 +129,29 @@ export const Repertorio = () => {
     }
 
     return result;
-  }, [songs, searchTerm, filterCategory, showUnused, unusedSongs]);
+  }, [songs, searchTerm, filterCategories, showUnused, unusedSongs]);
+
+  // Toggle category in filter
+  const toggleFilterCategory = (catId) => {
+    setFilterCategories(prev =>
+      prev.includes(catId) ? prev.filter(c => c !== catId) : [...prev, catId]
+    );
+  };
+
+  // Clear all category filters
+  const clearCategoryFilters = () => {
+    setFilterCategories([]);
+  };
+
+  // Toggle category in form (for song editing)
+  const toggleFormCategory = (catId) => {
+    setFormData(prev => ({
+      ...prev,
+      categories: prev.categories.includes(catId)
+        ? prev.categories.filter(c => c !== catId)
+        : [...prev.categories, catId]
+    }));
+  };
 
   const handleOpenModal = (song = null) => {
     if (song) {
@@ -126,7 +160,7 @@ export const Repertorio = () => {
         title: song.title,
         artist: song.artist || '',
         key: song.key || song.originalKey,
-        category: song.category || 'adoracion',
+        categories: song.categories || (song.category ? [song.category] : ['adoracion']),
         youtubeUrl: song.youtubeUrl || '',
         structure: song.structure || [{ type: 'verse', label: 'Verso 1', content: '', chords: '' }]
       });
@@ -136,7 +170,7 @@ export const Repertorio = () => {
         title: '',
         artist: '',
         key: 'C',
-        category: 'adoracion',
+        categories: ['adoracion'],
         youtubeUrl: '',
         structure: [{ type: 'intro', label: 'Intro', content: '', chords: '' }]
       });
@@ -365,16 +399,57 @@ export const Repertorio = () => {
           />
         </div>
         <div className="flex gap-2">
-          <select
-            className="px-4 py-3 bg-neutral-900 border border-neutral-800 rounded-xl focus:outline-none focus:border-white"
-            value={filterCategory}
-            onChange={(e) => setFilterCategory(e.target.value)}
-          >
-            <option value="all">Todas las categorías</option>
-            {SONG_CATEGORIES.map(cat => (
-              <option key={cat.id} value={cat.id}>{cat.label}</option>
-            ))}
-          </select>
+          {/* Category Multi-select Dropdown */}
+          <div className="relative">
+            <button
+              onClick={() => setShowCategoryDropdown(!showCategoryDropdown)}
+              className={`flex items-center gap-2 px-4 py-3 bg-neutral-900 border rounded-xl transition-colors ${
+                filterCategories.length > 0 ? 'border-purple-500 text-white' : 'border-neutral-800 text-gray-400 hover:text-white'
+              }`}
+            >
+              <Filter size={18} />
+              <span>
+                {filterCategories.length > 0 ? `${filterCategories.length} categoría(s)` : 'Categorías'}
+              </span>
+              <ChevronDown size={16} />
+            </button>
+
+            {showCategoryDropdown && (
+              <div className="absolute top-full right-0 mt-2 w-64 bg-neutral-900 border border-neutral-700 rounded-xl shadow-xl z-50 max-h-80 overflow-y-auto">
+                <div className="p-2 border-b border-neutral-800 flex justify-between items-center">
+                  <span className="text-xs text-gray-400">Seleccionar categorías</span>
+                  {filterCategories.length > 0 && (
+                    <button onClick={clearCategoryFilters} className="text-xs text-purple-400 hover:text-purple-300">
+                      Limpiar
+                    </button>
+                  )}
+                </div>
+                <div className="p-2">
+                  {SONG_CATEGORIES.map(cat => (
+                    <button
+                      key={cat.id}
+                      onClick={() => toggleFilterCategory(cat.id)}
+                      className="w-full flex items-center gap-3 px-3 py-2 rounded-lg hover:bg-neutral-800 transition-colors"
+                    >
+                      <div className={`w-5 h-5 rounded border flex items-center justify-center ${
+                        filterCategories.includes(cat.id)
+                          ? 'bg-purple-500 border-purple-500'
+                          : 'border-neutral-600'
+                      }`}>
+                        {filterCategories.includes(cat.id) && (
+                          <svg className="w-3 h-3 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" />
+                          </svg>
+                        )}
+                      </div>
+                      <span className={`${cat.color}`}>{cat.label}</span>
+                    </button>
+                  ))}
+                </div>
+              </div>
+            )}
+          </div>
+
           <Button
             variant={showUnused ? 'primary' : 'secondary'}
             icon={Clock}
@@ -384,6 +459,26 @@ export const Repertorio = () => {
           </Button>
         </div>
       </div>
+
+      {/* Active category filters display */}
+      {filterCategories.length > 0 && (
+        <div className="flex flex-wrap items-center gap-2">
+          <span className="text-sm text-gray-400">Filtros activos:</span>
+          {filterCategories.map(catId => {
+            const cat = SONG_CATEGORIES.find(c => c.id === catId);
+            return cat ? (
+              <Badge
+                key={catId}
+                className={`${cat.bg} cursor-pointer hover:opacity-80`}
+                onClick={() => toggleFilterCategory(catId)}
+              >
+                <span className={cat.color}>{cat.label}</span>
+                <X size={12} className="ml-1" />
+              </Badge>
+            ) : null;
+          })}
+        </div>
+      )}
 
       {/* Songs View - Cards or Table */}
       {viewMode === 'cards' ? (
@@ -404,12 +499,14 @@ export const Repertorio = () => {
                 <Badge variant="primary">Tono: {song.key}</Badge>
               </div>
 
-              <div className="flex items-center gap-2 mb-3">
-                <Badge className={categoryConfig[song.category]?.bg} variant="default">
-                  <span className={categoryConfig[song.category]?.color}>
-                    {categoryConfig[song.category]?.label}
-                  </span>
-                </Badge>
+              <div className="flex items-start gap-2 mb-3 flex-wrap">
+                {(song.categories || (song.category ? [song.category] : [])).map((catId, idx) => (
+                  <Badge key={`${catId}-${idx}`} className={categoryConfig[catId]?.bg} variant="default">
+                    <span className={categoryConfig[catId]?.color}>
+                      {categoryConfig[catId]?.label}
+                    </span>
+                  </Badge>
+                ))}
                 {song.youtubeUrl && (
                   <a
                     href={song.youtubeUrl}
@@ -505,11 +602,15 @@ export const Repertorio = () => {
                     </td>
                     <td className="px-4 py-3 text-sm text-gray-400">{song.artist || '-'}</td>
                     <td className="px-4 py-3">
-                      <Badge className={categoryConfig[song.category]?.bg} variant="default" size="sm">
-                        <span className={categoryConfig[song.category]?.color}>
-                          {categoryConfig[song.category]?.label}
-                        </span>
-                      </Badge>
+                      <div className="flex flex-wrap gap-1">
+                        {(song.categories || (song.category ? [song.category] : [])).map((catId, idx) => (
+                          <Badge key={`${catId}-${idx}`} className={categoryConfig[catId]?.bg} variant="default" size="sm">
+                            <span className={categoryConfig[catId]?.color}>
+                              {categoryConfig[catId]?.label}
+                            </span>
+                          </Badge>
+                        ))}
+                      </div>
                     </td>
                     <td className="px-4 py-3">
                       <select
@@ -637,17 +738,62 @@ export const Repertorio = () => {
             </div>
             <div>
               <label className="text-xs text-gray-400 font-medium uppercase tracking-wide block mb-1.5">
-                Categoría
+                Categorías
               </label>
-              <select
-                className="w-full"
-                value={formData.category}
-                onChange={(e) => setFormData({ ...formData, category: e.target.value })}
-              >
-                {SONG_CATEGORIES.map(cat => (
-                  <option key={cat.id} value={cat.id}>{cat.label}</option>
-                ))}
-              </select>
+              <div className="relative">
+                <button
+                  type="button"
+                  onClick={() => setShowCategoryDropdown(!showCategoryDropdown)}
+                  className="w-full flex items-center justify-between px-3 py-2 bg-neutral-900 border border-neutral-700 rounded-lg text-left"
+                >
+                  <span className={formData.categories.length === 0 ? 'text-gray-500' : 'text-white'}>
+                    {formData.categories.length > 0 ? `${formData.categories.length} seleccionada(s)` : 'Seleccionar...'}
+                  </span>
+                  <ChevronDown size={16} className="text-gray-400" />
+                </button>
+
+                {showCategoryDropdown && (
+                  <div className="absolute top-full left-0 right-0 mt-1 bg-neutral-900 border border-neutral-700 rounded-lg shadow-xl z-10 max-h-48 overflow-y-auto">
+                    {SONG_CATEGORIES.map(cat => (
+                      <button
+                        key={cat.id}
+                        type="button"
+                        onClick={() => toggleFormCategory(cat.id)}
+                        className="w-full flex items-center gap-2 px-3 py-2 hover:bg-neutral-800 transition-colors"
+                      >
+                        <div className={`w-4 h-4 rounded border flex items-center justify-center ${
+                          formData.categories.includes(cat.id)
+                            ? 'bg-purple-500 border-purple-500'
+                            : 'border-neutral-600'
+                        }`}>
+                          {formData.categories.includes(cat.id) && (
+                            <svg className="w-2.5 h-2.5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" />
+                            </svg>
+                          )}
+                        </div>
+                        <span className={`${cat.color} text-sm`}>{cat.label}</span>
+                      </button>
+                    ))}
+                  </div>
+                )}
+              </div>
+              {/* Selected categories display */}
+              {formData.categories.length > 0 && (
+                <div className="flex flex-wrap gap-1 mt-2">
+                  {formData.categories.map(catId => {
+                    const cat = SONG_CATEGORIES.find(c => c.id === catId);
+                    return cat ? (
+                      <span
+                        key={catId}
+                        className={`text-xs px-2 py-0.5 rounded ${cat.bg} ${cat.color}`}
+                      >
+                        {cat.label}
+                      </span>
+                    ) : null;
+                  })}
+                </div>
+              )}
             </div>
             <Input
               label="YouTube URL"
@@ -742,11 +888,13 @@ export const Repertorio = () => {
               <div className="flex items-center justify-between">
                 <div>
                   <p className="text-gray-400">{viewingSong.artist}</p>
-                  <div className="flex items-center gap-2 mt-2">
+                  <div className="flex flex-wrap items-center gap-2 mt-2">
                     <Badge variant="primary">Tono Original: {originalKey}</Badge>
-                    <Badge className={categoryConfig[viewingSong.category]?.bg}>
-                      {categoryConfig[viewingSong.category]?.label}
-                    </Badge>
+                    {(viewingSong.categories || (viewingSong.category ? [viewingSong.category] : [])).map((catId, idx) => (
+                      <Badge key={`${catId}-${idx}`} className={categoryConfig[catId]?.bg}>
+                        {categoryConfig[catId]?.label}
+                      </Badge>
+                    ))}
                   </div>
                 </div>
                 <div className="flex items-center gap-2">
@@ -849,11 +997,13 @@ export const Repertorio = () => {
                   <p className="text-sm text-gray-400">{exportModalSong.artist}</p>
                 </div>
               </div>
-              <div className="flex gap-2">
+              <div className="flex flex-wrap gap-2">
                 <Badge variant="primary">Original: {exportModalSong.originalKey || exportModalSong.key}</Badge>
-                <Badge className={categoryConfig[exportModalSong.category]?.bg}>
-                  {categoryConfig[exportModalSong.category]?.label}
-                </Badge>
+                {(exportModalSong.categories || (exportModalSong.category ? [exportModalSong.category] : [])).map((catId, idx) => (
+                  <Badge key={`${catId}-${idx}`} className={categoryConfig[catId]?.bg}>
+                    {categoryConfig[catId]?.label}
+                  </Badge>
+                ))}
               </div>
             </div>
 

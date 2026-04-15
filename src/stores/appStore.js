@@ -149,7 +149,7 @@ const convertSongFromDB = (s) => ({
   artist: s.artist,
   originalKey: s.original_key,
   key: s.key,
-  category: s.category,
+  categories: s.categories || (s.category ? [s.category] : ['adoracion']), // Support both old single category and new array
   youtubeUrl: s.youtube_url,
   structure: s.structure || [],
   lastUsed: s.last_used,
@@ -199,7 +199,8 @@ const convertSongToDB = (s) => ({
   artist: s.artist || null,
   original_key: s.originalKey || s.key || 'C',
   key: s.key || s.originalKey || 'C',
-  category: s.category || 'adoracion',
+  categories: s.categories || (s.category ? [s.category] : ['adoracion']), // Support both array and legacy single category
+  category: Array.isArray(s.categories) ? s.categories[0] : (s.category || 'adoracion'), // Keep category for compatibility
   youtube_url: s.youtubeUrl || null,
   structure: s.structure || [],
   last_used: s.lastUsed || null,
@@ -756,12 +757,19 @@ export const useAppStore = create((set, get) => ({
 
 // Constants
 export const SONG_CATEGORIES = [
-  { id: 'adoracion', label: 'Adoración', icon: 'Heart', color: 'text-pink-400' },
-  { id: 'intimidad', label: 'Intimidad', icon: 'Sparkles', color: 'text-purple-400' },
-  { id: 'guerra', label: 'Guerra Espiritual', icon: 'Sword', color: 'text-red-400' },
-  { id: 'rapida', label: 'Rápida', icon: 'Zap', color: 'text-yellow-400' },
-  { id: 'lenta', label: 'Lenta', icon: 'Moon', color: 'text-blue-400' },
-  { id: 'alabanza', label: 'Alabanza', icon: 'Music2', color: 'text-green-400' },
+  { id: 'adoracion', label: 'Adoración', icon: 'Heart', color: 'text-pink-400', bg: 'bg-pink-500/20' },
+  { id: 'intimidad', label: 'Intimidad', icon: 'Sparkles', color: 'text-purple-400', bg: 'bg-purple-500/20' },
+  { id: 'guerra', label: 'Guerra Espiritual', icon: 'Sword', color: 'text-red-400', bg: 'bg-red-500/20' },
+  { id: 'rapida', label: 'Rápida', icon: 'Zap', color: 'text-yellow-400', bg: 'bg-yellow-500/20' },
+  { id: 'lenta', label: 'Lenta', icon: 'Moon', color: 'text-blue-400', bg: 'bg-blue-500/20' },
+  { id: 'alabanza', label: 'Alabanza', icon: 'Music2', color: 'text-green-400', bg: 'bg-green-500/20' },
+  { id: 'humillacion', label: 'Humillación', icon: 'Cross', color: 'text-orange-400', bg: 'bg-orange-500/20' },
+  { id: 'pascua', label: 'Pascua', icon: 'Egg', color: 'text-cyan-400', bg: 'bg-cyan-500/20' },
+  { id: 'santa_cena', label: 'Santa Cena', icon: 'Wine', color: 'text-red-400', bg: 'bg-red-500/20' },
+  { id: 'testimonial', label: 'Testimonial', icon: 'Mic', color: 'text-teal-400', bg: 'bg-teal-500/20' },
+  { id: 'ofrenda', label: 'Ofrenda', icon: 'Gift', color: 'text-amber-400', bg: 'bg-amber-500/20' },
+  { id: 'coritos', label: 'Coritos', icon: 'Baby', color: 'text-yellow-300', bg: 'bg-yellow-500/20' },
+  { id: 'festivas', label: 'Festivas', icon: 'PartyPopper', color: 'text-fuchsia-400', bg: 'bg-fuchsia-500/20' },
 ];
 
 export const MEETING_TYPES = [
