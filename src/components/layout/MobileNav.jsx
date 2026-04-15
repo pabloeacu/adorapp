@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef, useCallback } from 'react';
+import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import { NavLink, useLocation } from 'react-router-dom';
 import {
   LayoutDashboard,
@@ -21,11 +21,14 @@ import {
   ZoomOut,
   Move,
   FileText,
-  Send
+  Send,
+  Bell,
+  Music,
+  Heart
 } from 'lucide-react';
 import { useAuthStore } from '../../stores/authStore';
 import { supabase } from '../../lib/supabase';
-import { useMemo } from 'react';
+import { useAppStore } from '../../stores/appStore';
 
 const navItems = [
   { path: '/', icon: LayoutDashboard, label: 'Inicio' },
@@ -47,6 +50,99 @@ export const MobileNav = () => {
   const [zoom, setZoom] = useState(1);
   const [rotation, setRotation] = useState(0);
   const [position, setPosition] = useState({ x: 0, y: 0 });
+
+  // Notifications state
+  const [showNotifications, setShowNotifications] = useState(false);
+  const [notifications, setNotifications] = useState([]);
+  const [unreadCount, setUnreadCount] = useState(0);
+  const [readNotificationIds, setReadNotificationIds] = useState([]);
+
+  // Load read notification IDs for current user
+  useEffect(() => {
+    const { user } = useAuthStore.getState();
+    if (user?.id) {
+      const userKey = `readNotificationIds_${user.id}`;
+      const saved = JSON.parse(localStorage.getItem(userKey) || '[]');
+      setReadNotificationIds(saved);
+    }
+  }, []);
+
+  // Load notifications from Supabase
+  useEffect(() => {
+    const loadNotifications = async () => {
+      try {
+        const notifs = [];
+        const { user, profile } = useAuthStore.getState();
+        const isPastor = profile?.role === 'pastor';
+
+        // Check for new songs
+        const { data: newSongs } = await supabase
+          .from('songs')
+          .select('id, title, created_at')
+          .order('created_at', { ascending: false })
+          .limit(3);
+
+        if (newSongs && newSongs.length > 0) {
+          notifs.push({
+            id: 'song-' + newSongs[0].id,
+            type: 'song',
+            message: `¡Nueva canción: "${newSongs[0].title}"`,
+            icon: 'music',
+            time: new Date(newSongs[0].created_at).toLocaleTimeString('es-AR', { hour: '2-digit', minute: '2-digit' })
+          });
+        }
+
+        // Check for pending requests (pastors only)
+        if (isPastor) {
+          const { data: pendingRequests } = await supabase
+            .from('pending_registrations')
+            .select('id, name, created_at')
+            .eq('status', 'pending')
+            .order('created_at', { ascending: false });
+
+          if (pendingRequests && pendingRequests.length > 0) {
+            notifs.push({
+              id: 'pending-' + pendingRequests[0].id,
+              type: 'request',
+              message: `${pendingRequests.length} solicitud(es) de registro pendiente(s)`,
+              icon: 'file',
+              time: new Date(pendingRequests[0].created_at).toLocaleTimeString('es-AR', { hour: '2-digit', minute: '2-digit' })
+            });
+          }
+        }
+
+        setNotifications(notifs);
+        const unread = notifs.filter(n => !readNotificationIds.includes(n.id)).length;
+        setUnreadCount(unread);
+      } catch (err) {
+        console.log('Error loading notifications:', err);
+      }
+    };
+
+    loadNotifications();
+    const interval = setInterval(loadNotifications, 2 * 60 * 1000);
+    return () => clearInterval(interval);
+  }, [readNotificationIds]);
+
+  const markAsRead = (notificationId) => {
+    const { user } = useAuthStore.getState();
+    if (!user?.id) return;
+    const userKey = `readNotificationIds_${user.id}`;
+    const newReadIds = [...readNotificationIds, notificationId];
+    setReadNotificationIds(newReadIds);
+    localStorage.setItem(userKey, JSON.stringify(newReadIds));
+    setUnreadCount(Math.max(0, unreadCount - 1));
+  };
+
+  const markAllAsRead = () => {
+    const { user } = useAuthStore.getState();
+    if (!user?.id) return;
+    const userKey = `readNotificationIds_${user.id}`;
+    const allIds = notifications.map(n => n.id);
+    setReadNotificationIds(allIds);
+    localStorage.setItem(userKey, JSON.stringify(allIds));
+    setUnreadCount(0);
+  };
 
   // Edit profile form state
   const [editName, setEditName] = useState('');
@@ -410,7 +506,21 @@ export const MobileNav = () => {
       >
         <div className="flex items-center justify-between px-4 h-14">
           <img src="/logo.png" alt="AdorAPP" className="w-8 h-8 rounded-lg object-contain" />
-          <span className="text-white font-semibold text-sm">AdorAPP</span>
+
+          {/* Notification Bell - Left of profile */}
+          <button
+            onClick={(e) => {
+              e.stopPropagation();
+              setShowNotifications(true);
+            }}
+            className="relative p-2 rounded-full hover:bg-neutral-800 transition-colors"
+            title="Notificaciones"
+          >
+            <Bell size={22} className="text-neutral-400 hover:text-white transition-colors" />
+            {unreadCount > 0 && (
+              <span className="absolute top-1 right-1 w-4 h-4 bg-red-500 rounded-full border-2 border-black animate-pulse" />
+            )}
+          </button>
 
           {/* Profile Button */}
           <button
@@ -999,6 +1109,104 @@ export const MobileNav = () => {
                 );
               })}
             </nav>
+          </div>
+        </div>
+      )}
+
+      {/* Mobile Notifications Modal */}
+      {showNotifications && (
+        <div
+          className="lg:hidden fixed inset-0 z-[60] bg-black/80 backdrop-blur-sm animate-fade-in"
+          onClick={(e) => {
+            if (e.target === e.currentTarget) {
+              setShowNotifications(false);
+            }
+          }}
+        >
+          <div
+            className="absolute bottom-0 left-0 right-0 bg-neutral-900 rounded-t-3xl animate-slide-up max-h-[85vh] overflow-y-auto"
+            style={{
+              paddingBottom: 'calc(env(safe-area-inset-bottom) + 20px)',
+            }}
+            onClick={(e) => e.stopPropagation()}
+          >
+            {/* Handle Bar */}
+            <div className="flex justify-center pt-3 pb-2">
+              <div className="w-10 h-1 bg-neutral-700 rounded-full" />
+            </div>
+
+            {/* Header */}
+            <div className="flex items-center justify-between px-5 py-4 border-b border-neutral-800 sticky top-0 bg-neutral-900">
+              <h2 className="text-white font-semibold text-lg">Notificaciones</h2>
+              <button
+                onClick={() => setShowNotifications(false)}
+                className="p-2 rounded-full hover:bg-neutral-800 transition-colors"
+              >
+                <X size={20} className="text-neutral-400" />
+              </button>
+            </div>
+
+            {/* Notifications List */}
+            <div className="p-5 space-y-3">
+              {(() => {
+                const unreadNotifications = notifications.filter(
+                  n => !readNotificationIds.includes(n.id)
+                );
+
+                if (unreadNotifications.length === 0) {
+                  return (
+                    <div className="text-center py-12">
+                      <Bell size={48} className="mx-auto text-gray-600 mb-4" />
+                      <p className="text-gray-400 font-medium">No hay notificaciones nuevas</p>
+                      <p className="text-xs text-gray-500 mt-2">Las notificaciones aparecen cuando hay nuevas canciones o solicitudes</p>
+                    </div>
+                  );
+                }
+
+                return (
+                  <>
+                    <div className="flex items-center justify-between mb-2">
+                      <span className="text-xs text-gray-400">{unreadNotifications.length} sin leer</span>
+                      <button
+                        onClick={markAllAsRead}
+                        className="text-xs text-blue-400 hover:text-blue-300"
+                      >
+                        Marcar todas como leídas
+                      </button>
+                    </div>
+                    {unreadNotifications.map((notif) => (
+                      <div
+                        key={notif.id}
+                        onClick={() => {
+                          markAsRead(notif.id);
+                          if (notif.type === 'request') {
+                            setShowNotifications(false);
+                            window.location.href = '/solicitudes';
+                          }
+                        }}
+                        className="p-4 bg-neutral-800/50 rounded-2xl border border-neutral-700 hover:border-blue-500/50 transition-colors cursor-pointer"
+                      >
+                        <div className="flex items-start gap-3">
+                          <div className={`p-2 rounded-xl ${
+                            notif.type === 'song' ? 'bg-purple-500/20' :
+                            notif.type === 'request' ? 'bg-yellow-500/20' :
+                            'bg-blue-500/20'
+                          }`}>
+                            {notif.icon === 'music' && <Music size={18} className="text-purple-400" />}
+                            {notif.icon === 'file' && <FileText size={18} className="text-yellow-400" />}
+                          </div>
+                          <div className="flex-1">
+                            <p className="text-sm text-white leading-relaxed">{notif.message}</p>
+                            <p className="text-xs text-gray-500 mt-1">{notif.time}</p>
+                          </div>
+                          <span className="w-2 h-2 bg-blue-500 rounded-full mt-2" />
+                        </div>
+                      </div>
+                    ))}
+                  </>
+                );
+              })()}
+            </div>
           </div>
         </div>
       )}
