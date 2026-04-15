@@ -78,14 +78,24 @@ export const Login = () => {
   return (
     <div className="min-h-screen bg-black flex items-center justify-center p-4">
       <div className="w-full max-w-md">
+        {/* Header con logos */}
         <div className="text-center mb-8">
+          {/* Logo ADORACIÓN CAF */}
           <img
-            src="/logo.png"
-            alt="AdorAPP Logo"
-            className="w-24 h-24 rounded-2xl mx-auto mb-4 object-contain"
+            src="/adoracion-caf-logo.png"
+            alt="Adoración CAF"
+            className="w-28 mx-auto mb-4 object-contain"
           />
-          <h1 className="text-3xl font-bold tracking-tight">AdorAPP</h1>
-          <p className="text-gray-500 mt-2">La plataforma de Adoración CAF</p>
+
+          {/* Logo AdorAPP */}
+          <img
+            src="/adorapp-logo.png"
+            alt="AdorAPP"
+            className="w-52 mx-auto object-contain"
+          />
+
+          {/* Tagline */}
+          <p className="text-gray-500 mt-4">La plataforma de Adoración CAF</p>
         </div>
 
         <div className="bg-neutral-900 border border-neutral-800 rounded-2xl p-8">
@@ -176,7 +186,7 @@ export const Login = () => {
           </div>
         </div>
 
-        <p className="text-xs text-gray-600 text-center mt-6">
+        <p className="text-xs text-gray-400 text-center mt-6">
           © 2026 Centro de Avivamiento Familiar
         </p>
       </div>

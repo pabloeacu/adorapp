@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useRef, useEffect } from 'react';
 import {
   Plus, Search, Music, Download, Edit, Trash2, Clock, MoreVertical,
   Eye, ExternalLink, Filter, X, GripVertical, Music2, Save,
@@ -59,6 +59,8 @@ export const Repertorio = () => {
   const [exportModalSong, setExportModalSong] = useState(null);
   const [exportSongKey, setExportSongKey] = useState('C');
   const [showCategoryDropdown, setShowCategoryDropdown] = useState(false);
+  const [newSectionIndex, setNewSectionIndex] = useState(null);
+  const structureContainerRef = useRef(null);
 
   const [formData, setFormData] = useState({
     title: '',
@@ -259,13 +261,34 @@ export const Repertorio = () => {
 
   const addStructureSection = () => {
     setFormData(prev => {
+      const newIndex = prev.structure.length;
       const newLabel = getDefaultSectionLabel('verse', prev.structure);
       return {
         ...prev,
         structure: [...prev.structure, { type: 'verse', label: newLabel, content: '', chords: '' }]
       };
     });
+    // Scroll to the new section after render
+    setNewSectionIndex(formData.structure.length);
   };
+
+  // Effect to scroll to new section when index changes
+  useEffect(() => {
+    if (newSectionIndex !== null && structureContainerRef.current) {
+      const sections = structureContainerRef.current.querySelectorAll('.structure-section');
+      const newSection = sections[newSectionIndex];
+      if (newSection) {
+        // Small delay to ensure DOM is rendered
+        setTimeout(() => {
+          newSection.scrollIntoView({ behavior: 'smooth', block: 'center' });
+          // Focus the chords input of the new section
+          const chordsInput = newSection.querySelector('input[type="text"]');
+          if (chordsInput) chordsInput.focus();
+        }, 50);
+      }
+      setNewSectionIndex(null);
+    }
+  }, [newSectionIndex]);
 
   const removeStructureSection = (index) => {
     setFormData(prev => ({
@@ -355,7 +378,8 @@ export const Repertorio = () => {
         <div>
           <h2 className="text-2xl font-bold">Repertorio de Canciones</h2>
           <p className="text-sm text-gray-400 mt-1">
-            {filteredSongs.length} canciones {filterCategory !== 'all' && `· ${categoryConfig[filterCategory]?.label}`}
+            {filteredSongs.length} canciones
+            {filterCategories.length > 0 && ` · ${filterCategories.length} filtro(s) activo(s)`}
           </p>
         </div>
         <div className="flex items-center gap-2">
@@ -386,8 +410,8 @@ export const Repertorio = () => {
         </div>
       </div>
 
-      {/* Search and Filters */}
-      <div className="flex flex-col sm:flex-row gap-4">
+      {/* Search and Filters - Mobile optimized */}
+      <div className="flex flex-col sm:flex-row gap-3">
         <div className="relative flex-1">
           <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-500" size={20} />
           <input
@@ -398,64 +422,76 @@ export const Repertorio = () => {
             className="w-full pl-12 pr-4 py-3 bg-neutral-900 border border-neutral-800 rounded-xl focus:outline-none focus:border-white transition-colors"
           />
         </div>
-        <div className="flex gap-2">
-          {/* Category Multi-select Dropdown */}
-          <div className="relative">
+        <div className="flex flex-wrap sm:flex-nowrap gap-2 w-full sm:w-auto">
+          {/* Category Multi-select Dropdown - Mobile friendly */}
+          <div className="relative flex-1 sm:flex-none sm:w-48">
             <button
               onClick={() => setShowCategoryDropdown(!showCategoryDropdown)}
-              className={`flex items-center gap-2 px-4 py-3 bg-neutral-900 border rounded-xl transition-colors ${
+              className={`w-full flex items-center justify-between gap-2 px-4 py-3 bg-neutral-900 border rounded-xl transition-colors ${
                 filterCategories.length > 0 ? 'border-purple-500 text-white' : 'border-neutral-800 text-gray-400 hover:text-white'
               }`}
             >
-              <Filter size={18} />
-              <span>
-                {filterCategories.length > 0 ? `${filterCategories.length} categoría(s)` : 'Categorías'}
-              </span>
+              <div className="flex items-center gap-2">
+                <Filter size={18} />
+                <span className="text-sm sm:text-base">
+                  {filterCategories.length > 0 ? `${filterCategories.length} cat(s)` : 'Categorías'}
+                </span>
+              </div>
               <ChevronDown size={16} />
             </button>
 
             {showCategoryDropdown && (
-              <div className="absolute top-full right-0 mt-2 w-64 bg-neutral-900 border border-neutral-700 rounded-xl shadow-xl z-50 max-h-80 overflow-y-auto">
-                <div className="p-2 border-b border-neutral-800 flex justify-between items-center">
-                  <span className="text-xs text-gray-400">Seleccionar categorías</span>
-                  {filterCategories.length > 0 && (
-                    <button onClick={clearCategoryFilters} className="text-xs text-purple-400 hover:text-purple-300">
-                      Limpiar
-                    </button>
-                  )}
+              <>
+                {/* Backdrop to close dropdown */}
+                <div
+                  className="fixed inset-0 z-40"
+                  onClick={() => setShowCategoryDropdown(false)}
+                />
+                <div className="absolute top-full left-0 right-0 mt-2 bg-neutral-900 border border-neutral-700 rounded-xl shadow-xl z-50 max-h-64 sm:max-h-80 overflow-y-auto">
+                  <div className="sticky top-0 p-2 border-b border-neutral-800 flex justify-between items-center bg-neutral-900">
+                    <span className="text-xs text-gray-400">Seleccionar categorías</span>
+                    {filterCategories.length > 0 && (
+                      <button onClick={clearCategoryFilters} className="text-xs text-purple-400 hover:text-purple-300">
+                        Limpiar
+                      </button>
+                    )}
+                  </div>
+                  <div className="p-2">
+                    {SONG_CATEGORIES.map(cat => (
+                      <button
+                        key={cat.id}
+                        onClick={() => toggleFilterCategory(cat.id)}
+                        className="w-full flex items-center gap-3 px-3 py-2.5 rounded-lg hover:bg-neutral-800 transition-colors text-left"
+                      >
+                        <div className={`w-5 h-5 rounded border flex items-center justify-center shrink-0 ${
+                          filterCategories.includes(cat.id)
+                            ? 'bg-purple-500 border-purple-500'
+                            : 'border-neutral-600'
+                        }`}>
+                          {filterCategories.includes(cat.id) && (
+                            <svg className="w-3 h-3 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" />
+                            </svg>
+                          )}
+                        </div>
+                        <span className={`${cat.color} text-sm`}>{cat.label}</span>
+                      </button>
+                    ))}
+                  </div>
                 </div>
-                <div className="p-2">
-                  {SONG_CATEGORIES.map(cat => (
-                    <button
-                      key={cat.id}
-                      onClick={() => toggleFilterCategory(cat.id)}
-                      className="w-full flex items-center gap-3 px-3 py-2 rounded-lg hover:bg-neutral-800 transition-colors"
-                    >
-                      <div className={`w-5 h-5 rounded border flex items-center justify-center ${
-                        filterCategories.includes(cat.id)
-                          ? 'bg-purple-500 border-purple-500'
-                          : 'border-neutral-600'
-                      }`}>
-                        {filterCategories.includes(cat.id) && (
-                          <svg className="w-3 h-3 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" />
-                          </svg>
-                        )}
-                      </div>
-                      <span className={`${cat.color}`}>{cat.label}</span>
-                    </button>
-                  ))}
-                </div>
-              </div>
+              </>
             )}
           </div>
 
           <Button
             variant={showUnused ? 'primary' : 'secondary'}
             icon={Clock}
+            size="sm"
             onClick={() => setShowUnused(!showUnused)}
+            className="px-3"
           >
-            Sin usar {showUnused && `(${unusedSongs.length})`}
+            <span className="sm:hidden">Sin usar</span>
+            <span className="hidden sm:inline">Sin usar {showUnused && `(${unusedSongs.length})`}</span>
           </Button>
         </div>
       </div>
@@ -690,23 +726,35 @@ export const Repertorio = () => {
         </div>
       )}
 
-      {/* Add/Edit Song Modal */}
+      {/* Add/Edit Song Modal - Mobile optimized */}
       <Modal
         isOpen={isModalOpen}
         onClose={handleCloseModal}
         title={editingSong ? 'Editar Canción' : 'Nueva Canción'}
         size="xl"
         footer={
-          <>
-            <Button variant="secondary" onClick={handleCloseModal}>Cancelar</Button>
-            <Button icon={Save} onClick={handleSubmit} disabled={!formData.title.trim()}>
-              {editingSong ? 'Guardar Cambios' : 'Crear Canción'}
-            </Button>
-          </>
+          <div className="flex flex-row gap-3 w-full">
+            <button
+              type="button"
+              onClick={handleCloseModal}
+              className="flex-1 px-4 py-3 bg-neutral-800 hover:bg-neutral-700 text-gray-300 rounded-xl font-medium transition-colors"
+            >
+              Cancelar
+            </button>
+            <button
+              type="button"
+              onClick={handleSubmit}
+              disabled={!formData.title.trim()}
+              className="flex-1 px-4 py-3 bg-purple-600 hover:bg-purple-500 disabled:bg-purple-600/50 disabled:opacity-50 text-white rounded-xl font-medium transition-colors flex items-center justify-center gap-2"
+            >
+              <Save size={18} />
+              {editingSong ? 'Guardar' : 'Crear'}
+            </button>
+          </div>
         }
       >
         <form onSubmit={handleSubmit} className="space-y-6">
-          <div className="grid grid-cols-2 gap-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <Input
               label="Título"
               placeholder="Nombre de la canción"
@@ -721,13 +769,13 @@ export const Repertorio = () => {
             />
           </div>
 
-          <div className="grid grid-cols-3 gap-4">
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
             <div>
               <label className="text-xs text-gray-400 font-medium uppercase tracking-wide block mb-1.5">
                 Tono Original
               </label>
               <select
-                className="w-full"
+                className="w-full bg-neutral-900 border border-neutral-700 rounded-lg px-3 py-2.5"
                 value={formData.key}
                 onChange={(e) => setFormData({ ...formData, key: e.target.value })}
               >
@@ -736,7 +784,7 @@ export const Repertorio = () => {
                 ))}
               </select>
             </div>
-            <div>
+            <div className="sm:col-span-2">
               <label className="text-xs text-gray-400 font-medium uppercase tracking-wide block mb-1.5">
                 Categorías
               </label>
@@ -744,38 +792,48 @@ export const Repertorio = () => {
                 <button
                   type="button"
                   onClick={() => setShowCategoryDropdown(!showCategoryDropdown)}
-                  className="w-full flex items-center justify-between px-3 py-2 bg-neutral-900 border border-neutral-700 rounded-lg text-left"
+                  className="w-full flex items-center justify-between px-3 py-2.5 bg-neutral-900 border border-neutral-700 rounded-lg text-left"
                 >
                   <span className={formData.categories.length === 0 ? 'text-gray-500' : 'text-white'}>
-                    {formData.categories.length > 0 ? `${formData.categories.length} seleccionada(s)` : 'Seleccionar...'}
+                    {formData.categories.length > 0
+                      ? `${formData.categories.length} seleccionada(s) - ${formData.categories.slice(0, 2).map(c => SONG_CATEGORIES.find(sc => sc.id === c)?.label).join(', ')}${formData.categories.length > 2 ? '...' : ''}`
+                      : 'Seleccionar...'}
                   </span>
-                  <ChevronDown size={16} className="text-gray-400" />
+                  <ChevronDown size={16} className="text-gray-400 shrink-0 ml-2" />
                 </button>
 
                 {showCategoryDropdown && (
-                  <div className="absolute top-full left-0 right-0 mt-1 bg-neutral-900 border border-neutral-700 rounded-lg shadow-xl z-10 max-h-48 overflow-y-auto">
-                    {SONG_CATEGORIES.map(cat => (
-                      <button
-                        key={cat.id}
-                        type="button"
-                        onClick={() => toggleFormCategory(cat.id)}
-                        className="w-full flex items-center gap-2 px-3 py-2 hover:bg-neutral-800 transition-colors"
-                      >
-                        <div className={`w-4 h-4 rounded border flex items-center justify-center ${
-                          formData.categories.includes(cat.id)
-                            ? 'bg-purple-500 border-purple-500'
-                            : 'border-neutral-600'
-                        }`}>
-                          {formData.categories.includes(cat.id) && (
-                            <svg className="w-2.5 h-2.5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" />
-                            </svg>
-                          )}
-                        </div>
-                        <span className={`${cat.color} text-sm`}>{cat.label}</span>
-                      </button>
-                    ))}
-                  </div>
+                  <>
+                    <div
+                      className="fixed inset-0 z-40"
+                      onClick={() => setShowCategoryDropdown(false)}
+                    />
+                    <div className="absolute top-full left-0 right-0 mt-1 bg-neutral-900 border border-neutral-700 rounded-lg shadow-xl z-50 max-h-56 sm:max-h-64 overflow-y-auto">
+                      <div className="p-2">
+                        {SONG_CATEGORIES.map(cat => (
+                          <button
+                            key={cat.id}
+                            type="button"
+                            onClick={() => toggleFormCategory(cat.id)}
+                            className="w-full flex items-center gap-2 px-3 py-2.5 hover:bg-neutral-800 transition-colors text-left"
+                          >
+                            <div className={`w-4 h-4 rounded border flex items-center justify-center shrink-0 ${
+                              formData.categories.includes(cat.id)
+                                ? 'bg-purple-500 border-purple-500'
+                                : 'border-neutral-600'
+                            }`}>
+                              {formData.categories.includes(cat.id) && (
+                                <svg className="w-2.5 h-2.5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" />
+                                </svg>
+                              )}
+                            </div>
+                            <span className={`${cat.color} text-sm`}>{cat.label}</span>
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+                  </>
                 )}
               </div>
               {/* Selected categories display */}
@@ -786,22 +844,30 @@ export const Repertorio = () => {
                     return cat ? (
                       <span
                         key={catId}
-                        className={`text-xs px-2 py-0.5 rounded ${cat.bg} ${cat.color}`}
+                        className={`text-xs px-2 py-0.5 rounded ${cat.bg} ${cat.color} flex items-center gap-1`}
                       >
                         {cat.label}
+                        <button
+                          type="button"
+                          onClick={() => toggleFormCategory(catId)}
+                          className="ml-1 hover:opacity-70"
+                        >
+                          <X size={10} />
+                        </button>
                       </span>
                     ) : null;
                   })}
                 </div>
               )}
             </div>
-            <Input
-              label="YouTube URL"
-              placeholder="https://youtube.com/..."
-              value={formData.youtubeUrl}
-              onChange={(e) => setFormData({ ...formData, youtubeUrl: e.target.value })}
-            />
           </div>
+
+          <Input
+            label="YouTube URL"
+            placeholder="https://youtube.com/..."
+            value={formData.youtubeUrl}
+            onChange={(e) => setFormData({ ...formData, youtubeUrl: e.target.value })}
+          />
 
           <div>
             <div className="flex items-center justify-between mb-3">
@@ -812,9 +878,9 @@ export const Repertorio = () => {
                 Agregar Sección
               </Button>
             </div>
-            <div className="space-y-3 max-h-80 overflow-y-auto">
+            <div className="space-y-3 max-h-80 sm:max-h-96 overflow-y-auto" ref={structureContainerRef}>
               {formData.structure.map((section, index) => (
-                <div key={index} className="bg-neutral-800 rounded-xl p-4">
+                <div key={index} className="structure-section bg-neutral-800 rounded-xl p-4 transition-all duration-300 hover:ring-2 hover:ring-purple-500/30">
                   <div className="flex items-center gap-3 mb-3">
                     <GripVertical size={16} className="text-gray-500" />
                     <select

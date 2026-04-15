@@ -30,30 +30,33 @@ export const Modal = ({
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
-      <div
-        className="absolute inset-0 bg-black/80 backdrop-blur-sm animate-fade-in"
-        onClick={onClose}
-      />
+    <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 pb-20 bg-black/80">
+      {/* Modal Container */}
       <div className={`
         relative bg-neutral-900 border border-neutral-800 rounded-2xl
-        w-full ${sizes[size]} max-h-[90vh] overflow-hidden
+        w-full ${sizes[size]} max-h-[calc(100vh-160px)]
+        flex flex-col
         animate-scale-in shadow-2xl
       `}>
-        <div className="flex items-center justify-between p-5 border-b border-neutral-800">
-          <h2 className="text-lg font-semibold">{title}</h2>
+        {/* Header - Always visible */}
+        <div className="flex items-center justify-between p-4 border-b border-neutral-800 shrink-0 bg-neutral-900">
+          <h2 className="text-lg font-semibold text-white">{title}</h2>
           <button
             onClick={onClose}
-            className="p-2 rounded-lg hover:bg-neutral-800 transition-colors"
+            className="p-2 rounded-lg hover:bg-neutral-800 transition-colors text-gray-400"
           >
-            <X size={20} className="text-gray-400" />
+            <X size={20} />
           </button>
         </div>
-        <div className="p-5 overflow-y-auto max-h-[60vh]">
+
+        {/* Content - Scrollable but leaves room for footer */}
+        <div className="flex-1 overflow-y-auto p-4 pb-32">
           {children}
         </div>
+
+        {/* Footer - Always visible at bottom */}
         {footer && (
-          <div className="p-5 border-t border-neutral-800 flex justify-end gap-3">
+          <div className="absolute bottom-0 left-0 right-0 p-4 border-t border-neutral-800 bg-neutral-900 rounded-b-2xl safe-area-bottom">
             {footer}
           </div>
         )}
