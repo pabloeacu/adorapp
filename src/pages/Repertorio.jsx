@@ -932,6 +932,17 @@ export const Repertorio = () => {
                 </div>
               ))}
             </div>
+            {/* Botón para agregar sección debajo de la última */}
+            <div className="mt-2">
+              <button
+                type="button"
+                onClick={addStructureSection}
+                className="w-full py-2.5 border border-dashed border-neutral-700 rounded-xl text-gray-400 hover:text-white hover:border-neutral-600 transition-colors flex items-center justify-center gap-2 text-sm"
+              >
+                <Plus size={16} />
+                Agregar Sección
+              </button>
+            </div>
           </div>
         </form>
       </Modal>
