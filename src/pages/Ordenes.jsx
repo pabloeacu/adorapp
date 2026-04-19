@@ -29,9 +29,20 @@ const statusConfig = {
 
 export const Ordenes = () => {
   const { orders, bands, songs, members, addOrder, updateOrder, deleteOrder, cloneOrder, getUnusedByBand, getSongById, getBandById, getMemberById } = useAppStore();
-  const { profile } = useAuthStore();
-  const isPastor = profile?.role === 'pastor';
-  const isLeader = profile?.role === 'leader';
+  const { profile, user } = useAuthStore();
+
+  // Buscar miembro por email (mismo método que Header.jsx)
+  const currentMember = useMemo(() => {
+    if (user?.email && members) {
+      return members.find(m => m.email === user.email);
+    }
+    return null;
+  }, [user, members]);
+
+  // Usar el rol del member encontrado, fallback a profile.role
+  const userRole = currentMember?.role || profile?.role;
+  const isPastor = userRole === 'pastor';
+  const isLeader = userRole === 'leader';
 
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [isDetailOpen, setIsDetailOpen] = useState(false);
