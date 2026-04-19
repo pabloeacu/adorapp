@@ -41,10 +41,21 @@ const categoryConfig = {
 };
 
 export const Repertorio = () => {
-  const { songs, addSong, updateSong, deleteSong, getUnusedSongs } = useAppStore();
-  const { profile } = useAuthStore();
-  const isPastor = profile?.role === 'pastor';
-  const isLeader = profile?.role === 'leader';
+  const { songs, addSong, updateSong, deleteSong, members, getUnusedSongs } = useAppStore();
+  const { profile, user } = useAuthStore();
+
+  // Buscar miembro por email (mismo método que Header.jsx)
+  const currentMember = useMemo(() => {
+    if (user?.email && members) {
+      return members.find(m => m.email === user.email);
+    }
+    return null;
+  }, [user, members]);
+
+  // Usar el rol del member encontrado, fallback a profile.role
+  const userRole = currentMember?.role || profile?.role;
+  const isPastor = userRole === 'pastor';
+  const isLeader = userRole === 'leader';
 
   const [searchTerm, setSearchTerm] = useState('');
   const [filterCategories, setFilterCategories] = useState([]); // Multiselect
@@ -400,8 +411,8 @@ export const Repertorio = () => {
                 <List size={18} />
               </button>
             </div>
-            {/* Only pastors can add songs - NEVER leaders or members */}
-            {isPastor && (
+            {/* Pastors and leaders can add songs */}
+            {(isPastor || isLeader) && (
               <Button icon={Plus} onClick={() => handleOpenModal()}>
                 Nueva Canción
               </Button>
