@@ -9,13 +9,13 @@
   "orientation": "portrait-primary",
   "icons": [
     {
-      "src": "/adorapp-logo.png",
+      "src": "/adoracion-caf-logo.png",
       "sizes": "192x192",
       "type": "image/png",
       "purpose": "any maskable"
     },
     {
-      "src": "/adorapp-logo.png",
+      "src": "/adoracion-caf-logo.png",
       "sizes": "512x512",
       "type": "image/png",
       "purpose": "any maskable"
