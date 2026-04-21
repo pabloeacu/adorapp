@@ -122,6 +122,7 @@ const convertMemberFromDB = (m) => ({
   leader_of: m.leader_of,
   birthdate: m.birthdate,
   role: m.role,
+  editor: m.editor || false, // Editor permission for songs
   instruments: m.instruments || [],
   active: m.active,
   userId: m.user_id,
@@ -181,6 +182,7 @@ const convertMemberToDB = (m) => ({
   leader_of: m.leader_of || null,
   birthdate: m.birthdate || null,
   role: m.role || 'member',
+  editor: m.editor || false, // Editor permission for songs
   instruments: m.instruments || [],
   active: m.active ?? true,
   user_id: m.userId || null,

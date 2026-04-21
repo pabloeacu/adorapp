@@ -106,7 +106,6 @@ export const Repertorio = () => {
     title: '',
     message: ''
   });
-  const [isGeneratingPDF, setIsGeneratingPDF] = useState(false);
 
   const unusedSongs = getUnusedSongs(4);
 
@@ -339,47 +338,39 @@ export const Repertorio = () => {
       ? transposeSongStructure(song.structure || [], originalKey, key)
       : song.structure;
 
+    // Use white background for better printing
     const doc = new jsPDF({
       orientation: 'portrait',
       unit: 'mm',
       format: 'a4'
     });
 
-    // Colors - optimized for dark background
-    const purple = [168, 85, 247];
-    const white = [255, 255, 255];
-    const lightGray = [200, 200, 200];
-    const mediumGray = [153, 153, 153];
-    const purpleLight = [200, 150, 255];
-
-    // Helper function to add dark background to a page
-    const addDarkBackground = () => {
-      doc.setFillColor(26, 26, 26);
-      doc.rect(0, 0, 210, 297, 'F');
-    };
-
-    // Initial dark background
-    addDarkBackground();
+    // Colors - optimized for white background
+    const purple = [128, 0, 128];
+    const darkPurple = [75, 0, 130];
+    const black = [0, 0, 0];
+    const darkGray = [64, 64, 64];
+    const gray = [128, 128, 128];
 
     let y = 20;
 
-    // Header - Title (white for contrast)
+    // Header - Title
     doc.setFontSize(24);
-    doc.setTextColor(...white);
+    doc.setTextColor(...black);
     doc.setFont('helvetica', 'bold');
     doc.text(song.title, 20, y);
-    y += 10;
+    y += 8;
 
-    // Artist (light gray)
-    doc.setFontSize(14);
-    doc.setTextColor(...lightGray);
+    // Artist
+    doc.setFontSize(12);
+    doc.setTextColor(...darkGray);
     doc.setFont('helvetica', 'normal');
     doc.text(song.artist || 'Artista desconocido', 20, y);
-    y += 10;
+    y += 8;
 
-    // Meta info - white text for contrast on dark background
-    doc.setFontSize(11);
-    doc.setTextColor(...white);
+    // Meta info
+    doc.setFontSize(10);
+    doc.setTextColor(...darkGray);
 
     const metaParts = [`Tono: ${key}`];
     if (key !== originalKey) {
@@ -395,35 +386,34 @@ export const Repertorio = () => {
     const catLabel = categories[0] ? categoryConfig[categories[0]]?.label : 'Sin categoría';
     metaParts.push(catLabel);
 
-    doc.text(metaParts.join('   •   '), 20, y);
-    y += 15;
+    doc.text(metaParts.join('  |  '), 20, y);
+    y += 10;
 
     // Separator line
     doc.setDrawColor(...purple);
     doc.setLineWidth(0.5);
     doc.line(20, y, 190, y);
-    y += 12;
+    y += 10;
 
     // Sections
-    transposedStructure.forEach((section, index) => {
+    transposedStructure.forEach((section) => {
       // Check if we need a new page
-      if (y > 250) {
+      if (y > 260) {
         doc.addPage();
-        addDarkBackground();
         y = 20;
       }
 
-      // Section label (lighter purple for better visibility)
-      doc.setFontSize(13);
-      doc.setTextColor(...purpleLight);
+      // Section label
+      doc.setFontSize(12);
+      doc.setTextColor(...purple);
       doc.setFont('helvetica', 'bold');
       doc.text(section.label, 20, y);
-      y += 8;
+      y += 7;
 
-      // Chords (purple)
+      // Chords
       if (section.chords) {
-        doc.setFontSize(16);
-        doc.setTextColor(...purple);
+        doc.setFontSize(14);
+        doc.setTextColor(...darkPurple);
         doc.setFont('courier', 'bold');
 
         // Split long chords into multiple lines if needed
@@ -434,7 +424,7 @@ export const Repertorio = () => {
           const testLine = line ? `${line} ${word}` : word;
           if (doc.getTextWidth(testLine) > maxWidth) {
             doc.text(line, 20, y);
-            y += 7;
+            y += 6;
             line = word;
           } else {
             line = testLine;
@@ -442,55 +432,55 @@ export const Repertorio = () => {
         });
         if (line) {
           doc.text(line, 20, y);
-          y += 8;
+          y += 7;
         }
       }
 
-      // Lyrics (white for maximum contrast)
+      // Lyrics
       if (section.content) {
-        doc.setFontSize(12);
-        doc.setTextColor(...white);
+        doc.setFontSize(11);
+        doc.setTextColor(...black);
         doc.setFont('helvetica', 'normal');
 
         // Word wrap lyrics
         const lines = doc.splitTextToSize(section.content, 170);
         lines.forEach((lineText) => {
-          if (y > 270) {
+          if (y > 275) {
             doc.addPage();
-            addDarkBackground();
             y = 20;
           }
           doc.text(lineText, 20, y);
-          y += 6;
+          y += 5;
         });
       }
 
       // Empty section (musical intro)
       if (!section.chords && !section.content && section.type === 'intro') {
         doc.setFontSize(10);
-        doc.setTextColor(...mediumGray);
+        doc.setTextColor(...gray);
         doc.setFont('helvetica', 'italic');
         doc.text('Silencio musical', 20, y);
-        y += 6;
+        y += 5;
       }
 
-      y += 10; // Space between sections
+      y += 8; // Space between sections
     });
 
     // Footer
     if (y > 270) {
       doc.addPage();
-      addDarkBackground();
       y = 20;
     }
     y += 5;
-    doc.setFontSize(9);
-    doc.setTextColor(...mediumGray);
+    doc.setFontSize(8);
+    doc.setTextColor(...gray);
     doc.setFont('helvetica', 'italic');
     doc.text('Generado por AdorAPP - La plataforma de Adoración CAF', 20, y);
 
-    // Download the PDF using save() method - most reliable across browsers
+    // Generate filename
     const fileName = `${song.title.replace(/[^a-zA-Z0-9áéíóúÁÉÍÓÚñÑ\s]/g, '').replace(/\s+/g, '_')}_${key}.pdf`;
+
+    // Download - use save() directly which triggers browser download
     doc.save(fileName);
   };
 
@@ -523,8 +513,8 @@ export const Repertorio = () => {
                 <List size={18} />
               </button>
             </div>
-            {/* Pastors and leaders can add songs */}
-            {(isPastor || isLeader) && (
+            {/* Pastors, leaders and editors can add songs */}
+            {(isPastor || isLeader || currentMember?.editor) && (
               <Button icon={Plus} onClick={() => handleOpenModal()}>
                 Nueva Canción
               </Button>
@@ -712,7 +702,7 @@ export const Repertorio = () => {
                 >
                   PDF
                 </Button>
-                {(isPastor || isLeader) && (
+                {(isPastor || isLeader || currentMember?.editor) && (
                   <>
                     <Button
                       variant="ghost"
@@ -810,7 +800,7 @@ export const Repertorio = () => {
                         >
                           <FileDown size={14} />
                         </button>
-                        {(isPastor || isLeader) && (
+                        {(isPastor || isLeader || currentMember?.editor) && (
                           <>
                             <button
                               onClick={() => handleOpenModal(song)}
@@ -842,7 +832,7 @@ export const Repertorio = () => {
         <div className="text-center py-12">
           <Music size={48} className="mx-auto text-gray-600 mb-4" />
           <p className="text-gray-400">No se encontraron canciones</p>
-          {(isPastor || isLeader) && (
+          {(isPastor || isLeader || currentMember?.editor) && (
             <Button
               variant="secondary"
               icon={Plus}
@@ -1213,25 +1203,27 @@ export const Repertorio = () => {
         size="md"
         footer={
           <>
-            <Button variant="secondary" onClick={() => setExportModalSong(null)} disabled={isGeneratingPDF}>Cancelar</Button>
-            <Button icon={FileDown} onClick={async () => {
+            <Button variant="secondary" onClick={() => setExportModalSong(null)}>Cancelar</Button>
+            <Button icon={FileDown} onClick={() => {
               if (exportModalSong) {
-                setIsGeneratingPDF(true);
-                try {
-                  await generateSongPDF(exportModalSong, exportSongKey);
-                } catch (err) {
-                  console.error('Error generating PDF:', err);
-                  setErrorModal({
-                    isOpen: true,
-                    title: 'Error',
-                    message: 'No se pudo generar el PDF. Intenta de nuevo.'
-                  });
-                }
-                setIsGeneratingPDF(false);
-                setExportModalSong(null);
+                const song = exportModalSong;
+                const key = exportSongKey;
+                setExportModalSong(null); // Close modal first
+                setTimeout(() => {
+                  try {
+                    generateSongPDF(song, key);
+                  } catch (err) {
+                    console.error('Error generating PDF:', err);
+                    setErrorModal({
+                      isOpen: true,
+                      title: 'Error',
+                      message: 'No se pudo generar el PDF. Intenta de nuevo.'
+                    });
+                  }
+                }, 100); // Small delay to let modal close first
               }
-            }} disabled={isGeneratingPDF}>
-              {isGeneratingPDF ? 'Generando...' : 'Descargar PDF'}
+            }}>
+              Descargar PDF
             </Button>
           </>
         }

@@ -59,6 +59,7 @@ export const Miembros = () => {
     leader_of: '',
     birthdate: '',
     role: 'member',
+    editor: false, // Editor permission for songs
     instruments: [],
     active: true,
     password: '' // Password field for new members
@@ -122,6 +123,7 @@ export const Miembros = () => {
         leader_of: member.leader_of || '',
         birthdate: member.birthdate || '',
         role: member.role,
+        editor: member.editor || false,
         instruments: member.instruments || [],
         active: member.active,
         // NOTE: Do NOT include avatar_url here - let the store preserve it
@@ -139,6 +141,7 @@ export const Miembros = () => {
         leader_of: '',
         birthdate: '',
         role: 'member',
+        editor: false,
         instruments: [],
         active: true,
         password: ''
@@ -849,6 +852,38 @@ export const Miembros = () => {
               ))}
             </div>
           </div>
+
+          {/* Editor Permission Switch - Only visible to pastors when editing/creating members */}
+          {isPastor && formData.role === 'member' && (
+            <div className="p-4 bg-purple-500/10 border border-purple-500/30 rounded-xl">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-3">
+                  <div className="w-10 h-10 rounded-lg bg-purple-500/20 flex items-center justify-center">
+                    <Edit size={20} className="text-purple-400" />
+                  </div>
+                  <div>
+                    <p className="font-medium text-white">Permiso de Editor</p>
+                    <p className="text-xs text-gray-400">Permite agregar y editar canciones</p>
+                  </div>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setFormData(prev => ({ ...prev, editor: !prev.editor }))}
+                  className={`
+                    relative w-14 h-8 rounded-full transition-colors duration-200
+                    ${formData.editor ? 'bg-purple-500' : 'bg-neutral-700'}
+                  `}
+                >
+                  <span
+                    className={`
+                      absolute top-1 left-1 w-6 h-6 bg-white rounded-full transition-transform duration-200
+                      ${formData.editor ? 'translate-x-6' : 'translate-x-0'}
+                    `}
+                  />
+                </button>
+              </div>
+            </div>
+          )}
 
           <div>
             <label className="text-xs text-gray-400 font-medium uppercase tracking-wide block mb-3">
