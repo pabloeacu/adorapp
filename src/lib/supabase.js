@@ -70,8 +70,11 @@ CREATE TABLE IF NOT EXISTS songs (
   original_key TEXT DEFAULT 'C',
   key TEXT DEFAULT 'C',
   category TEXT DEFAULT 'adoracion',
+  categories TEXT[] DEFAULT ARRAY['adoracion'],
   youtube_url TEXT,
   structure JSONB DEFAULT '[]',
+  compass TEXT,
+  bpm INTEGER,
   last_used DATE,
   created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
   updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()

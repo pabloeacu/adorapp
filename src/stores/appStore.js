@@ -152,6 +152,8 @@ const convertSongFromDB = (s) => ({
   categories: s.categories || (s.category ? [s.category] : ['adoracion']), // Support both old single category and new array
   youtubeUrl: s.youtube_url,
   structure: s.structure || [],
+  compass: s.compass || '', // Compás (ej: 4/4)
+  bpm: s.bpm || '', // BPM (número hasta 3 dígitos)
   lastUsed: s.last_used,
   createdAt: s.created_at,
   updatedAt: s.updated_at,
@@ -203,6 +205,8 @@ const convertSongToDB = (s) => ({
   category: Array.isArray(s.categories) ? s.categories[0] : (s.category || 'adoracion'), // Keep category for compatibility
   youtube_url: s.youtubeUrl || null,
   structure: s.structure || [],
+  compass: s.compass || null, // Compás (ej: 4/4)
+  bpm: s.bpm || null, // BPM (número hasta 3 dígitos)
   last_used: s.lastUsed || null,
 });
 
