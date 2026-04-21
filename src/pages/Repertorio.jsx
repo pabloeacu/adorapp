@@ -79,6 +79,8 @@ export const Repertorio = () => {
     key: 'C',
     categories: ['adoracion'],
     youtubeUrl: '',
+    compass: '', // Compás (ej: 4/4, 3/4)
+    bpm: '', // BPM (número hasta 3 dígitos)
     structure: [{ type: 'verse', label: 'Verso 1', content: '', chords: '' }]
   });
 
@@ -175,6 +177,8 @@ export const Repertorio = () => {
         key: song.key || song.originalKey,
         categories: song.categories || (song.category ? [song.category] : ['adoracion']),
         youtubeUrl: song.youtubeUrl || '',
+        compass: song.compass || '',
+        bpm: song.bpm || '',
         structure: song.structure || [{ type: 'verse', label: 'Verso 1', content: '', chords: '' }]
       });
     } else {
@@ -185,6 +189,8 @@ export const Repertorio = () => {
         key: 'C',
         categories: ['adoracion'],
         youtubeUrl: '',
+        compass: '',
+        bpm: '',
         structure: [{ type: 'intro', label: 'Intro', content: '', chords: '' }]
       });
     }
@@ -544,6 +550,12 @@ export const Repertorio = () => {
                   </div>
                 </div>
                 <Badge variant="primary">Tono: {song.key}</Badge>
+                  {song.compass && (
+                    <Badge variant="secondary">Comp: {song.compass}</Badge>
+                  )}
+                  {song.bpm && (
+                    <Badge variant="secondary">BPM: {song.bpm}</Badge>
+                  )}
               </div>
 
               <div className="flex items-start gap-2 mb-3 flex-wrap">
@@ -780,7 +792,7 @@ export const Repertorio = () => {
             />
           </div>
 
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
             <div>
               <label className="text-xs text-gray-400 font-medium uppercase tracking-wide block mb-1.5">
                 Tono Original
@@ -795,7 +807,35 @@ export const Repertorio = () => {
                 ))}
               </select>
             </div>
-            <div className="sm:col-span-2">
+            <div>
+              <label className="text-xs text-gray-400 font-medium uppercase tracking-wide block mb-1.5">
+                Compás
+              </label>
+              <input
+                type="text"
+                placeholder="4/4"
+                maxLength={5}
+                className="w-full bg-neutral-900 border border-neutral-700 rounded-lg px-3 py-2.5 text-center"
+                value={formData.compass}
+                onChange={(e) => setFormData({ ...formData, compass: e.target.value })}
+              />
+            </div>
+            <div>
+              <label className="text-xs text-gray-400 font-medium uppercase tracking-wide block mb-1.5">
+                BPM
+              </label>
+              <input
+                type="number"
+                placeholder="120"
+                min="0"
+                max="999"
+                maxLength={3}
+                className="w-full bg-neutral-900 border border-neutral-700 rounded-lg px-3 py-2.5 text-center [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+                value={formData.bpm}
+                onChange={(e) => setFormData({ ...formData, bpm: e.target.value.slice(0, 3) })}
+              />
+            </div>
+            <div className="sm:col-span-1">
               <label className="text-xs text-gray-400 font-medium uppercase tracking-wide block mb-1.5">
                 Categorías
               </label>
@@ -977,7 +1017,13 @@ export const Repertorio = () => {
                 <div>
                   <p className="text-gray-400">{viewingSong.artist}</p>
                   <div className="flex flex-wrap items-center gap-2 mt-2">
-                    <Badge variant="primary">Tono Original: {originalKey}</Badge>
+                    <Badge variant="primary">Tono: {originalKey}</Badge>
+                    {viewingSong.compass && (
+                      <Badge variant="secondary">Compás: {viewingSong.compass}</Badge>
+                    )}
+                    {viewingSong.bpm && (
+                      <Badge variant="secondary">BPM: {viewingSong.bpm}</Badge>
+                    )}
                     {(viewingSong.categories || (viewingSong.category ? [viewingSong.category] : [])).map((catId, idx) => (
                       <Badge key={`${catId}-${idx}`} className={categoryConfig[catId]?.bg}>
                         {categoryConfig[catId]?.label}
