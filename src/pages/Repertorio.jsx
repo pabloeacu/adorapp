@@ -1,4 +1,5 @@
 import React, { useState, useMemo, useRef, useEffect } from 'react';
+import { jsPDF } from 'jspdf';
 import {
   Plus, Search, Music, Download, Edit, Trash2, Clock, MoreVertical,
   Eye, ExternalLink, Filter, X, GripVertical, Music2, Save,
@@ -105,6 +106,7 @@ export const Repertorio = () => {
     title: '',
     message: ''
   });
+  const [isGeneratingPDF, setIsGeneratingPDF] = useState(false);
 
   const unusedSongs = getUnusedSongs(4);
 
@@ -331,61 +333,165 @@ export const Repertorio = () => {
     });
   };
 
-  const generateSongPDF = (song, key) => {
+  const generateSongPDF = async (song, key) => {
     const originalKey = song.originalKey || song.key;
     const transposedStructure = key !== originalKey
       ? transposeSongStructure(song.structure || [], originalKey, key)
       : song.structure;
 
-    const printWindow = window.open('', '_blank');
-    const html = `
-      <!DOCTYPE html>
-      <html>
-      <head>
-        <title>${song.title} - AdorAPP</title>
-        <style>
-          * { margin: 0; padding: 0; box-sizing: border-box; }
-          body { font-family: 'Segoe UI', Arial, sans-serif; background: #1a1a1a; color: #fff; padding: 40px; }
-          .header { text-align: center; margin-bottom: 30px; border-bottom: 2px solid #333; padding-bottom: 20px; }
-          .header h1 { font-size: 28px; margin-bottom: 8px; }
-          .header .artist { color: #888; font-size: 16px; }
-          .meta { display: flex; justify-content: center; gap: 20px; margin-top: 15px; }
-          .meta span { background: #333; padding: 6px 16px; border-radius: 20px; font-size: 14px; }
-          .section { margin-bottom: 20px; padding: 20px; background: #252525; border-radius: 12px; }
-          .section-label { color: #a855f7; font-size: 14px; font-weight: 600; margin-bottom: 10px; }
-          .chords { color: #a855f7; font-size: 22px; font-family: monospace; margin-bottom: 10px; }
-          .lyrics { color: #ccc; font-size: 16px; line-height: 1.8; white-space: pre-wrap; }
-          .footer { text-align: center; margin-top: 40px; color: #555; font-size: 12px; }
-          @media print { body { background: #fff; color: #000; } .section { background: #f5f5f5; } .chords { color: #7c3aed; } }
-        </style>
-      </head>
-      <body>
-        <div class="header">
-          <h1>${song.title}</h1>
-          <div class="artist">${song.artist || 'Artista desconocido'}</div>
-          <div class="meta">
-            <span>Tono: ${key}</span>
-            ${key !== originalKey ? `<span>Original: ${originalKey}</span>` : ''}
-            <span>${categoryConfig[song.category]?.label || 'Sin categoría'}</span>
-          </div>
-        </div>
-        ${transposedStructure.map((section, i) => `
-          <div class="section">
-            <div class="section-label">${section.label}</div>
-            ${section.chords ? `<div class="chords">${section.chords}</div>` : ''}
-            ${section.content ? `<div class="lyrics">${section.content}</div>` : ''}
-            ${!section.chords && !section.content ? `<div class="lyrics" style="color:#666;font-style:italic">Silencio musical</div>` : ''}
-          </div>
-        `).join('')}
-        <div class="footer">
-          Generado por AdorAPP - La plataforma de Adoración CAF
-        </div>
-      </body>
-      </html>
-    `;
-    printWindow.document.write(html);
-    printWindow.document.close();
-    printWindow.print();
+    const doc = new jsPDF({
+      orientation: 'portrait',
+      unit: 'mm',
+      format: 'a4'
+    });
+
+    // Colors - optimized for dark background
+    const purple = [168, 85, 247];
+    const white = [255, 255, 255];
+    const lightGray = [200, 200, 200];
+    const mediumGray = [153, 153, 153];
+    const purpleLight = [200, 150, 255];
+
+    // Helper function to add dark background to a page
+    const addDarkBackground = () => {
+      doc.setFillColor(26, 26, 26);
+      doc.rect(0, 0, 210, 297, 'F');
+    };
+
+    // Initial dark background
+    addDarkBackground();
+
+    let y = 20;
+
+    // Header - Title (white for contrast)
+    doc.setFontSize(24);
+    doc.setTextColor(...white);
+    doc.setFont('helvetica', 'bold');
+    doc.text(song.title, 20, y);
+    y += 10;
+
+    // Artist (light gray)
+    doc.setFontSize(14);
+    doc.setTextColor(...lightGray);
+    doc.setFont('helvetica', 'normal');
+    doc.text(song.artist || 'Artista desconocido', 20, y);
+    y += 10;
+
+    // Meta info - white text for contrast on dark background
+    doc.setFontSize(11);
+    doc.setTextColor(...white);
+
+    const metaParts = [`Tono: ${key}`];
+    if (key !== originalKey) {
+      metaParts.push(`Original: ${originalKey}`);
+    }
+    if (song.compass) {
+      metaParts.push(`Compás: ${song.compass}`);
+    }
+    if (song.bpm) {
+      metaParts.push(`BPM: ${song.bpm}`);
+    }
+    const categories = song.categories || (song.category ? [song.category] : []);
+    const catLabel = categories[0] ? categoryConfig[categories[0]]?.label : 'Sin categoría';
+    metaParts.push(catLabel);
+
+    doc.text(metaParts.join('   •   '), 20, y);
+    y += 15;
+
+    // Separator line
+    doc.setDrawColor(...purple);
+    doc.setLineWidth(0.5);
+    doc.line(20, y, 190, y);
+    y += 12;
+
+    // Sections
+    transposedStructure.forEach((section, index) => {
+      // Check if we need a new page
+      if (y > 250) {
+        doc.addPage();
+        addDarkBackground();
+        y = 20;
+      }
+
+      // Section label (lighter purple for better visibility)
+      doc.setFontSize(13);
+      doc.setTextColor(...purpleLight);
+      doc.setFont('helvetica', 'bold');
+      doc.text(section.label, 20, y);
+      y += 8;
+
+      // Chords (purple)
+      if (section.chords) {
+        doc.setFontSize(16);
+        doc.setTextColor(...purple);
+        doc.setFont('courier', 'bold');
+
+        // Split long chords into multiple lines if needed
+        const maxWidth = 170;
+        const words = section.chords.split(' ');
+        let line = '';
+        words.forEach((word) => {
+          const testLine = line ? `${line} ${word}` : word;
+          if (doc.getTextWidth(testLine) > maxWidth) {
+            doc.text(line, 20, y);
+            y += 7;
+            line = word;
+          } else {
+            line = testLine;
+          }
+        });
+        if (line) {
+          doc.text(line, 20, y);
+          y += 8;
+        }
+      }
+
+      // Lyrics (white for maximum contrast)
+      if (section.content) {
+        doc.setFontSize(12);
+        doc.setTextColor(...white);
+        doc.setFont('helvetica', 'normal');
+
+        // Word wrap lyrics
+        const lines = doc.splitTextToSize(section.content, 170);
+        lines.forEach((lineText) => {
+          if (y > 270) {
+            doc.addPage();
+            addDarkBackground();
+            y = 20;
+          }
+          doc.text(lineText, 20, y);
+          y += 6;
+        });
+      }
+
+      // Empty section (musical intro)
+      if (!section.chords && !section.content && section.type === 'intro') {
+        doc.setFontSize(10);
+        doc.setTextColor(...mediumGray);
+        doc.setFont('helvetica', 'italic');
+        doc.text('Silencio musical', 20, y);
+        y += 6;
+      }
+
+      y += 10; // Space between sections
+    });
+
+    // Footer
+    if (y > 270) {
+      doc.addPage();
+      addDarkBackground();
+      y = 20;
+    }
+    y += 5;
+    doc.setFontSize(9);
+    doc.setTextColor(...mediumGray);
+    doc.setFont('helvetica', 'italic');
+    doc.text('Generado por AdorAPP - La plataforma de Adoración CAF', 20, y);
+
+    // Download the PDF using save() method - most reliable across browsers
+    const fileName = `${song.title.replace(/[^a-zA-Z0-9áéíóúÁÉÍÓÚñÑ\s]/g, '').replace(/\s+/g, '_')}_${key}.pdf`;
+    doc.save(fileName);
   };
 
   return (
@@ -1107,14 +1213,25 @@ export const Repertorio = () => {
         size="md"
         footer={
           <>
-            <Button variant="secondary" onClick={() => setExportModalSong(null)}>Cancelar</Button>
-            <Button icon={FileDown} onClick={() => {
+            <Button variant="secondary" onClick={() => setExportModalSong(null)} disabled={isGeneratingPDF}>Cancelar</Button>
+            <Button icon={FileDown} onClick={async () => {
               if (exportModalSong) {
-                generateSongPDF(exportModalSong, exportSongKey);
+                setIsGeneratingPDF(true);
+                try {
+                  await generateSongPDF(exportModalSong, exportSongKey);
+                } catch (err) {
+                  console.error('Error generating PDF:', err);
+                  setErrorModal({
+                    isOpen: true,
+                    title: 'Error',
+                    message: 'No se pudo generar el PDF. Intenta de nuevo.'
+                  });
+                }
+                setIsGeneratingPDF(false);
                 setExportModalSong(null);
               }
-            }}>
-              Generar PDF
+            }} disabled={isGeneratingPDF}>
+              {isGeneratingPDF ? 'Generando...' : 'Descargar PDF'}
             </Button>
           </>
         }
@@ -1132,7 +1249,16 @@ export const Repertorio = () => {
                 </div>
               </div>
               <div className="flex flex-wrap gap-2">
-                <Badge variant="primary">Original: {exportModalSong.originalKey || exportModalSong.key}</Badge>
+                <Badge variant="primary">Tono: {exportSongKey}</Badge>
+                {exportSongKey !== (exportModalSong.originalKey || exportModalSong.key) && (
+                  <Badge variant="secondary">Original: {exportModalSong.originalKey || exportModalSong.key}</Badge>
+                )}
+                {exportModalSong.compass && (
+                  <Badge variant="secondary">Compás: {exportModalSong.compass}</Badge>
+                )}
+                {exportModalSong.bpm && (
+                  <Badge variant="secondary">BPM: {exportModalSong.bpm}</Badge>
+                )}
                 {(exportModalSong.categories || (exportModalSong.category ? [exportModalSong.category] : [])).map((catId, idx) => (
                   <Badge key={`${catId}-${idx}`} className={categoryConfig[catId]?.bg}>
                     {categoryConfig[catId]?.label}

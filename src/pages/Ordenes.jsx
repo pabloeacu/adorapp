@@ -5,6 +5,7 @@ import {
   User, Zap, AlertCircle, ChevronDown, FileDown, History, Award,
   FileText, Printer, Copy as CopyIcon
 } from 'lucide-react';
+import { jsPDF } from 'jspdf';
 import { useAppStore, MEETING_TYPES, MUSICAL_KEYS, transposeSongStructure } from '../stores/appStore';
 import { useAuthStore } from '../stores/authStore';
 import { supabase } from '../lib/supabase';
@@ -206,102 +207,200 @@ export const Ordenes = () => {
   };
 
   // Export order summary (without chords)
-  const generateOrderPDF = (order) => {
+  const generateOrderPDF = async (order) => {
     const band = getBandById(order.bandId);
-    const printWindow = window.open('', '_blank');
+    const doc = new jsPDF({
+      orientation: 'portrait',
+      unit: 'mm',
+      format: 'a4'
+    });
 
-    const songsHtml = order.songs.map((songRef, index) => {
+    // Colors - optimized for dark background
+    const purple = [168, 85, 247];
+    const white = [255, 255, 255];
+    const lightGray = [200, 200, 200];
+    const mediumGray = [153, 153, 153];
+    const purpleLight = [200, 150, 255];
+
+    // Helper function to add dark background to a page
+    const addDarkBackground = () => {
+      doc.setFillColor(26, 26, 26);
+      doc.rect(0, 0, 210, 297, 'F');
+    };
+
+    // Initial dark background
+    addDarkBackground();
+
+    let y = 25;
+
+    // Header - Title
+    doc.setFontSize(28);
+    doc.setTextColor(...purple);
+    doc.setFont('helvetica', 'bold');
+    doc.text('Orden de Servicio', 105, y, { align: 'center' });
+    y += 12;
+
+    // Date and time
+    doc.setFontSize(18);
+    doc.setTextColor(...white);
+    doc.setFont('helvetica', 'normal');
+    doc.text(formatDate(order.date), 105, y, { align: 'center' });
+    y += 8;
+    doc.setFontSize(14);
+    doc.setTextColor(...lightGray);
+    doc.text(order.time, 105, y, { align: 'center' });
+    y += 15;
+
+    // Meta info
+    doc.setFontSize(12);
+    doc.setTextColor(...white);
+    doc.text(`${band?.name || 'Banda'}   •   ${getMeetingTypeLabel(order.meetingType)}   •   ${order.songs.length} canciones`, 105, y, { align: 'center' });
+    y += 15;
+
+    // Separator line
+    doc.setDrawColor(...purple);
+    doc.setLineWidth(0.5);
+    doc.line(20, y, 190, y);
+    y += 15;
+
+    // Table header
+    doc.setFontSize(10);
+    doc.setTextColor(...mediumGray);
+    doc.setFont('helvetica', 'bold');
+    doc.text('#', 20, y);
+    doc.text('Canción', 35, y);
+    doc.text('Tono', 140, y, { align: 'center' });
+    doc.text('Director', 165, y);
+    y += 8;
+
+    // Table separator
+    doc.setDrawColor(60, 60, 60);
+    doc.setLineWidth(0.2);
+    doc.line(20, y, 190, y);
+    y += 5;
+
+    // Songs
+    order.songs.forEach((songRef, index) => {
+      // Check if we need a new page
+      if (y > 260) {
+        doc.addPage();
+        addDarkBackground();
+        y = 25;
+      }
+
       const song = getSongById(songRef.songId);
       const director = getMemberById(songRef.directorId);
-      const originalKey = song?.originalKey || song?.key || songRef.key;
-      const key = songRef.key || originalKey;
+      const key = songRef.key || song?.originalKey || song?.key || 'C';
 
-      return `
-        <tr>
-          <td style="padding:12px;border-bottom:1px solid #333;text-align:center">${index + 1}</td>
-          <td style="padding:12px;border-bottom:1px solid #333">
-            <strong>${song?.title || 'Sin título'}</strong>
-            <div style="color:#888;font-size:12px">${song?.artist || ''}</div>
-          </td>
-          <td style="padding:12px;border-bottom:1px solid #333;text-align:center">
-            <span style="background:#333;border:1px solid #555;color:#a855f7;padding:6px 12px;border-radius:6px;font-weight:bold">${key}</span>
-          </td>
-          <td style="padding:12px;border-bottom:1px solid #333">${director?.name || '-'}</td>
-        </tr>
-      `;
-    }).join('');
+      // Number
+      doc.setFontSize(12);
+      doc.setTextColor(...purple);
+      doc.setFont('helvetica', 'bold');
+      doc.text(`${index + 1}`, 20, y);
 
-    const html = `
-      <!DOCTYPE html>
-      <html>
-      <head>
-        <title>Orden de Servicio - ${formatDate(order.date)} - AdorAPP</title>
-        <style>
-          * { margin: 0; padding: 0; box-sizing: border-box; }
-          body { font-family: 'Segoe UI', Arial, sans-serif; background: #1a1a1a; color: #fff; padding: 30px; }
-          .header { text-align: center; margin-bottom: 30px; border-bottom: 2px solid #333; padding-bottom: 20px; }
-          .header h1 { font-size: 24px; margin-bottom: 8px; color: #a855f7; }
-          .header .date { font-size: 18px; color: #ccc; }
-          .meta { display: flex; justify-content: center; gap: 15px; margin-top: 15px; flex-wrap: wrap; }
-          .meta span { background: #333; padding: 6px 14px; border-radius: 20px; font-size: 13px; }
-          table { width: 100%; border-collapse: collapse; margin-top: 25px; }
-          th { background: #252525; padding: 12px; text-align: left; font-size: 12px; color: #888; text-transform: uppercase; }
-          td { vertical-align: middle; }
-          .footer { text-align: center; margin-top: 40px; color: #555; font-size: 11px; }
-          .feedback-box { margin-top: 20px; background: #252525; padding: 15px; border-radius: 10px; }
-          .feedback-box h3 { color: #f59e0b; font-size: 14px; margin-bottom: 8px; }
-          @media print { body { background: #fff; color: #000; } th { background: #eee; color: #333; } td { border-bottom: 1px solid #ddd; } }
-        </style>
-      </head>
-      <body>
-        <div class="header">
-          <h1>Orden de Servicio</h1>
-          <div class="date">${formatDate(order.date)} - ${order.time}</div>
-          <div class="meta">
-            <span>${band?.name || 'Banda'}</span>
-            <span>${getMeetingTypeLabel(order.meetingType)}</span>
-            <span>${order.songs.length} canciones</span>
-          </div>
-        </div>
+      // Title and artist
+      doc.setTextColor(...white);
+      doc.setFont('helvetica', 'normal');
+      doc.setFontSize(11);
+      doc.text(song?.title || 'Sin título', 35, y);
+      if (song?.artist) {
+        doc.setFontSize(9);
+        doc.setTextColor(...mediumGray);
+        doc.text(song.artist, 35, y + 5);
+      }
 
-        <table>
-          <thead>
-            <tr>
-              <th style="width:50px;text-align:center">#</th>
-              <th>Canción</th>
-              <th style="width:100px;text-align:center">Tono</th>
-              <th style="width:150px">Director</th>
-            </tr>
-          </thead>
-          <tbody>
-            ${songsHtml}
-          </tbody>
-        </table>
+      // Key badge
+      doc.setFontSize(10);
+      doc.setTextColor(...purple);
+      doc.setFont('helvetica', 'bold');
+      doc.text(key, 140, y + (song?.artist ? 3 : 0), { align: 'center' });
 
-        ${order.feedback ? `
-          <div class="feedback-box">
-            <h3>Devolución del Pastor</h3>
-            <p style="color:#ccc;font-size:14px">${order.feedback}</p>
-          </div>
-        ` : ''}
+      // Director
+      doc.setTextColor(...lightGray);
+      doc.setFontSize(10);
+      doc.setFont('helvetica', 'normal');
+      doc.text(director?.name || '-', 190, y + (song?.artist ? 3 : 0), { align: 'right' });
 
-        <div class="footer">
-          Generado por AdorAPP - La plataforma de Adoración CAF
-        </div>
-      </body>
-      </html>
-    `;
+      // Move to next row
+      y += song?.artist ? 12 : 10;
 
-    printWindow.document.write(html);
-    printWindow.document.close();
-    printWindow.print();
+      // Row separator
+      doc.setDrawColor(50, 50, 50);
+      doc.setLineWidth(0.1);
+      doc.line(20, y - 3, 190, y - 3);
+    });
+
+    // Feedback section
+    if (order.feedback) {
+      if (y > 230) {
+        doc.addPage();
+        addDarkBackground();
+        y = 25;
+      }
+      y += 10;
+      doc.setFontSize(12);
+      doc.setTextColor(245, 158, 11); // Yellow
+      doc.setFont('helvetica', 'bold');
+      doc.text('Devolución del Pastor', 20, y);
+      y += 8;
+      doc.setFontSize(11);
+      doc.setTextColor(...lightGray);
+      doc.setFont('helvetica', 'normal');
+      const feedbackLines = doc.splitTextToSize(order.feedback, 170);
+      feedbackLines.forEach(line => {
+        doc.text(line, 20, y);
+        y += 6;
+      });
+    }
+
+    // Footer
+    if (y > 270) {
+      doc.addPage();
+      addDarkBackground();
+      y = 20;
+    }
+    y += 10;
+    doc.setFontSize(9);
+    doc.setTextColor(...mediumGray);
+    doc.setFont('helvetica', 'italic');
+    doc.text('Generado por AdorAPP - La plataforma de Adoración CAF', 105, y, { align: 'center' });
+
+    // Download the PDF
+    const dateStr = new Date(order.date).toLocaleDateString('es-ES', { day: '2-digit', month: '2-digit', year: '2-digit' }).replace(/\//g, '-');
+    const fileName = `${band?.name || 'Banda'} - Orden ${dateStr}.pdf`;
+    doc.save(fileName);
   };
 
   // Print all songs with full content (one song per page with page break)
-  const generateSongsPDF = (order) => {
+  const generateSongsPDF = async (order) => {
     const band = getBandById(order.bandId);
+    const doc = new jsPDF({
+      orientation: 'portrait',
+      unit: 'mm',
+      format: 'a4'
+    });
 
-    const songsHtml = order.songs.map((songRef, index) => {
+    // Colors - optimized for dark background
+    const purple = [168, 85, 247];
+    const white = [255, 255, 255];
+    const lightGray = [200, 200, 200];
+    const mediumGray = [153, 153, 153];
+    const purpleLight = [200, 150, 255];
+
+    // Helper function to add dark background to a page
+    const addDarkBackground = () => {
+      doc.setFillColor(26, 26, 26);
+      doc.rect(0, 0, 210, 297, 'F');
+    };
+
+    // Process each song
+    order.songs.forEach((songRef, index) => {
+      // Add new page for each song (except first)
+      if (index > 0) {
+        doc.addPage();
+      }
+      addDarkBackground();
+
       const song = getSongById(songRef.songId);
       const director = getMemberById(songRef.directorId);
       const originalKey = song?.originalKey || song?.key || 'C';
@@ -313,153 +412,148 @@ export const Ordenes = () => {
         structure = transposeSongStructure(song.structure, originalKey, key);
       }
 
-      // Build sections with chords AND lyrics (like generateSongPDF in Repertorio)
-      const sectionsHtml = structure.map((section) => `
-        <div class="section">
-          <div class="section-label">${section.label || 'Sección'}</div>
-          ${section.chords ? `<div class="chords">${section.chords}</div>` : ''}
-          ${section.content ? `<div class="lyrics">${section.content}</div>` : ''}
-          ${!section.chords && !section.content ? `<div class="lyrics" style="color:#666;font-style:italic">Silencio musical</div>` : ''}
-        </div>
-      `).join('');
+      let y = 20;
 
-      return `
-        <div class="song-page">
-          <div class="song-header">
-            <div class="song-number">#${index + 1}</div>
-            <div class="song-meta">
-              <div class="meta-item"><span class="meta-label">Orden:</span> ${formatDate(order.date)}</div>
-              <div class="meta-item"><span class="meta-label">Banda:</span> ${band?.name || 'N/A'}</div>
-              <div class="meta-item"><span class="meta-label">Director:</span> ${director?.name || '-'}</div>
-              <div class="meta-item"><span class="meta-label">Tonalidad:</span> <span class="key-badge">${key}</span></div>
-            </div>
-          </div>
-          <h1 class="song-title">${song?.title || 'Sin título'}</h1>
-          ${song?.artist ? `<p class="song-artist">${song.artist}</p>` : ''}
-          <div class="song-content">
-            ${sectionsHtml || '<p style="color:#888">Sin contenido disponible</p>'}
-          </div>
-        </div>
-      `;
-    }).join('');
+      // Song number (large)
+      doc.setFontSize(48);
+      doc.setTextColor(...purple);
+      doc.setFont('helvetica', 'bold');
+      doc.text(`${index + 1}`, 20, y + 15);
 
-    const html = `
-      <!DOCTYPE html>
-      <html>
-      <head>
-        <title>Canciones - Orden ${formatDate(order.date)} - AdorAPP</title>
-        <style>
-          * { margin: 0; padding: 0; box-sizing: border-box; }
-          body { font-family: 'Segoe UI', Arial, sans-serif; background: #1a1a1a; color: #fff; }
-          .song-page {
-            min-height: 100vh;
-            padding: 40px;
-            page-break-after: always;
-            display: flex;
-            flex-direction: column;
-          }
-          .song-page:last-child { page-break-after: auto; }
-          .song-header {
-            display: flex;
-            align-items: flex-start;
-            justify-content: space-between;
-            margin-bottom: 20px;
-            padding-bottom: 15px;
-            border-bottom: 2px solid #333;
-          }
-          .song-number {
-            font-size: 48px;
-            font-weight: bold;
-            color: #a855f7;
-            line-height: 1;
-          }
-          .song-meta {
-            display: flex;
-            flex-wrap: wrap;
-            gap: 12px;
-            justify-content: flex-end;
-          }
-          .meta-item {
-            background: #252525;
-            padding: 6px 12px;
-            border-radius: 6px;
-            font-size: 13px;
-          }
-          .meta-label {
-            color: #888;
-            margin-right: 6px;
-          }
-          .key-badge {
-            background: #a855f7;
-            color: white;
-            padding: 2px 8px;
-            border-radius: 4px;
-            font-weight: bold;
-          }
-          .song-title {
-            font-size: 32px;
-            margin-bottom: 8px;
-          }
-          .song-artist {
-            color: #888;
-            font-size: 16px;
-            margin-bottom: 30px;
-          }
-          .song-content {
-            flex: 1;
-            background: #1f1f1f;
-            padding: 25px;
-            border-radius: 12px;
-          }
-          .section {
-            margin-bottom: 24px;
-            padding: 20px;
-            background: #252525;
-            border-radius: 12px;
-          }
-          .section-label {
-            color: #a855f7;
-            font-size: 14px;
-            font-weight: 600;
-            margin-bottom: 10px;
-          }
-          .chords {
-            color: #a855f7;
-            font-size: 22px;
-            font-family: monospace;
-            margin-bottom: 10px;
-          }
-          .lyrics {
-            color: #ccc;
-            font-size: 16px;
-            line-height: 1.8;
-            white-space: pre-wrap;
-          }
-          @media print {
-            body { background: #fff; color: #000; }
-            .song-page { min-height: 100vh; page-break-after: always; }
-            .song-number { color: #7c3aed; }
-            .key-badge { background: #7c3aed; color: white; }
-            .meta-item { background: #f3f4f6; }
-            .song-content { background: #fafafa; }
-            .section { background: #f5f5f5; }
-            .section-label { color: #7c3aed; }
-            .chords { color: #7c3aed; }
-            .lyrics { color: #333; }
-          }
-          @page { margin: 0; }
-        </style>
-      </head>
-      <body>
-        ${songsHtml}
-      </body>
-      </html>
-    `;
+      // Meta info on the right
+      doc.setFontSize(10);
+      doc.setTextColor(...mediumGray);
+      const metaLines = [
+        `Orden: ${formatDate(order.date)}`,
+        `Banda: ${band?.name || 'N/A'}`,
+        `Director: ${director?.name || '-'}`,
+        `Tono: ${key}${key !== originalKey ? ` (Original: ${originalKey})` : ''}`
+      ];
+      metaLines.forEach((line, i) => {
+        doc.text(line, 190, y + 5 + (i * 5), { align: 'right' });
+      });
 
-    const printWindow = window.open('', '_blank');
-    printWindow.document.write(html);
-    printWindow.document.close();
-    printWindow.print();
+      // Separator
+      y = 50;
+      doc.setDrawColor(60, 60, 60);
+      doc.setLineWidth(0.3);
+      doc.line(20, y, 190, y);
+      y += 12;
+
+      // Song title
+      doc.setFontSize(28);
+      doc.setTextColor(...white);
+      doc.setFont('helvetica', 'bold');
+      doc.text(song?.title || 'Sin título', 20, y);
+      y += 10;
+
+      // Artist
+      if (song?.artist) {
+        doc.setFontSize(14);
+        doc.setTextColor(...lightGray);
+        doc.setFont('helvetica', 'normal');
+        doc.text(song.artist, 20, y);
+        y += 10;
+      }
+
+      // Add compass and BPM if available
+      if (song?.compass || song?.bpm) {
+        doc.setFontSize(11);
+        doc.setTextColor(...purpleLight);
+        const extraInfo = [];
+        if (song.compass) extraInfo.push(`Compás: ${song.compass}`);
+        if (song.bpm) extraInfo.push(`BPM: ${song.bpm}`);
+        doc.text(extraInfo.join('   •   '), 20, y);
+        y += 8;
+      }
+
+      y += 5;
+
+      // Content background
+      doc.setFillColor(31, 31, 31);
+      doc.roundedRect(15, y, 180, 200, 5, 5, 'F');
+
+      y += 15;
+
+      // Sections
+      structure.forEach((section) => {
+        // Section label
+        doc.setFontSize(14);
+        doc.setTextColor(...purpleLight);
+        doc.setFont('helvetica', 'bold');
+        doc.text(section.label || 'Sección', 20, y);
+        y += 8;
+
+        // Chords
+        if (section.chords) {
+          doc.setFontSize(18);
+          doc.setTextColor(...purple);
+          doc.setFont('courier', 'bold');
+
+          // Split long chords into multiple lines
+          const maxWidth = 170;
+          const words = section.chords.split(' ');
+          let line = '';
+          words.forEach((word) => {
+            const testLine = line ? `${line} ${word}` : word;
+            if (doc.getTextWidth(testLine) > maxWidth) {
+              doc.text(line, 20, y);
+              y += 8;
+              line = word;
+            } else {
+              line = testLine;
+            }
+          });
+          if (line) {
+            doc.text(line, 20, y);
+            y += 10;
+          }
+        }
+
+        // Lyrics
+        if (section.content) {
+          doc.setFontSize(12);
+          doc.setTextColor(...white);
+          doc.setFont('helvetica', 'normal');
+
+          const lines = doc.splitTextToSize(section.content, 170);
+          lines.forEach((lineText) => {
+            if (y > 250) {
+              // Close current content box and add new page
+              doc.addPage();
+              addDarkBackground();
+              y = 20;
+            }
+            doc.text(lineText, 20, y);
+            y += 6;
+          });
+          y += 4;
+        }
+
+        // Empty section (musical intro)
+        if (!section.chords && !section.content && section.type === 'intro') {
+          doc.setFontSize(10);
+          doc.setTextColor(...mediumGray);
+          doc.setFont('helvetica', 'italic');
+          doc.text('Silencio musical', 20, y);
+          y += 6;
+        }
+
+        y += 8;
+      });
+
+      if (!structure.length || (structure.length === 1 && !structure[0].chords && !structure[0].content)) {
+        doc.setFontSize(11);
+        doc.setTextColor(...mediumGray);
+        doc.setFont('helvetica', 'italic');
+        doc.text('Sin contenido disponible', 20, y);
+      }
+    });
+
+    // Download the PDF
+    const dateStr = new Date(order.date).toLocaleDateString('es-ES', { day: '2-digit', month: '2-digit', year: '2-digit' }).replace(/\//g, '-');
+    const fileName = `${band?.name || 'Banda'} - Orden ${dateStr} - Canciones.pdf`;
+    doc.save(fileName);
   };
 
   const addSongToOrder = async (song) => {
