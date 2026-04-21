@@ -243,32 +243,43 @@ export const Header = () => {
       try {
         const notifs = [];
 
-        // Get devotional for today
+        // Get devotional - show EVERY time until user reads it
         const now = new Date();
         const today = now.toISOString().split('T')[0];
         const lastDevotionalDate = localStorage.getItem('lastDevocionalDate') || '';
-        const hour = now.getHours();
+        let readDevotionalIds = JSON.parse(localStorage.getItem('readDevotionalIds') || '[]');
         const isNewDay = today !== lastDevotionalDate;
 
-        // Generate daily devotional (one per day, from 6 AM onwards)
-        // Show devotional if: it's a new day AND after 6 AM, OR we already showed it today
-        if ((isNewDay && hour >= 6) || lastDevotionalDate === today) {
-          const dayOfYear = Math.floor((now - new Date(now.getFullYear(), 0, 0)) / (1000 * 60 * 60 * 24));
-          const verseIndex = dayOfYear % bibleVerses.length;
-          const verse = bibleVerses[verseIndex];
+        // If it's a new day, clear old read devotionals (keep only today's)
+        if (isNewDay) {
+          readDevotionalIds = readDevotionalIds.filter(id => id.startsWith('devocional-' + today));
+          localStorage.setItem('readDevotionalIds', JSON.stringify(readDevotionalIds));
+        }
 
+        // Calculate verse based on day of year (changes at midnight)
+        const dayOfYear = Math.floor((now - new Date(now.getFullYear(), 0, 0)) / (1000 * 60 * 60 * 24));
+        const verseIndex = dayOfYear % bibleVerses.length;
+        const verse = bibleVerses[verseIndex];
+        const devotionalId = 'devocional-' + today;
+
+        // Show devotional if: it's a new day (auto-reset), OR we already showed it today and haven't read it
+        // Don't show if user already read this devotional
+        const alreadyRead = readDevotionalIds.includes(devotionalId);
+
+        if (!alreadyRead) {
           notifs.push({
-            id: 'devocional-' + today,
+            id: devotionalId,
             type: 'devocional',
             message: `¿Ya hiciste tu devocional? "${verse.verse}" — ${verse.reference} RV1960`,
             icon: 'cross',
             time: '06:00',
-            isDevocional: true
+            isDevocional: true,
+            verse: verse.verse,
+            reference: verse.reference
           });
 
-          if (isNewDay) {
-            localStorage.setItem('lastDevocionalDate', today);
-          }
+          // Save the date we showed this devotional
+          localStorage.setItem('lastDevocionalDate', today);
         }
 
         // Check for new songs from Supabase
@@ -395,8 +406,18 @@ export const Header = () => {
     localStorage.setItem(userKey, JSON.stringify(newReadIds));
     setUnreadCount(Math.max(0, unreadCount - 1));
 
-    // Find if this is a communication notification
+    // Find if this is a devotional notification - save to read list
     const notif = notifications.find(n => n.id === notificationId);
+    if (notif?.type === 'devocional' || notif?.isDevocional) {
+      // Save to read devotionals list so it doesn't show again today
+      const readDevotionalIds = JSON.parse(localStorage.getItem('readDevotionalIds') || '[]');
+      if (!readDevotionalIds.includes(notificationId)) {
+        readDevotionalIds.push(notificationId);
+        localStorage.setItem('readDevotionalIds', JSON.stringify(readDevotionalIds));
+      }
+    }
+
+    // Find if this is a communication notification
     if (notif?.type === 'communication' && notif?.communicationId) {
       // Mark as read in database
       await supabase
