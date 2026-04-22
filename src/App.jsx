@@ -50,16 +50,29 @@ function App() {
   const [initialized, setInitialized] = useState(false);
   const initializeAuth = useAuthStore((state) => state.initialize);
   const initializeApp = useAppStore((state) => state.initialize);
+  const setAutoRefresh = useAppStore((state) => state.setAutoRefresh);
   const authLoading = useAuthStore((state) => state.loading);
+  const user = useAuthStore((state) => state.user);
 
   useEffect(() => {
     const init = async () => {
       await initializeAuth();
       await initializeApp();
+
+      // Enable auto-refresh every 5 minutes for PWA (runs in background)
+      setAutoRefresh(5);
+
       setInitialized(true);
     };
     init();
-  }, [initializeAuth, initializeApp]);
+  }, [initializeAuth, initializeApp, setAutoRefresh]);
+
+  // Disable auto-refresh on logout
+  useEffect(() => {
+    if (!user) {
+      setAutoRefresh(0);
+    }
+  }, [user, setAutoRefresh]);
 
   // Show loading spinner while initializing
   if (!initialized || authLoading) {

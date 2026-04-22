@@ -230,6 +230,43 @@ export const useAppStore = create((set, get) => ({
   loading: false,
   error: null,
 
+  // Auto-refresh mechanism for PWA
+  autoRefreshInterval: null,
+  autoRefreshMinutes: 5,
+
+  // Set auto-refresh interval (in minutes, 0 to disable)
+  setAutoRefresh: (minutes) => {
+    const state = get();
+
+    // Clear existing interval
+    if (state.autoRefreshInterval) {
+      clearInterval(state.autoRefreshInterval);
+    }
+
+    if (minutes > 0) {
+      console.log(`🔄 Auto-refresh enabled: every ${minutes} minutes`);
+      const intervalId = setInterval(() => {
+        console.log('🔄 Auto-refresh triggered, reloading data...');
+        get().initialize();
+      }, minutes * 60 * 1000);
+
+      set({ autoRefreshInterval: intervalId, autoRefreshMinutes: minutes });
+    } else {
+      console.log('🔄 Auto-refresh disabled');
+      set({ autoRefreshInterval: null, autoRefreshMinutes: 0 });
+    }
+  },
+
+  // Stop auto-refresh
+  clearAutoRefresh: () => {
+    const state = get();
+    if (state.autoRefreshInterval) {
+      clearInterval(state.autoRefreshInterval);
+      set({ autoRefreshInterval: null });
+      console.log('🔄 Auto-refresh stopped');
+    }
+  },
+
   // Initialize data from Supabase
   initialize: async () => {
     set({ loading: true, error: null });
@@ -749,13 +786,20 @@ export const useAppStore = create((set, get) => ({
 
   // Reset all data on logout
   reset: () => {
+    // Clear auto-refresh interval
+    if (get().autoRefreshInterval) {
+      clearInterval(get().autoRefreshInterval);
+    }
+
     set({
       members: [],
       bands: [],
       songs: [],
       orders: [],
       loading: false,
-      error: null
+      error: null,
+      autoRefreshInterval: null,
+      autoRefreshMinutes: 5,
     });
     console.log('✅ App store reset on logout (localStorage preserved)');
   },
