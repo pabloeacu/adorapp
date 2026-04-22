@@ -37,7 +37,10 @@ export const Layout = () => {
         </div>
 
         {/* Mobile Content - Full screen */}
-        <div className="lg:hidden flex-1 overflow-y-auto overflow-x-hidden pb-16 pt-14">
+        <div
+          className="lg:hidden flex-1 overflow-y-auto overflow-x-hidden pb-16"
+          style={{ paddingTop: 'calc(56px + env(safe-area-inset-top, 0px))' }}
+        >
           <main className="p-4">
             <Outlet />
           </main>
