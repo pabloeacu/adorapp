@@ -373,12 +373,32 @@ export const Header = () => {
                 subject: cn.subject,
                 preview: cn.preview,
                 fullMessage: cn.full_message,
-                message: cn.subject, // Display subject as main message
+                message: cn.subject,
                 icon: 'send',
                 time: new Date(cn.created_at).toLocaleTimeString('es-AR', { hour: '2-digit', minute: '2-digit' })
               });
             });
           }
+        }
+
+        // Load GLOBAL reflection notifications from notifications table
+        const { data: globalNotifs } = await supabase
+          .from('notifications')
+          .select('id, title, message, type, created_at')
+          .eq('is_global', true)
+          .order('created_at', { ascending: false })
+          .limit(5);
+
+        if (globalNotifs && globalNotifs.length > 0) {
+          globalNotifs.forEach(n => {
+            notifs.push({
+              id: n.id,
+              type: 'reflection',
+              message: n.message,
+              icon: 'cross',
+              time: new Date(n.created_at).toLocaleTimeString('es-AR', { hour: '2-digit', minute: '2-digit' })
+            });
+          });
         }
 
         setNotifications(notifs);
