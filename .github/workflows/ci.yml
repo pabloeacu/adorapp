@@ -1,0 +1,74 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  ci:
+    name: Lint + Build
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci --legacy-peer-deps
+
+      - name: Lint
+        run: npm run lint
+
+      - name: Build
+        env:
+          # The anon key is public by design (RLS is the security boundary).
+          # Stored as repo variables (not secrets) so PRs from forks can
+          # build too if we ever open external contributions.
+          VITE_SUPABASE_URL: ${{ vars.VITE_SUPABASE_URL }}
+          VITE_SUPABASE_ANON_KEY: ${{ vars.VITE_SUPABASE_ANON_KEY }}
+        run: npm run build
+
+      - name: Smoke check bundle integrity
+        run: |
+          # Fail the build if the production bundle accidentally re-includes
+          # the service_role key or the old supabaseAdmin export — both are
+          # known regression risks given how the codebase was structured.
+          if grep -rE "service_role|supabaseAdmin" dist/assets/*.js >/dev/null; then
+            echo "::error::Bundle contains service_role or supabaseAdmin reference. Refusing to ship."
+            exit 1
+          fi
+          echo "Bundle clean."
+
+  smoke-prod:
+    name: Smoke test production after deploy
+    needs: ci
+    if: github.ref == 'refs/heads/main' && github.event_name == 'push'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Wait for Vercel deploy to settle
+        run: sleep 60
+      - name: Hit prod
+        run: |
+          # Vercel auto-deploys main on push. Give it a minute, then verify
+          # the production URL is up and serves the SPA shell.
+          for attempt in 1 2 3 4 5; do
+            STATUS=$(curl -sS -o /tmp/prod.html -w '%{http_code}' https://adorapp.net.ar/ || true)
+            if [ "$STATUS" = "200" ]; then
+              if grep -q '<title>AdorAPP' /tmp/prod.html && grep -q '/assets/index-' /tmp/prod.html; then
+                echo "Prod responded 200 with expected shell on attempt $attempt"
+                exit 0
+              fi
+            fi
+            echo "Attempt $attempt: status=$STATUS, retrying..."
+            sleep 30
+          done
+          echo "::error::Prod smoke test failed after 5 attempts"
+          exit 1
