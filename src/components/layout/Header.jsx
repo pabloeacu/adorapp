@@ -382,14 +382,22 @@ export const Header = () => {
         }
 
         // Load GLOBAL reflection notifications from notifications table
-        const { data: globalNotifs } = await supabase
+        console.log('Fetching global notifications...');
+        const { data: globalNotifs, error: globalError } = await supabase
           .from('notifications')
           .select('id, title, message, type, created_at')
           .eq('is_global', true)
           .order('created_at', { ascending: false })
           .limit(5);
 
+        console.log('Global notifications query result:', { globalNotifs, globalError });
+
+        if (globalError) {
+          console.error('Error fetching global notifications:', globalError);
+        }
+
         if (globalNotifs && globalNotifs.length > 0) {
+          console.log('Adding', globalNotifs.length, 'global notifications');
           globalNotifs.forEach(n => {
             notifs.push({
               id: n.id,
@@ -399,6 +407,8 @@ export const Header = () => {
               time: new Date(n.created_at).toLocaleTimeString('es-AR', { hour: '2-digit', minute: '2-digit' })
             });
           });
+        } else {
+          console.log('No global notifications found in database');
         }
 
         setNotifications(notifs);
@@ -415,7 +425,7 @@ export const Header = () => {
     loadNotifications();
     const interval = setInterval(loadNotifications, 2 * 60 * 1000);
     return () => clearInterval(interval);
-  }, [readNotificationIds]);
+  }, [readNotificationIds, user?.id]);
 
   // Mark notification as read (user-specific)
   const markAsRead = async (notificationId) => {
@@ -1552,6 +1562,10 @@ export const Header = () => {
         size="md"
       >
         <div className="space-y-4">
+          {/* Debug info */}
+          <div className="text-xs text-gray-500 bg-neutral-800 p-2 rounded mb-4">
+            Total loaded: {notifications.length} | Unread: {unreadCount} | Read IDs: {readNotificationIds.length}
+          </div>
           {/* Filter to show only unread notifications */}
           {(() => {
             const unreadNotifications = notifications.filter(
