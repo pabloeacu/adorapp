@@ -57,10 +57,10 @@ jobs:
         run: sleep 60
       - name: Hit prod
         run: |
-          # Vercel auto-deploys main on push. Give it a minute, then verify
-          # the production URL is up and serves the SPA shell.
+          # Follow redirects (-L): the apex domain 307s to www.adorapp.net.ar.
+          # Without -L curl reports 307 and the check thinks prod is broken.
           for attempt in 1 2 3 4 5; do
-            STATUS=$(curl -sS -o /tmp/prod.html -w '%{http_code}' https://adorapp.net.ar/ || true)
+            STATUS=$(curl -sSL -o /tmp/prod.html -w '%{http_code}' https://adorapp.net.ar/ || true)
             if [ "$STATUS" = "200" ]; then
               if grep -q '<title>AdorAPP' /tmp/prod.html && grep -q '/assets/index-' /tmp/prod.html; then
                 echo "Prod responded 200 with expected shell on attempt $attempt"
