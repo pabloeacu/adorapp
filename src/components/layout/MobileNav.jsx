@@ -38,6 +38,18 @@ const navItems = [
   { path: '/miembros', icon: UserCircle, label: 'Miembros' },
 ];
 
+// Page titles shown in the mobile header so users always know where they are.
+// Kept in sync with the desktop pageTitles map in Header.jsx.
+const pageTitles = {
+  '/': 'Inicio',
+  '/ordenes': 'Órdenes',
+  '/repertorio': 'Repertorio',
+  '/bandas': 'Bandas',
+  '/miembros': 'Miembros',
+  '/solicitudes': 'Solicitudes',
+  '/comunicaciones': 'Comunicaciones',
+};
+
 export const MobileNav = () => {
   const [menuOpen, setMenuOpen] = useState(false);
   const [profileOpen, setProfileOpen] = useState(false);
@@ -115,7 +127,7 @@ export const MobileNav = () => {
         const unread = notifs.filter(n => !readNotificationIds.includes(n.id)).length;
         setUnreadCount(unread);
       } catch (err) {
-        console.log('Error loading notifications:', err);
+        console.error('Error loading notifications:', err);
       }
     };
 
@@ -286,11 +298,6 @@ export const MobileNav = () => {
     if (!file) return;
 
     // DEBUG: Log original file info
-    console.log('=== IMAGE DEBUG - ORIGINAL FILE ===');
-    console.log('File name:', file.name);
-    console.log('File size:', file.size, 'bytes');
-    console.log('File type:', file.type);
-    console.log('File dimensions will be checked after image load');
 
     // Validate file type
     if (!file.type.startsWith('image/')) {
@@ -307,18 +314,11 @@ export const MobileNav = () => {
     try {
       // Show loading state in preview
       const url = URL.createObjectURL(file);
-      console.log('=== IMAGE DEBUG - PREVIEW URL CREATED ===');
-      console.log('Preview URL:', url);
-      console.log('This should be a blob URL pointing to the ORIGINAL file');
 
       // Load image to verify dimensions
       const img = new Image();
       await new Promise((resolve, reject) => {
         img.onload = () => {
-          console.log('=== IMAGE DEBUG - IMAGE LOADED IN BROWSER ===');
-          console.log('Natural width:', img.naturalWidth);
-          console.log('Natural height:', img.naturalHeight);
-          console.log('If this is MUCH smaller than original, something is wrong!');
           resolve();
         };
         img.onerror = reject;
@@ -353,8 +353,6 @@ export const MobileNav = () => {
         return;
       }
 
-      console.log('=== SAVE PHOTO ===');
-      console.log('zoom:', zoom, 'rotation:', rotation, 'position:', position);
 
       // Load the image
       const img = new Image();
@@ -425,14 +423,10 @@ export const MobileNav = () => {
         throw new Error('Error al procesar la imagen');
       }
 
-      console.log('=== UPLOAD INFO ===');
-      console.log('Blob size:', blob.size, 'bytes');
-      console.log('Blob type:', blob.type);
 
       // Generate unique filename - use profile.id as backup if user_id is null
       const userId = profile?.user_id || profile?.id || `temp-${Date.now()}`;
       const fileName = `avatars/${userId}-${Date.now()}.png`;
-      console.log('Filename:', fileName);
 
       // Upload processed image to Supabase Storage
       const { data: uploadData, error: uploadError } = await supabase.storage
@@ -461,7 +455,6 @@ export const MobileNav = () => {
         return;
       }
 
-      console.log('Updating members table with user_id/id:', memberUserId);
 
       const { error: updateError } = await supabase
         .from('members')
@@ -528,8 +521,13 @@ export const MobileNav = () => {
         className="lg:hidden fixed top-0 left-0 right-0 z-40 bg-black/95 backdrop-blur-lg border-b border-neutral-800"
         style={{ paddingTop: 'env(safe-area-inset-top)' }}
       >
-        <div className="flex items-center justify-between px-4 h-14">
-          <img src="/logo.png" alt="AdorAPP" className="w-8 h-8 rounded-lg object-contain" />
+        <div className="flex items-center justify-between px-4 h-14 gap-3">
+          <div className="flex items-center gap-3 min-w-0 flex-1">
+            <img src="/logo.png" alt="AdorAPP" className="w-8 h-8 rounded-lg object-contain shrink-0" />
+            <h1 className="text-base font-semibold text-white truncate">
+              {pageTitles[location.pathname] || 'AdorAPP'}
+            </h1>
+          </div>
 
           {/* Notification Bell - Left of profile */}
           <button
@@ -650,7 +648,7 @@ export const MobileNav = () => {
                         type="text"
                         value={editName}
                         onChange={(e) => setEditName(e.target.value)}
-                        className="w-full bg-neutral-800 border border-neutral-700 rounded-xl px-4 py-3 text-white focus:outline-none focus:border-white transition-colors"
+                        className="w-full bg-neutral-800 border border-neutral-700 rounded-xl px-4 py-3 text-white focus:outline-none focus:ring-2 focus:ring-white/40 focus:border-white transition-colors"
                         placeholder="Tu nombre"
                       />
                     </div>
@@ -663,7 +661,7 @@ export const MobileNav = () => {
                           type="tel"
                           value={editPhone}
                           onChange={(e) => setEditPhone(e.target.value)}
-                          className="w-full bg-neutral-800 border border-neutral-700 rounded-xl pl-11 pr-4 py-3 text-white focus:outline-none focus:border-white transition-colors"
+                          className="w-full bg-neutral-800 border border-neutral-700 rounded-xl pl-11 pr-4 py-3 text-white focus:outline-none focus:ring-2 focus:ring-white/40 focus:border-white transition-colors"
                           placeholder="+54 11 1234-5678"
                         />
                       </div>
@@ -677,7 +675,7 @@ export const MobileNav = () => {
                           type="text"
                           value={editPastorArea}
                           onChange={(e) => setEditPastorArea(e.target.value)}
-                          className="w-full bg-neutral-800 border border-neutral-700 rounded-xl pl-11 pr-4 py-3 text-white focus:outline-none focus:border-white transition-colors"
+                          className="w-full bg-neutral-800 border border-neutral-700 rounded-xl pl-11 pr-4 py-3 text-white focus:outline-none focus:ring-2 focus:ring-white/40 focus:border-white transition-colors"
                           placeholder="Nombre del pastor"
                         />
                       </div>
@@ -691,7 +689,7 @@ export const MobileNav = () => {
                           type="text"
                           value={editLeaderOf}
                           onChange={(e) => setEditLeaderOf(e.target.value)}
-                          className="w-full bg-neutral-800 border border-neutral-700 rounded-xl pl-11 pr-4 py-3 text-white focus:outline-none focus:border-white transition-colors"
+                          className="w-full bg-neutral-800 border border-neutral-700 rounded-xl pl-11 pr-4 py-3 text-white focus:outline-none focus:ring-2 focus:ring-white/40 focus:border-white transition-colors"
                           placeholder="Grupo o área que lidera"
                         />
                       </div>
@@ -705,7 +703,7 @@ export const MobileNav = () => {
                           type="date"
                           value={editBirthdate}
                           onChange={(e) => setEditBirthdate(e.target.value)}
-                          className="w-full bg-neutral-800 border border-neutral-700 rounded-xl pl-11 pr-4 py-3 text-white focus:outline-none focus:border-white transition-colors"
+                          className="w-full bg-neutral-800 border border-neutral-700 rounded-xl pl-11 pr-4 py-3 text-white focus:outline-none focus:ring-2 focus:ring-white/40 focus:border-white transition-colors"
                         />
                       </div>
                     </div>
@@ -1240,7 +1238,7 @@ export const MobileNav = () => {
         className="lg:hidden fixed bottom-0 left-0 right-0 z-40 bg-black/95 backdrop-blur-lg border-t border-neutral-800"
         style={{ paddingBottom: 'env(safe-area-inset-bottom)' }}
       >
-        <div className="flex items-center justify-around h-16 px-2">
+        <div className="flex items-center justify-around h-20 px-2">
           {allNavItems.map(({ path, icon: Icon, label }) => {
             const isActive = location.pathname === path;
             return (
@@ -1254,7 +1252,7 @@ export const MobileNav = () => {
                 <div className={`p-2 rounded-xl transition-all ${isActive ? 'bg-white/10' : ''}`}>
                   <Icon size={22} strokeWidth={isActive ? 2.5 : 2} />
                 </div>
-                <span className={`text-[10px] mt-1 font-medium ${isActive ? 'text-white' : ''}`}>
+                <span className={`text-xs mt-1 font-medium ${isActive ? 'text-white' : ''}`}>
                   {label}
                 </span>
               </NavLink>

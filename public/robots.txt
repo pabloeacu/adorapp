@@ -1,0 +1,14 @@
+# AdorAPP — Plataforma del Ministerio de Adoración del Centro de Avivamiento Familiar
+# Most of this app is gated behind login; we only allow crawlers on the public landing.
+
+User-agent: *
+Allow: /$
+Allow: /login
+Disallow: /ordenes
+Disallow: /repertorio
+Disallow: /bandas
+Disallow: /miembros
+Disallow: /solicitudes
+Disallow: /comunicaciones
+
+Sitemap: https://adorapp.net.ar/sitemap.xml

@@ -30,33 +30,46 @@ export const Modal = ({
   };
 
   return (
-    <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 pb-20 bg-black/80">
-      {/* Modal Container */}
+    <div
+      className="fixed inset-0 z-[100] flex items-center justify-center p-4 pb-20 bg-black/80"
+      role="dialog"
+      aria-modal="true"
+      aria-labelledby="modal-title"
+    >
+      {/* Modal Container.
+          - max-h uses 100dvh (dynamic viewport) so iOS soft-keyboard does
+            not push the footer below the visible area.
+          - explicit padding-bottom from env(safe-area-inset-bottom) so the
+            footer never overlaps the home indicator on notched phones. */}
       <div className={`
         relative bg-neutral-900 border border-neutral-800 rounded-2xl
-        w-full ${sizes[size]} max-h-[calc(100vh-160px)]
+        w-full ${sizes[size]} max-h-[calc(100dvh-160px)]
         flex flex-col
         animate-scale-in shadow-2xl
       `}>
-        {/* Header - Always visible */}
+        {/* Header */}
         <div className="flex items-center justify-between p-4 border-b border-neutral-800 shrink-0 bg-neutral-900">
-          <h2 className="text-lg font-semibold text-white">{title}</h2>
+          <h2 id="modal-title" className="text-lg font-semibold text-white">{title}</h2>
           <button
             onClick={onClose}
-            className="p-2 rounded-lg hover:bg-neutral-800 transition-colors text-gray-400"
+            aria-label="Cerrar"
+            className="p-2 rounded-lg hover:bg-neutral-800 transition-colors text-gray-400 focus:outline-none focus:ring-2 focus:ring-white/40"
           >
             <X size={20} />
           </button>
         </div>
 
-        {/* Content - Scrollable but leaves room for footer */}
+        {/* Content */}
         <div className="flex-1 overflow-y-auto p-4 pb-32">
           {children}
         </div>
 
-        {/* Footer - Always visible at bottom */}
+        {/* Footer */}
         {footer && (
-          <div className="absolute bottom-0 left-0 right-0 p-4 border-t border-neutral-800 bg-neutral-900 rounded-b-2xl safe-area-bottom">
+          <div
+            className="absolute bottom-0 left-0 right-0 p-4 border-t border-neutral-800 bg-neutral-900 rounded-b-2xl"
+            style={{ paddingBottom: 'calc(1rem + env(safe-area-inset-bottom, 0px))' }}
+          >
             {footer}
           </div>
         )}

@@ -109,7 +109,7 @@ export const Login = () => {
                 placeholder="Email"
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
-                className="w-full pl-12 pr-4 py-3 bg-neutral-800 border border-neutral-700 rounded-xl text-white placeholder-gray-500 focus:outline-none focus:border-white transition-colors"
+                className="w-full pl-12 pr-4 py-3 bg-neutral-800 border border-neutral-700 rounded-xl text-white placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-white/40 focus:border-white transition-colors"
                 autoComplete="username"
                 disabled={loading}
               />
@@ -122,7 +122,7 @@ export const Login = () => {
                 placeholder="Contraseña"
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
-                className="w-full pl-12 pr-12 py-3 bg-neutral-800 border border-neutral-700 rounded-xl text-white placeholder-gray-500 focus:outline-none focus:border-white transition-colors"
+                className="w-full pl-12 pr-12 py-3 bg-neutral-800 border border-neutral-700 rounded-xl text-white placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-white/40 focus:border-white transition-colors"
                 autoComplete="current-password"
                 disabled={loading}
               />
@@ -446,7 +446,7 @@ const Input = ({ label, name, type = 'text', placeholder, value, onChange, requi
       value={value}
       onChange={onChange}
       required={required}
-      className="w-full px-4 py-3 bg-neutral-800 border border-neutral-700 rounded-xl text-white placeholder-gray-500 focus:outline-none focus:border-white transition-colors"
+      className="w-full px-4 py-3 bg-neutral-800 border border-neutral-700 rounded-xl text-white placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-white/40 focus:border-white transition-colors"
     />
   </div>
 );

@@ -364,7 +364,7 @@ export const Miembros = () => {
               placeholder="Buscar por nombre, email o instrumento..."
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
-              className="w-full pl-12 pr-4 py-3 bg-neutral-900 border border-neutral-800 rounded-xl focus:outline-none focus:border-white transition-colors"
+              className="w-full pl-12 pr-4 py-3 bg-neutral-900 border border-neutral-800 rounded-xl focus:outline-none focus:ring-2 focus:ring-white/40 focus:border-white transition-colors"
             />
           </div>
           <Button
@@ -1005,7 +1005,7 @@ export const Miembros = () => {
               placeholder="Ingresá la nueva contraseña"
               value={newPassword}
               onChange={(e) => setNewPassword(e.target.value)}
-              className="w-full px-4 py-3 bg-neutral-900 border border-neutral-800 rounded-xl focus:outline-none focus:border-purple-500 transition-colors"
+              className="w-full px-4 py-3 bg-neutral-900 border border-neutral-800 rounded-xl focus:outline-none focus:ring-2 focus:ring-white/40 focus:border-purple-500 transition-colors"
             />
           </div>
 

@@ -584,7 +584,9 @@ export const Ordenes = () => {
       return { ...prev, songs: newSongs };
     });
 
-    // Fetch key history asynchronously and update key/tooltip
+    // Fetch key history asynchronously and update key/tooltip.
+    // The .catch keeps a transient network failure from leaving the user with
+    // a stale tooltip and no idea why — we just fall back to the song's own key.
     if (directorId && songId) {
       fetchKeyHistory(directorId, songId).then(result => {
         const song = getSongById(songId);
@@ -607,6 +609,10 @@ export const Ordenes = () => {
             )
           }));
         }
+      }).catch(err => {
+        console.error('fetchKeyHistory failed:', err);
+        // No UI change needed; the song stays on its current key. The tooltip
+        // will simply not show "found"/"first time" indicators.
       });
     } else {
       // Director cleared - reset tooltip

@@ -875,21 +875,11 @@ export const Header = () => {
         throw new Error('Error al procesar la imagen');
       }
 
-      console.log('Canvas processed:', {
-        originalSize: `${img.width}x${img.height}`,
-        displaySize: `${imgDisplayW}x${imgDisplayH}`,
-        canvasSize: `${canvasImgW}x${canvasImgH}`,
-        zoom, rotation,
-        position,
-        scaleToCanvas
-      });
-
       // Upload to Supabase - use currentUserMember.id for reliable identification
       const fileExt = 'jpg';
       // Use currentUserMember.id as primary ID, fallback to user?.id
       const memberId = currentUserMember?.id || user?.id || 'unknown';
       const fileName = `avatars/${memberId}-${Date.now()}.${fileExt}`;
-      console.log('Uploading photo with fileName:', fileName, 'memberId:', memberId);
 
       const { data: uploadData, error: uploadError } = await supabase.storage
         .from('avatars')
@@ -925,7 +915,6 @@ export const Header = () => {
       // Try to update member table using currentUserMember.id
       const memberIdToUpdate = currentUserMember?.id;
       if (memberIdToUpdate) {
-        console.log('Updating member record with avatar_url:', dataUrl.substring(0, 50) + '...');
 
         const { error: updateError } = await supabase
           .from('members')
@@ -935,7 +924,6 @@ export const Header = () => {
         if (updateError) {
           console.error('Failed to update member avatar_url:', updateError);
         } else {
-          console.log('Member avatar_url updated successfully');
         }
 
         // Sync appStore.members immediately so changes are visible everywhere
@@ -953,8 +941,6 @@ export const Header = () => {
         localStorage.setItem('appMembers', JSON.stringify(updatedMembers));
       } else {
         console.error('Cannot update member: currentUserMember.id is null/undefined');
-        console.log('user?.id:', user?.id);
-        console.log('profile?.id:', profile?.id);
       }
 
       // Show success modal
@@ -1098,7 +1084,7 @@ export const Header = () => {
                     type="text"
                     value={editName}
                     onChange={(e) => setEditName(e.target.value)}
-                    className="w-full bg-neutral-700 border border-neutral-600 rounded-lg px-3 py-1.5 text-white focus:outline-none focus:border-blue-500"
+                    className="w-full bg-neutral-700 border border-neutral-600 rounded-lg px-3 py-1.5 text-white focus:outline-none focus:ring-2 focus:ring-white/40 focus:border-blue-500"
                     placeholder="Tu nombre"
                   />
                 ) : (
@@ -1118,7 +1104,7 @@ export const Header = () => {
                     type="tel"
                     value={editPhone}
                     onChange={(e) => setEditPhone(e.target.value)}
-                    className="w-full bg-neutral-700 border border-neutral-600 rounded-lg px-3 py-1.5 text-white focus:outline-none focus:border-blue-500"
+                    className="w-full bg-neutral-700 border border-neutral-600 rounded-lg px-3 py-1.5 text-white focus:outline-none focus:ring-2 focus:ring-white/40 focus:border-blue-500"
                     placeholder="+54 11 1234-5678"
                   />
                 ) : (
@@ -1138,7 +1124,7 @@ export const Header = () => {
                     type="text"
                     value={editPastorArea}
                     onChange={(e) => setEditPastorArea(e.target.value)}
-                    className="w-full bg-neutral-700 border border-neutral-600 rounded-lg px-3 py-1.5 text-white focus:outline-none focus:border-blue-500"
+                    className="w-full bg-neutral-700 border border-neutral-600 rounded-lg px-3 py-1.5 text-white focus:outline-none focus:ring-2 focus:ring-white/40 focus:border-blue-500"
                     placeholder="Nombre del pastor"
                   />
                 ) : (
@@ -1158,7 +1144,7 @@ export const Header = () => {
                     type="text"
                     value={editLeaderOf}
                     onChange={(e) => setEditLeaderOf(e.target.value)}
-                    className="w-full bg-neutral-700 border border-neutral-600 rounded-lg px-3 py-1.5 text-white focus:outline-none focus:border-blue-500"
+                    className="w-full bg-neutral-700 border border-neutral-600 rounded-lg px-3 py-1.5 text-white focus:outline-none focus:ring-2 focus:ring-white/40 focus:border-blue-500"
                     placeholder="Grupo o área"
                   />
                 ) : (
@@ -1178,7 +1164,7 @@ export const Header = () => {
                     type="date"
                     value={editBirthdate}
                     onChange={(e) => setEditBirthdate(e.target.value)}
-                    className="w-full bg-neutral-700 border border-neutral-600 rounded-lg px-3 py-1.5 text-white focus:outline-none focus:border-blue-500"
+                    className="w-full bg-neutral-700 border border-neutral-600 rounded-lg px-3 py-1.5 text-white focus:outline-none focus:ring-2 focus:ring-white/40 focus:border-blue-500"
                   />
                 ) : (
                   <p className="font-medium">{(currentUserMember?.birthdate || profile?.birthdate) ? formatDateLocal(currentUserMember?.birthdate || profile?.birthdate) : 'No configurada'}</p>
@@ -1522,7 +1508,7 @@ export const Header = () => {
                 value={newPassword}
                 onChange={(e) => setNewPassword(e.target.value)}
                 placeholder="Mínimo 6 caracteres"
-                className="w-full px-4 py-3 bg-neutral-900 border border-neutral-800 rounded-xl focus:outline-none focus:border-blue-500 transition-colors pr-12"
+                className="w-full px-4 py-3 bg-neutral-900 border border-neutral-800 rounded-xl focus:outline-none focus:ring-2 focus:ring-white/40 focus:border-blue-500 transition-colors pr-12"
               />
               <button
                 type="button"
@@ -1545,7 +1531,7 @@ export const Header = () => {
                 value={confirmPassword}
                 onChange={(e) => setConfirmPassword(e.target.value)}
                 placeholder="Repetí la nueva contraseña"
-                className={`w-full px-4 py-3 bg-neutral-900 border rounded-xl focus:outline-none transition-colors pr-12 ${
+                className={`w-full px-4 py-3 bg-neutral-900 border rounded-xl focus:outline-none focus:ring-2 focus:ring-white/40 transition-colors pr-12 ${
                   confirmPassword && confirmPassword !== newPassword
                     ? 'border-red-500 focus:border-red-500'
                     : confirmPassword && confirmPassword === newPassword

@@ -325,7 +325,7 @@ export const Comunicaciones = () => {
               value={subject}
               onChange={(e) => setSubject(e.target.value)}
               placeholder="Ej: Reunión de líderes este sábado"
-              className="w-full px-4 py-3 bg-neutral-800 border border-neutral-700 rounded-xl text-white focus:outline-none focus:border-blue-500 transition-colors"
+              className="w-full px-4 py-3 bg-neutral-800 border border-neutral-700 rounded-xl text-white focus:outline-none focus:ring-2 focus:ring-white/40 focus:border-blue-500 transition-colors"
               maxLength={100}
             />
           </div>
@@ -340,7 +340,7 @@ export const Comunicaciones = () => {
               onChange={(e) => setMessage(e.target.value)}
               placeholder="Escribí tu mensaje aquí..."
               rows={6}
-              className="w-full px-4 py-3 bg-neutral-800 border border-neutral-700 rounded-xl text-white focus:outline-none focus:border-blue-500 transition-colors resize-none"
+              className="w-full px-4 py-3 bg-neutral-800 border border-neutral-700 rounded-xl text-white focus:outline-none focus:ring-2 focus:ring-white/40 focus:border-blue-500 transition-colors resize-none"
               maxLength={1000}
             />
             <p className="text-xs text-gray-500 mt-1 text-right">

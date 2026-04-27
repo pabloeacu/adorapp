@@ -532,7 +532,7 @@ export const Repertorio = () => {
             placeholder="Buscar por título o artista..."
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
-            className="w-full pl-12 pr-4 py-3 bg-neutral-900 border border-neutral-800 rounded-xl focus:outline-none focus:border-white transition-colors"
+            className="w-full pl-12 pr-4 py-3 bg-neutral-900 border border-neutral-800 rounded-xl focus:outline-none focus:ring-2 focus:ring-white/40 focus:border-white transition-colors"
           />
         </div>
         <div className="flex flex-wrap sm:flex-nowrap gap-2 w-full sm:w-auto">

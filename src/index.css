@@ -97,6 +97,19 @@ button, a, [role="button"] {
   to { opacity: 1; transform: scale(1); }
 }
 
+/* Respect users who request reduced motion (vestibular sensitivity / OS toggle).
+   This keeps animations effectively instant without removing the visual end-state. */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}
+
 /* Form Elements - Mobile Optimized */
 input, textarea, select {
   background-color: var(--ador-gray);

@@ -275,7 +275,7 @@ export const Solicitudes = () => {
               placeholder="Buscar por nombre o email..."
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
-              className="w-full pl-12 pr-4 py-3 bg-neutral-900 border border-neutral-800 rounded-xl focus:outline-none focus:border-white transition-colors"
+              className="w-full pl-12 pr-4 py-3 bg-neutral-900 border border-neutral-800 rounded-xl focus:outline-none focus:ring-2 focus:ring-white/40 focus:border-white transition-colors"
             />
           </div>
           <Button
@@ -570,7 +570,7 @@ export const Solicitudes = () => {
                 type="text"
                 value={generatedPassword}
                 onChange={(e) => setGeneratedPassword(e.target.value)}
-                className="flex-1 px-4 py-3 bg-neutral-900 border border-neutral-800 rounded-xl font-mono focus:outline-none focus:border-white transition-colors"
+                className="flex-1 px-4 py-3 bg-neutral-900 border border-neutral-800 rounded-xl font-mono focus:outline-none focus:ring-2 focus:ring-white/40 focus:border-white transition-colors"
                 placeholder="Mínimo 6 caracteres"
                 minLength={6}
               />
