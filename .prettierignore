@@ -1,0 +1,8 @@
+dist/
+node_modules/
+.vercel/
+supabase/
+public/
+package-lock.json
+AUDIT/
+*.lock
