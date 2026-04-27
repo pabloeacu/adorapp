@@ -45,4 +45,71 @@ Bitácora viva de la auditoría y refactor liderada por el nuevo tech lead (Clau
 - **No se ha modificado código fuente, ni la DB, ni Vercel, ni Cloudflare, ni `nic.ar`.**
 - Esperando autorización del usuario para ejecutar el plan de remediación de la emergencia.
 
+### 11:30–17:30 — Plan de emergencia ejecutado, refactor de consistencia, fortificación general
+
+Acciones autónomas (yo) y co-operadas con el usuario, en orden:
+
+**Seguridad (cerrar la emergencia)**
+- Disabled signup público en Supabase Auth (vía Chrome).
+- 5 Edge Functions deployadas (`admin-create-member`, `admin-delete-member`, `admin-reset-password`, `admin-approve-registration`, `admin-reject-registration`).
+- Refactor cliente: borrada `supabaseAdmin` del bundle. `src/lib/supabase.js` reescrito para leer env vars Vite y exponer `callAdminFunction()`.
+- Vercel env vars seteadas (`VITE_SUPABASE_URL`, `VITE_SUPABASE_ANON_KEY`).
+- Migrations: helpers `auth_role()`, `is_pastor()`, `is_pastor_or_leader()` + RLS policies con role checks por tabla. Drop & recreate de las 60+ policies legacy del agente anterior.
+- Migration: `pending_registrations.password_hash` nulleada y marcada como DEPRECATED.
+- Refactor flow registro: el RegisterModal ya no pide password; pastor genera 12-char random al aprobar y la revela one-shot.
+- EF `admin-approve-registration` v2 con password obligatorio (sin fallback al campo deprecado).
+- Service_role key — **descartada la rotación** porque Supabase ya no permite rotar la legacy directly. Mitigación: ningún cliente la usa más; solo las EFs (que la inyecta Supabase como secret default que se actualiza solo).
+- **Caso Olga**: era un orphan auth.user de un delete que falló silently con la lógica vieja. Borrada del `auth.users`. Bug de raíz arreglado: `admin-delete-member` v2 ahora borra el auth.user PRIMERO y aborta si falla, en lugar de seguir y dejar zombies.
+
+**GitHub PAT**
+- PAT viejo "AdorAPP Deploy" con scopes excesivos (admin:enterprise, delete_repo, etc.) revocado.
+- Nuevo PAT con scope mínimo `repo`, expiración 90 días, almacenado en macOS Keychain. `.git/config` limpio sin token embebido.
+
+**Consistencia / single source of truth**
+- Verificado y vinculado: Paul y Andres tenían `member.user_id IS NULL` — vinculados a sus auth.users. Paul recuperó permisos de pastor sin re-loguear.
+- `authStore.refreshProfile()` ahora también dispara `appStore.initialize()` — cualquier cambio de perfil/foto/rol se propaga a todo el árbol en el mismo tick.
+- `authStore.logout()` ampliado: limpia 16+ claves de localStorage incluyendo todos los `readNotificationIds_*` per-user, `appMembers/Bands/Songs/Orders`, flags `rememberMe`, etc. Cero data del usuario anterior visible al next login en el mismo dispositivo.
+- 12 referencias a `photo_url` (columna que no existe) eliminadas. Toda lectura/escritura va por `avatar_url`.
+
+**Edge Functions atómicas**
+- Nueva EF `admin-send-communication`: el fan-out de un mensaje a N destinatarios (parent + per-recipient inserts) ahora es server-side y atómico — si falla la inserción de los notifications, hace rollback del parent. Antes el cliente lo hacía en N round-trips y podía dejar mensajes huérfanos.
+
+**Notificaciones bell — Realtime**
+- Header.jsx y MobileNav.jsx suscriben vía `supabase.channel()` a INSERT en `notifications` (is_global), `communication_notifications` (recipient_id=me), `songs`. Latencia: 2 minutos → ~1 segundo.
+- Publication `supabase_realtime` extendida para incluir las 5 tablas relevantes (sin esto las suscripciones nunca disparan).
+- 2-minute fallback poll mantenido para "derived" notifications (cuento de canciones recientes, etc.) que no tienen Realtime hook directo.
+
+**Reflexión diaria automatizada**
+- pg_cron habilitado.
+- `send_daily_reflection_notification()` reescrita con `search_path` lockeado e idempotente (replaces today's reflection en lugar de stackear).
+- Cron job `daily-reflection-notification` agendado: `5 0 * * *` (00:05 UTC, ≈ 21:05 Argentina). Disparado una vez al deploy para popular el bell ya.
+
+**Auto-sync optimizado**
+- App.jsx: removido el setInterval de 30s y el setAutoRefresh PWA de 5min. Reemplazado por:
+  - sync on route change (mantenido)
+  - sync on window focus / visibilitychange (nuevo)
+  - Realtime subscriptions para data sensible al cambio
+- appStore: borrada toda la lógica de `setAutoRefresh`/`autoRefreshInterval` que ya no se usa.
+
+**Cleanup repo**
+- 38 archivos legacy del agente anterior borrados (`*FIX_RLS*.sql`, scripts ad-hoc, daily_reflections_inserts.sql 93KB, etc.).
+- `PROJECT_DOCUMENTATION.md` (con service_role en plaintext) eliminado del repo.
+- `TECHNICAL_DOCUMENTATION.md` sanitizado.
+- `src/lib/useAuth.js` (dead code) eliminado.
+- `package-lock.json` agregado al repo.
+- console.log de debug innecesarios limpiados de Header.jsx y Comunicaciones.jsx.
+
+**Secret Scanning**
+- GitHub Push Protection bloqueó un commit que tenía el PAT viejo citado en `00_EMERGENCY.md`. Sanitizado y re-pusheado.
+
+### 17:35 — Estado final
+- 4 commits en `main`: `87a9cd2` (security refactor), `013e72f` (registration flow), `b4cff54` (cleanup), `1e4c50c` (realtime + atomic + single-source).
+- Vercel: último deploy `dpl_9jEjKeDnSt1CVd5RcTjgcTfSLB6m` READY en `adorapp.net.ar`.
+- Bundle de producción verificado: 0 referencias a `service_role` / `supabaseAdmin`.
+- Advisors Supabase: 6 warnings restantes, todos esperables (2 INSERT-anon en pending_registrations es el formulario público; 3 SECURITY DEFINER helpers que las RLS usan; 1 HIBP toggle omitido por decisión de diseño).
+
+### Pendiente del lado del usuario / decisiones
+- HIBP password protection: omitido. Reabrir solo si se agrega un flow self-set-password en Fase 2.
+- Test end-to-end manual con Paul logueado en producción para confirmar que las RLS apretadas no bloquean ningún flow legítimo.
+
 ---
