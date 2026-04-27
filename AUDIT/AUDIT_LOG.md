@@ -113,3 +113,71 @@ Acciones autónomas (yo) y co-operadas con el usuario, en orden:
 - Test end-to-end manual con Paul logueado en producción para confirmar que las RLS apretadas no bloquean ningún flow legítimo.
 
 ---
+
+## 2026-04-27 (PM) — FASE A ejecutada
+
+Roadmap del prompt original: Fase 4 (implementación supervisada). Se cumplió en 4 rounds + 2 fixes:
+
+**Round 1 — A11y, SEO/social, security headers, mobile polish** (`ded4623`)
+- Focus-ring en 22 sitios donde había `focus:outline-none` sin alternativa.
+- Modal con `role="dialog"`, `aria-modal`, `aria-labelledby`, `100dvh`, safe-area-inset.
+- `prefers-reduced-motion` global.
+- Bottom tab bar `h-20` y label `text-xs` (tap targets + legibilidad).
+- Page title bar en mobile header (matchea desktop).
+- index.html con OG + Twitter Card + canonical + JSON-LD Organization + descripción extendida.
+- `public/robots.txt` y `public/sitemap.xml` reales (la SPA fallback los enmascaraba).
+- vercel.json: CSP, Referrer-Policy, Permissions-Policy, HSTS preload + cache-control en /assets/*; region `gru1` (São Paulo, latencia 130ms→30ms desde Argentina).
+- `.then()` sin catch en `Ordenes.jsx:589` arreglado.
+- `npm install uuid@latest` (cierra critical advisory).
+- Cleanup de console.log de debug en Header.jsx + MobileNav.jsx.
+
+**Round 2 — Performance / code splitting** (`d0c02dd`)
+- React.lazy() + Suspense en App.jsx por ruta. Cada página es un chunk.
+- `await import('jspdf')` dentro de las funciones de export, no eager.
+- Bundle inicial: 988 KB → 479 KB (gzip 283 KB → 134 KB). −51%.
+- Cada page extra es 8-30 KB on-demand.
+
+**Round 3a — ESLint + Prettier + RUNBOOK** (`623000a`)
+- ESLint 9 flat config (react + react-hooks + react-refresh). Cero errores, 67 warnings de baseline.
+- Prettier config + `.prettierignore`.
+- Scripts: `lint`, `lint:fix`, `format`, `format:check`. `--max-warnings=80` (no bloquea baseline pero falla nuevas).
+- `docs/RUNBOOK.md`: rollback Vercel, restore PITR, rotación de keys, recuperación cron, deploy manual.
+
+**Round 3b — GitHub Actions CI** (`c1b951c`)
+- `.github/workflows/ci.yml`: job `Lint + Build` (lint + build + bundle integrity grep contra service_role/supabaseAdmin) + `smoke-prod` (curl follow-redirect a adorapp.net.ar verificando 200 + shell esperada).
+- Repository variables `VITE_SUPABASE_URL` y `VITE_SUPABASE_ANON_KEY` seteadas vía GitHub API.
+- PAT rotado a scope `repo` + `workflow` para poder pushear `.github/workflows/`.
+
+**Round 4 — Observabilidad custom** (`08046cc` + `4664417`)
+- Tabla `error_log` con RLS pastor-only (SELECT/UPDATE). INSERT solo vía EF.
+- Tabla `health_checks` con RLS pastor-only.
+- EF `log-error` (verify_jwt:false): recibe errores del cliente, captura user via JWT si presente, rate-limited 5/min/key, field-length caps.
+- `src/lib/errorReporter.js` + `src/components/ErrorBoundary.jsx`: captura render-time errors + window.onerror + unhandledrejection.
+- `pg_net` extension habilitada.
+- Cron `daily-reflection-notification` ya estaba.
+- Cron `reflection-monitor` (cada 6 horas): detecta si la reflexión diaria no se generó en 25h y escribe a `error_log` para visibilidad.
+- Cron `uptime-check` removido (`drop_uptime_cron_blocked_by_pg_net`): pg_net no puede llegar a adorapp.net.ar dentro del statement_timeout. Migrar a GitHub Actions schedule en Fase B.
+
+**Fixes durante FASE A**
+- `4664417`: `@eslint/js@10.0.1` (latest) tenía peer eslint@^10.0.0 vs eslint@9.39.4 del proyecto → ERESOLVE en `npm install` de Vercel sin --legacy-peer-deps. Pinnear @eslint/js a `^9.39.4` y regenerar lockfile.
+- `091bc9e`: Smoke step del CI usaba `curl -sS` sin `-L` y veía el 307 del apex → www como falla. Agregado `-L`.
+
+**Branch protection en main**
+- Activada vía GitHub API: requiere status check `Lint + Build`, sin force-push, sin delete, sin enforce_admins (admin puede emergency-bypass).
+
+**SQL quick wins durante la auditoría** (incluidos en `fc2c6c7`)
+- 6 índices FK creados, 6 unused dropped, 9 RLS init plan rewrites, bands multiple permissive policies fixed, song_key_history schema reparado (id PK + NOT NULLs + UNIQUE + trigger).
+
+### Estado al cierre de FASE A
+- 7 commits a `main`: `ded4623`, `d0c02dd`, `623000a`, `c1b951c`, `08046cc`, `4664417`, `091bc9e`.
+- Vercel: último deploy READY commit `091bc9e` en `adorapp.net.ar`. Bundle inicial 479 KB (134 KB gzip).
+- 2 cron jobs activos: `daily-reflection-notification`, `reflection-monitor`.
+- 6 EFs activas: las 5 admin-* + log-error.
+- CI corre lint+build+integrity+smoke en cada push/PR. Branch main protegida con required check.
+- DocOps: RUNBOOK.md completo con runbook de rollback, restore, key rotation.
+
+### Pendiente para FASE B (movido)
+- Uptime monitoring vía GitHub Actions scheduled workflow (reemplaza el pg_net cron que falló).
+- Test end-to-end manual con usuario real (login + flow pastor) para validar.
+
+---
