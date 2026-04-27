@@ -230,43 +230,6 @@ export const useAppStore = create((set, get) => ({
   loading: false,
   error: null,
 
-  // Auto-refresh mechanism for PWA
-  autoRefreshInterval: null,
-  autoRefreshMinutes: 5,
-
-  // Set auto-refresh interval (in minutes, 0 to disable)
-  setAutoRefresh: (minutes) => {
-    const state = get();
-
-    // Clear existing interval
-    if (state.autoRefreshInterval) {
-      clearInterval(state.autoRefreshInterval);
-    }
-
-    if (minutes > 0) {
-      console.log(`🔄 Auto-refresh enabled: every ${minutes} minutes`);
-      const intervalId = setInterval(() => {
-        console.log('🔄 Auto-refresh triggered, reloading data...');
-        get().initialize();
-      }, minutes * 60 * 1000);
-
-      set({ autoRefreshInterval: intervalId, autoRefreshMinutes: minutes });
-    } else {
-      console.log('🔄 Auto-refresh disabled');
-      set({ autoRefreshInterval: null, autoRefreshMinutes: 0 });
-    }
-  },
-
-  // Stop auto-refresh
-  clearAutoRefresh: () => {
-    const state = get();
-    if (state.autoRefreshInterval) {
-      clearInterval(state.autoRefreshInterval);
-      set({ autoRefreshInterval: null });
-      console.log('🔄 Auto-refresh stopped');
-    }
-  },
-
   // Initialize data from Supabase
   initialize: async () => {
     set({ loading: true, error: null });
@@ -752,13 +715,18 @@ export const useAppStore = create((set, get) => ({
     return state.songs.filter(song => !recentlyUsedSongIds.has(song.id));
   },
 
-  // Reset all data on logout
+  // Reset all data on logout. Also clears the localStorage caches that
+  // mirror this store, so a different user logging in on the same device
+  // does not see the previous user's data flash before fresh data loads.
   reset: () => {
-    // Clear auto-refresh interval
-    if (get().autoRefreshInterval) {
-      clearInterval(get().autoRefreshInterval);
+    try {
+      localStorage.removeItem('appMembers');
+      localStorage.removeItem('appBands');
+      localStorage.removeItem('appSongs');
+      localStorage.removeItem('appOrders');
+    } catch (_) {
+      // localStorage may be unavailable in some embedded contexts; non-fatal.
     }
-
     set({
       members: [],
       bands: [],
@@ -766,10 +734,7 @@ export const useAppStore = create((set, get) => ({
       orders: [],
       loading: false,
       error: null,
-      autoRefreshInterval: null,
-      autoRefreshMinutes: 5,
     });
-    console.log('✅ App store reset on logout (localStorage preserved)');
   },
 }));
 

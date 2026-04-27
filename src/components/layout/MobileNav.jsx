@@ -121,7 +121,31 @@ export const MobileNav = () => {
 
     loadNotifications();
     const interval = setInterval(loadNotifications, 2 * 60 * 1000);
-    return () => clearInterval(interval);
+
+    const { user } = useAuthStore.getState();
+    const channel = supabase
+      .channel(`bell-mobile-${user?.id || 'anon'}`)
+      .on(
+        'postgres_changes',
+        { event: 'INSERT', schema: 'public', table: 'notifications', filter: 'is_global=eq.true' },
+        () => loadNotifications()
+      )
+      .on(
+        'postgres_changes',
+        { event: 'INSERT', schema: 'public', table: 'communication_notifications', filter: `recipient_id=eq.${user?.id}` },
+        () => loadNotifications()
+      )
+      .on(
+        'postgres_changes',
+        { event: 'INSERT', schema: 'public', table: 'songs' },
+        () => loadNotifications()
+      )
+      .subscribe();
+
+    return () => {
+      clearInterval(interval);
+      supabase.removeChannel(channel);
+    };
   }, [readNotificationIds]);
 
   const markAsRead = (notificationId) => {
@@ -531,9 +555,9 @@ export const MobileNav = () => {
             }}
             className="flex items-center gap-2 p-1 rounded-full hover:bg-neutral-800 transition-colors"
           >
-            {profile?.avatar_url || profile?.photo_url ? (
+            {profile?.avatar_url ? (
               <img
-                src={profile.avatar_url || profile.photo_url}
+                src={profile.avatar_url}
                 alt={profile?.name}
                 className="w-8 h-8 rounded-full object-cover border-2 border-neutral-700"
               />
@@ -597,9 +621,9 @@ export const MobileNav = () => {
                   {/* Profile Photo with Edit */}
                   <div className="flex flex-col items-center mb-6">
                     <div className="relative">
-                      {profile?.avatar_url || profile?.photo_url ? (
+                      {profile?.avatar_url ? (
                         <img
-                          src={profile.avatar_url || profile.photo_url}
+                          src={profile.avatar_url}
                           alt={profile?.name}
                           className="w-20 h-20 rounded-full object-cover border-2 border-neutral-700"
                         />
@@ -710,9 +734,9 @@ export const MobileNav = () => {
                   {/* Profile Info */}
                   <div className="flex items-center gap-4 mb-6">
                     <div className="relative">
-                      {profile?.avatar_url || profile?.photo_url ? (
+                      {profile?.avatar_url ? (
                         <img
-                          src={profile.avatar_url || profile.photo_url}
+                          src={profile.avatar_url}
                           alt={profile?.name}
                           className="w-16 h-16 rounded-full object-cover border-2 border-neutral-700"
                         />
@@ -840,9 +864,9 @@ export const MobileNav = () => {
 
               <div className="flex flex-col items-center mb-6">
                 <div className="w-32 h-32 rounded-full bg-neutral-800 flex items-center justify-center mb-4 overflow-hidden border-2 border-neutral-700">
-                  {profile?.avatar_url || profile?.photo_url ? (
+                  {profile?.avatar_url ? (
                     <img
-                      src={profile.avatar_url || profile.photo_url}
+                      src={profile.avatar_url}
                       alt={profile?.name}
                       className="w-full h-full object-cover"
                     />
@@ -1063,9 +1087,9 @@ export const MobileNav = () => {
           >
             <div className="flex items-center justify-between px-5 mb-6">
               <div className="flex items-center gap-3">
-                {profile?.avatar_url || profile?.photo_url ? (
+                {profile?.avatar_url ? (
                   <img
-                    src={profile.avatar_url || profile.photo_url}
+                    src={profile.avatar_url}
                     alt={profile?.name}
                     className="w-10 h-10 rounded-full object-cover"
                   />

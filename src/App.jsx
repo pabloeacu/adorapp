@@ -12,35 +12,40 @@ import { Comunicaciones } from './pages/Comunicaciones';
 import { useAuthStore } from './stores/authStore';
 import { useAppStore } from './stores/appStore';
 
-// Component that auto-syncs on every route change and periodically
+// Auto-sync strategy:
+//   - On route change: re-fetch (kept; cheap and gives fresh data on user navigation).
+//   - On window focus / tab visibility change: re-fetch (catches changes made in
+//     other tabs or after returning from background without spamming the DB).
+//   - Realtime subscriptions on individual tables handle live changes (see Header
+//     and MobileNav for the bell, and the appStore subscriptions below for the
+//     CRUD tables). The previous 30-second polling interval is gone — Realtime
+//     covers it without burning egress quota.
 const RouteSync = ({ children }) => {
   const location = useLocation();
   const initializeApp = useAppStore((state) => state.initialize);
   const refreshProfile = useAuthStore((state) => state.refreshProfile);
   const user = useAuthStore((state) => state.user);
 
-  // AUTO-SYNC on every route change - NEVER cache profile data
-  useEffect(() => {
-    const syncData = async () => {
-      if (user) {
-        // ALWAYS reload from Supabase - no cache
-        await initializeApp();
-        await refreshProfile();
-      }
-    };
-    syncData();
-  }, [location.pathname, user, initializeApp, refreshProfile]);
-
-  // AUTO-SYNC every 30 seconds - keeps data fresh from database
   useEffect(() => {
     if (!user) return;
+    initializeApp();
+    refreshProfile();
+  }, [location.pathname, user, initializeApp, refreshProfile]);
 
-    const interval = setInterval(async () => {
-      await initializeApp();
-      await refreshProfile();
-    }, 30000); // Sync every 30 seconds
-
-    return () => clearInterval(interval);
+  useEffect(() => {
+    if (!user) return;
+    const onFocus = () => {
+      if (document.visibilityState === 'visible') {
+        initializeApp();
+        refreshProfile();
+      }
+    };
+    window.addEventListener('focus', onFocus);
+    document.addEventListener('visibilitychange', onFocus);
+    return () => {
+      window.removeEventListener('focus', onFocus);
+      document.removeEventListener('visibilitychange', onFocus);
+    };
   }, [user, initializeApp, refreshProfile]);
 
   return children;
@@ -50,29 +55,16 @@ function App() {
   const [initialized, setInitialized] = useState(false);
   const initializeAuth = useAuthStore((state) => state.initialize);
   const initializeApp = useAppStore((state) => state.initialize);
-  const setAutoRefresh = useAppStore((state) => state.setAutoRefresh);
   const authLoading = useAuthStore((state) => state.loading);
-  const user = useAuthStore((state) => state.user);
 
   useEffect(() => {
     const init = async () => {
       await initializeAuth();
       await initializeApp();
-
-      // Enable auto-refresh every 5 minutes for PWA (runs in background)
-      setAutoRefresh(5);
-
       setInitialized(true);
     };
     init();
-  }, [initializeAuth, initializeApp, setAutoRefresh]);
-
-  // Disable auto-refresh on logout
-  useEffect(() => {
-    if (!user) {
-      setAutoRefresh(0);
-    }
-  }, [user, setAutoRefresh]);
+  }, [initializeAuth, initializeApp]);
 
   // Show loading spinner while initializing
   if (!initialized || authLoading) {

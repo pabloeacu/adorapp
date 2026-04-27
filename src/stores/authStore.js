@@ -42,13 +42,21 @@ export const useAuthStore = create((set, get) => ({
     });
   },
 
-  // Force refresh profile from database - ALWAYS bypass cache
+  // Force-refresh the current user's profile AND the appStore caches that mirror
+  // the same data. This is the canonical way to make a profile/avatar/role
+  // change propagate everywhere without waiting for a route change.
   refreshProfile: async () => {
     const userId = get().user?.id;
     if (!userId) return;
 
     localStorage.removeItem('user_profile');
     await get().fetchProfile(userId);
+
+    try {
+      await useAppStore.getState().initialize();
+    } catch (err) {
+      console.error('appStore refresh after profile update failed:', err);
+    }
   },
 
   // Fetch user profile from members table - ALWAYS fresh from DB
@@ -178,37 +186,47 @@ export const useAuthStore = create((set, get) => ({
     return false;
   },
 
-  // Sign out - COMPLETE CLEANUP of all local data
+  // Sign out — wipe every trace of the previous user from this device:
+  // Supabase session, app caches, per-user keys, sessionStorage. Anything
+  // that survived would either leak data across users on a shared device
+  // or cause the next login to flash stale state.
   logout: async () => {
     try {
-      // 1. Clear Supabase auth session
       await supabase.auth.signOut();
 
-      // 2. Clear ALL localStorage data related to auth and app
-      const keysToRemove = [
+      // Static keys we know about.
+      const staticKeys = [
         'user_profile',
         'user',
         'userPhoto',
+        'rememberedEmail',
+        'rememberMe',
+        'rememberedPassword', // legacy leak — clear if any old client still has it
+        'lastDevocionalDate',
+        'readDevotionalIds',
         'supabase-auth-token',
         'supabase-session',
         'sb-gvsoexomzfaimagnaqzm-auth-token',
-        'sb-gvsoexomzfaimagnaqzm-auth-token-change-token'
+        'sb-gvsoexomzfaimagnaqzm-auth-token-change-token',
       ];
+      staticKeys.forEach(k => localStorage.removeItem(k));
 
-      keysToRemove.forEach(key => {
-        localStorage.removeItem(key);
-      });
+      // Per-user notification read-state keys (one per user_id we ever saw).
+      try {
+        const toDelete = [];
+        for (let i = 0; i < localStorage.length; i++) {
+          const key = localStorage.key(i);
+          if (key && key.startsWith('readNotificationIds_')) toDelete.push(key);
+        }
+        toDelete.forEach(k => localStorage.removeItem(k));
+      } catch (_) { /* non-fatal */ }
 
-      // 3. Clear sessionStorage as well
       sessionStorage.clear();
 
-      // 4. Reset app store data (members, bands, songs, orders)
+      // App caches (members/bands/songs/orders) — handled inside the store reset.
       useAppStore.getState().reset();
 
-      // 5. Reset auth store state
       set({ user: null, profile: null, loading: false, error: null });
-
-      console.log('✅ Complete logout cleanup performed');
     } catch (err) {
       console.error('Logout error:', err);
     }

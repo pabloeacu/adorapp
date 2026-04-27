@@ -4,7 +4,7 @@ import React, { useState, useEffect, useMemo } from 'react';
 import { Send, Users, X, Check, Loader2, AlertCircle } from 'lucide-react';
 import { useAuthStore } from '../stores/authStore';
 import { useAppStore } from '../stores/appStore';
-import { supabase } from '../lib/supabase';
+import { callAdminFunction } from '../lib/supabase';
 import { Card } from '../components/ui/Card';
 import { Button } from '../components/ui/Button';
 
@@ -31,38 +31,21 @@ export const Comunicaciones = () => {
   const [showBandSelector, setShowBandSelector] = useState(false);
   const [showUserSelector, setShowUserSelector] = useState(false);
 
-  // Debug: Log ALL member data to see if Olga is there
-  useEffect(() => {
-    console.log('=== DEBUG COMMUNICATIONS ===');
-    console.log('Total members:', members.length);
-    console.log('Total bands:', bands.length);
-    console.log('--- ALL MEMBERS ---');
-    members.forEach((m, i) => {
-      console.log(`${i+1}. ${m.name} | email: ${m.email} | userId: ${m.userId} | active: ${m.active} | role: ${m.role}`);
-    });
-    console.log('--- END MEMBERS ---');
-  }, [members, bands]);
-
   // Active members with user accounts (can receive notifications)
-  const activeMembers = useMemo(() => {
-    const active = members.filter(m => m.active === true);
-    console.log('Active members (with active=true):', active.length);
-    return active;
-  }, [members]);
+  const activeMembers = useMemo(
+    () => members.filter(m => m.active === true),
+    [members]
+  );
 
-  // Members with user accounts (can receive notifications)
-  const membersWithAccounts = useMemo(() => {
-    const withAccounts = activeMembers.filter(m => m.userId);
-    console.log('Members with userId:', withAccounts.length);
-    return withAccounts;
-  }, [activeMembers]);
+  const membersWithAccounts = useMemo(
+    () => activeMembers.filter(m => m.userId),
+    [activeMembers]
+  );
 
-  // Active bands only
-  const activeBands = useMemo(() => {
-    const active = bands.filter(b => b.active === true);
-    console.log('Active bands (with active=true):', active.length);
-    return active;
-  }, [bands]);
+  const activeBands = useMemo(
+    () => bands.filter(b => b.active === true),
+    [bands]
+  );
 
   // Get members by selected bands (from band's members array)
   const membersInSelectedBands = useMemo(() => {
@@ -90,17 +73,12 @@ export const Comunicaciones = () => {
     );
   };
 
-  // Toggle user selection
   const toggleUser = (userId) => {
-    console.log('toggleUser called with:', userId);
-    console.log('Current selectedUsers:', selectedUsers);
-    setSelectedUsers(prev => {
-      const newSelection = prev.includes(userId)
+    setSelectedUsers(prev =>
+      prev.includes(userId)
         ? prev.filter(id => id !== userId)
-        : [...prev, userId];
-      console.log('New selectedUsers:', newSelection);
-      return newSelection;
-    });
+        : [...prev, userId]
+    );
   };
 
   // Reset form
@@ -172,79 +150,28 @@ export const Comunicaciones = () => {
 
     setIsSending(true);
 
-    try {
-      // Get sender info (pastor's member record)
-      const senderMember = activeMembers.find(m => m.email === user?.email);
+    // The edge function does the parent insert, fan-out, and rolls back if anything
+    // fails — atomic from the client's perspective. The pastor's identity is taken
+    // from the JWT server-side (no need to send sender info from here).
+    const { data, error } = await callAdminFunction('admin-send-communication', {
+      recipientType,
+      recipientIds,
+      subject: subject.trim(),
+      message: message.trim(),
+    });
 
-      // Create communication record
-      const { data: commData, error: commError } = await supabase
-        .from('communications')
-        .insert({
-          sender_id: senderMember?.userId || senderMember?.id,
-          sender_name: senderMember?.name || profile?.name || user?.name,
-          sender_photo: senderMember?.avatar_url || senderMember?.photo_url,
-          subject: subject.trim(),
-          message: message.trim(),
-          recipient_type: recipientType,
-          recipient_ids: recipientIds,
-          recipient_count: recipientIds.length,
-        })
-        .select()
-        .single();
+    setIsSending(false);
 
-      if (commError) throw commError;
-
-      // Create individual notifications for each recipient
-      // Note: NOT including 'id' field - let Supabase generate UUID automatically
-      const notifications = recipientIds.map(recipientId => ({
-        communication_id: commData.id,
-        recipient_id: recipientId,
-        sender_name: senderMember?.name || profile?.name || user?.name || 'Pastor',
-        sender_photo: senderMember?.avatar_url || senderMember?.photo_url || null,
-        subject: subject.trim(),
-        preview: message.trim().substring(0, 100),
-        full_message: message.trim(),
-        is_read: false,
-      }));
-
-      // Insert notifications in batches of 50
-      const batchSize = 50;
-      let notificationsInserted = 0;
-      for (let i = 0; i < notifications.length; i += batchSize) {
-        const batch = notifications.slice(i, i + batchSize);
-        const { data, error: notifError } = await supabase
-          .from('communication_notifications')
-          .insert(batch)
-          .select();
-
-        if (notifError) {
-          console.error('Error inserting notifications:', notifError);
-          throw new Error(`Error al crear notificaciones: ${notifError.message}`);
-        }
-
-        if (data) {
-          notificationsInserted += data.length;
-          console.log(`Inserted ${data.length} notifications`);
-        }
-      }
-
-      console.log(`Total notifications inserted: ${notificationsInserted}`);
-
-      // Store recipient count before resetting
-      const sentCount = notificationsInserted;
-
-      setShowSuccess(true);
-      resetForm();
-
-      // Pass count to success modal via data attribute
-      window.lastSentCount = sentCount;
-    } catch (err) {
-      console.error('Error sending communication:', err);
-      setErrorMessage('Error al enviar la comunicación. Por favor, intentá de nuevo.');
+    if (error) {
+      console.error('Error sending communication:', error);
+      setErrorMessage('No se pudo enviar la comunicación: ' + error);
       setShowError(true);
-    } finally {
-      setIsSending(false);
+      return;
     }
+
+    window.lastSentCount = data?.inserted ?? recipientIds.length;
+    setShowSuccess(true);
+    resetForm();
   };
 
   // If not a pastor, show access denied

@@ -382,7 +382,6 @@ export const Header = () => {
         }
 
         // Load GLOBAL reflection notifications from notifications table
-        console.log('Fetching global notifications...');
         const { data: globalNotifs, error: globalError } = await supabase
           .from('notifications')
           .select('id, title, message, type, created_at')
@@ -390,14 +389,11 @@ export const Header = () => {
           .order('created_at', { ascending: false })
           .limit(5);
 
-        console.log('Global notifications query result:', { globalNotifs, globalError });
-
         if (globalError) {
           console.error('Error fetching global notifications:', globalError);
         }
 
         if (globalNotifs && globalNotifs.length > 0) {
-          console.log('Adding', globalNotifs.length, 'global notifications');
           globalNotifs.forEach(n => {
             notifs.push({
               id: n.id,
@@ -407,24 +403,47 @@ export const Header = () => {
               time: new Date(n.created_at).toLocaleTimeString('es-AR', { hour: '2-digit', minute: '2-digit' })
             });
           });
-        } else {
-          console.log('No global notifications found in database');
         }
 
         setNotifications(notifs);
-
-        // Calculate unread count
         const unread = notifs.filter(n => !readNotificationIds.includes(n.id)).length;
         setUnreadCount(unread);
       } catch (err) {
-        console.log('Error loading notifications:', err);
+        console.error('Error loading notifications:', err);
       }
     };
 
-    // Load immediately, then refresh every 2 minutes from Supabase
+    // Load immediately, then keep fresh through Supabase Realtime + a slower
+    // 2-minute fallback poll for the "derived" notifications (new songs count etc.)
+    // that don't have a direct Realtime hook.
     loadNotifications();
     const interval = setInterval(loadNotifications, 2 * 60 * 1000);
-    return () => clearInterval(interval);
+
+    // Realtime: refresh as soon as relevant rows are inserted, instead of waiting
+    // up to 2 minutes for the next poll.
+    const channel = supabase
+      .channel(`bell-${user?.id || 'anon'}`)
+      .on(
+        'postgres_changes',
+        { event: 'INSERT', schema: 'public', table: 'notifications', filter: 'is_global=eq.true' },
+        () => loadNotifications()
+      )
+      .on(
+        'postgres_changes',
+        { event: 'INSERT', schema: 'public', table: 'communication_notifications', filter: `recipient_id=eq.${user?.id}` },
+        () => loadNotifications()
+      )
+      .on(
+        'postgres_changes',
+        { event: 'INSERT', schema: 'public', table: 'songs' },
+        () => loadNotifications()
+      )
+      .subscribe();
+
+    return () => {
+      clearInterval(interval);
+      supabase.removeChannel(channel);
+    };
   }, [readNotificationIds, user?.id]);
 
   // Mark notification as read (user-specific)
