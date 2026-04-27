@@ -1,5 +1,5 @@
 import React, { useState, useMemo, useRef, useEffect } from 'react';
-import { jsPDF } from 'jspdf';
+// jspdf is loaded on demand inside generateSongPDF (~140 KB; no need at first paint).
 import {
   Plus, Search, Music, Download, Edit, Trash2, Clock, MoreVertical,
   Eye, ExternalLink, Filter, X, GripVertical, Music2, Save,
@@ -333,6 +333,7 @@ export const Repertorio = () => {
   };
 
   const generateSongPDF = async (song, key) => {
+    const { jsPDF } = await import('jspdf');
     const originalKey = song.originalKey || song.key;
     const transposedStructure = key !== originalKey
       ? transposeSongStructure(song.structure || [], originalKey, key)

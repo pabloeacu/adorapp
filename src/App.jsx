@@ -1,25 +1,43 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, lazy, Suspense } from 'react';
 import { BrowserRouter, Routes, Route, useLocation } from 'react-router-dom';
 import { Layout } from './components/layout/Layout';
-import { Login } from './pages/Login';
-import { Dashboard } from './pages/Dashboard';
-import { Ordenes } from './pages/Ordenes';
-import { Repertorio } from './pages/Repertorio';
-import { Bandas } from './pages/Bandas';
-import { Miembros } from './pages/Miembros';
-import { Solicitudes } from './pages/Solicitudes';
-import { Comunicaciones } from './pages/Comunicaciones';
 import { useAuthStore } from './stores/authStore';
 import { useAppStore } from './stores/appStore';
+
+// Lazy-loaded route components. Each compiles into its own chunk, so a user
+// who only ever opens Login / Dashboard does not download the Repertorio
+// editor, the PDF generator, or the photo cropper at first paint.
+//
+// `.then(m => ({ default: m.Foo }))` is needed because the page modules use
+// named exports rather than default ones.
+const lazyPage = (importer, name) =>
+  lazy(() => importer().then(m => ({ default: m[name] })));
+
+const Login = lazyPage(() => import('./pages/Login'), 'Login');
+const Dashboard = lazyPage(() => import('./pages/Dashboard'), 'Dashboard');
+const Ordenes = lazyPage(() => import('./pages/Ordenes'), 'Ordenes');
+const Repertorio = lazyPage(() => import('./pages/Repertorio'), 'Repertorio');
+const Bandas = lazyPage(() => import('./pages/Bandas'), 'Bandas');
+const Miembros = lazyPage(() => import('./pages/Miembros'), 'Miembros');
+const Solicitudes = lazyPage(() => import('./pages/Solicitudes'), 'Solicitudes');
+const Comunicaciones = lazyPage(() => import('./pages/Comunicaciones'), 'Comunicaciones');
+
+const RouteFallback = () => (
+  <div
+    role="status"
+    aria-live="polite"
+    className="min-h-[40vh] flex items-center justify-center"
+  >
+    <span className="sr-only">Cargando…</span>
+    <div className="w-10 h-10 rounded-full border-2 border-white/20 border-t-white animate-spin" />
+  </div>
+);
 
 // Auto-sync strategy:
 //   - On route change: re-fetch (kept; cheap and gives fresh data on user navigation).
 //   - On window focus / tab visibility change: re-fetch (catches changes made in
 //     other tabs or after returning from background without spamming the DB).
-//   - Realtime subscriptions on individual tables handle live changes (see Header
-//     and MobileNav for the bell, and the appStore subscriptions below for the
-//     CRUD tables). The previous 30-second polling interval is gone — Realtime
-//     covers it without burning egress quota.
+//   - Realtime subscriptions on individual tables handle live changes.
 const RouteSync = ({ children }) => {
   const location = useLocation();
   const initializeApp = useAppStore((state) => state.initialize);
@@ -66,7 +84,6 @@ function App() {
     init();
   }, [initializeAuth, initializeApp]);
 
-  // Show loading spinner while initializing
   if (!initialized || authLoading) {
     return (
       <div className="min-h-screen bg-black flex items-center justify-center">
@@ -85,18 +102,20 @@ function App() {
   return (
     <BrowserRouter>
       <RouteSync>
-        <Routes>
-          <Route path="/login" element={<Login />} />
-          <Route path="/" element={<Layout />}>
-            <Route index element={<Dashboard />} />
-            <Route path="ordenes" element={<Ordenes />} />
-            <Route path="repertorio" element={<Repertorio />} />
-            <Route path="bandas" element={<Bandas />} />
-            <Route path="miembros" element={<Miembros />} />
-            <Route path="solicitudes" element={<Solicitudes />} />
-            <Route path="comunicaciones" element={<Comunicaciones />} />
-          </Route>
-        </Routes>
+        <Suspense fallback={<RouteFallback />}>
+          <Routes>
+            <Route path="/login" element={<Login />} />
+            <Route path="/" element={<Layout />}>
+              <Route index element={<Dashboard />} />
+              <Route path="ordenes" element={<Ordenes />} />
+              <Route path="repertorio" element={<Repertorio />} />
+              <Route path="bandas" element={<Bandas />} />
+              <Route path="miembros" element={<Miembros />} />
+              <Route path="solicitudes" element={<Solicitudes />} />
+              <Route path="comunicaciones" element={<Comunicaciones />} />
+            </Route>
+          </Routes>
+        </Suspense>
       </RouteSync>
     </BrowserRouter>
   );

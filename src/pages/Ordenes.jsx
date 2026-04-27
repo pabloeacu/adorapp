@@ -5,7 +5,8 @@ import {
   User, Zap, AlertCircle, ChevronDown, FileDown, History, Award,
   FileText, Printer, Copy as CopyIcon
 } from 'lucide-react';
-import { jsPDF } from 'jspdf';
+// jspdf is loaded on demand inside generateOrderPDF / generateSongsPDF
+// (~140 KB; no need at first paint).
 import { useAppStore, MEETING_TYPES, MUSICAL_KEYS, transposeSongStructure } from '../stores/appStore';
 import { useAuthStore } from '../stores/authStore';
 import { supabase } from '../lib/supabase';
@@ -208,6 +209,7 @@ export const Ordenes = () => {
 
   // Export order summary (without chords)
   const generateOrderPDF = async (order) => {
+    const { jsPDF } = await import('jspdf');
     const band = getBandById(order.bandId);
     const doc = new jsPDF({
       orientation: 'portrait',
@@ -373,6 +375,7 @@ export const Ordenes = () => {
 
   // Print all songs with full content (one song per page with page break)
   const generateSongsPDF = async (order) => {
+    const { jsPDF } = await import('jspdf');
     const band = getBandById(order.bandId);
     const doc = new jsPDF({
       orientation: 'portrait',
