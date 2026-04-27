@@ -230,8 +230,6 @@ const RegisterModal = ({ isOpen, onClose, onSuccess }) => {
   const [formData, setFormData] = useState({
     name: '',
     email: '',
-    password: '',
-    confirmPassword: '',
     phone: '',
     birthdate: '',
     pastor_area: '',
@@ -240,8 +238,6 @@ const RegisterModal = ({ isOpen, onClose, onSuccess }) => {
   });
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
-  const [showPassword, setShowPassword] = useState(false);
-  const [showConfirmPassword, setShowConfirmPassword] = useState(false);
 
   const handleChange = (e) => {
     const { name, value } = e.target;
@@ -261,7 +257,6 @@ const RegisterModal = ({ isOpen, onClose, onSuccess }) => {
     e.preventDefault();
     setError('');
 
-    // Validations
     if (!formData.name.trim()) {
       setError('El nombre es obligatorio');
       return;
@@ -270,28 +265,15 @@ const RegisterModal = ({ isOpen, onClose, onSuccess }) => {
       setError('El email es obligatorio');
       return;
     }
-    if (!formData.password) {
-      setError('La contraseña es obligatoria');
-      return;
-    }
-    if (formData.password.length < 6) {
-      setError('La contraseña debe tener al menos 6 caracteres');
-      return;
-    }
-    if (formData.password !== formData.confirmPassword) {
-      setError('Las contraseñas no coinciden');
-      return;
-    }
 
     setLoading(true);
 
     try {
       const { supabase } = await import('../lib/supabase');
 
-      // Anonymous insert into pending_registrations (RLS policy allows anon insert).
-      // If the email is already pending, the UNIQUE constraint trips and we surface
-      // a friendly message. We do NOT pre-check `members` from the public form because
-      // anonymous reads of members are not allowed (and shouldn't be).
+      // Anonymous insert into pending_registrations (RLS allows anon insert).
+      // No password is sent — the pastor generates it at approval time and
+      // shares it with the new member through a secure channel.
       const { error: insertError } = await supabase
         .from('pending_registrations')
         .insert({
@@ -302,7 +284,6 @@ const RegisterModal = ({ isOpen, onClose, onSuccess }) => {
           pastor_area: formData.pastor_area.trim() || null,
           leader_of: formData.leader_of.trim() || null,
           instruments: formData.instruments,
-          password_hash: formData.password,
           status: 'pending',
         });
 
@@ -363,53 +344,8 @@ const RegisterModal = ({ isOpen, onClose, onSuccess }) => {
           required
         />
 
-        <div className="grid grid-cols-2 gap-4">
-          <div className="relative">
-            <label className="text-xs text-gray-400 font-medium uppercase tracking-wide block mb-2">
-              Contraseña *
-            </label>
-            <Lock className="absolute left-4 top-[42px] text-gray-500" size={18} />
-            <input
-              type={showPassword ? 'text' : 'password'}
-              name="password"
-              placeholder="Mínimo 6 caracteres"
-              value={formData.password}
-              onChange={handleChange}
-              className="w-full pl-12 pr-12 py-3 bg-neutral-800 border border-neutral-700 rounded-xl text-white placeholder-gray-500 focus:outline-none focus:border-white transition-colors"
-              required
-              minLength={6}
-            />
-            <button
-              type="button"
-              onClick={() => setShowPassword(!showPassword)}
-              className="absolute right-4 top-[42px] text-gray-500 hover:text-white"
-            >
-              {showPassword ? <EyeOff size={18} /> : <Eye size={18} />}
-            </button>
-          </div>
-
-          <div className="relative">
-            <label className="text-xs text-gray-400 font-medium uppercase tracking-wide block mb-2">
-              Confirmar Contraseña *
-            </label>
-            <Lock className="absolute left-4 top-[42px] text-gray-500" size={18} />
-            <input
-              type={showConfirmPassword ? 'text' : 'password'}
-              name="confirmPassword"
-              placeholder="Repetí la contraseña"
-              value={formData.confirmPassword}
-              onChange={handleChange}
-              className="w-full pl-12 pr-12 py-3 bg-neutral-800 border border-neutral-700 rounded-xl text-white placeholder-gray-500 focus:outline-none focus:border-white transition-colors"
-              required
-            />
-            <button
-              type="button"
-              onClick={() => setShowConfirmPassword(!showConfirmPassword)}
-              className="absolute right-4 top-[42px] text-gray-500 hover:text-white"
-            >
-              {showConfirmPassword ? <EyeOff size={18} /> : <Eye size={18} />}
-            </button>
-          </div>
+        <div className="p-3 bg-blue-500/10 border border-blue-500/30 rounded-lg text-sm text-blue-300">
+          Cuando un pastor apruebe tu solicitud, te va a generar una contraseña inicial y te la va a hacer llegar por un canal seguro.
         </div>
 
         <Input

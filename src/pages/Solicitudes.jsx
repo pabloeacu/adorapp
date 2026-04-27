@@ -45,6 +45,9 @@ export const Solicitudes = () => {
   const [showDetailModal, setShowDetailModal] = useState(false);
   const [showApproveModal, setShowApproveModal] = useState(false);
   const [selectedRole, setSelectedRole] = useState('member');
+  const [generatedPassword, setGeneratedPassword] = useState('');
+  const [createdMember, setCreatedMember] = useState(null);
+  const [showPasswordReveal, setShowPasswordReveal] = useState(false);
 
   // Confirmation modals
   const [confirmModal, setConfirmModal] = useState({
@@ -114,20 +117,41 @@ export const Solicitudes = () => {
     setShowDetailModal(true);
   };
 
+  // Generate a reasonably-strong random password (alphanumeric, 12 chars).
+  // Uses crypto.getRandomValues for unbiased entropy.
+  const generateRandomPassword = () => {
+    const alphabet = 'ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz23456789';
+    const buf = new Uint32Array(12);
+    crypto.getRandomValues(buf);
+    let out = '';
+    for (let i = 0; i < buf.length; i++) out += alphabet[buf[i] % alphabet.length];
+    return out;
+  };
+
   const handleApprove = (request) => {
     setSelectedRequest(request);
     setSelectedRole('member');
+    setGeneratedPassword(generateRandomPassword());
     setShowApproveModal(true);
   };
 
   const handleConfirmApproval = async () => {
     if (!selectedRequest) return;
+    if (!generatedPassword || generatedPassword.length < 6) {
+      setErrorModal({ isOpen: true, title: 'Error', message: 'La contraseña inicial debe tener al menos 6 caracteres.' });
+      return;
+    }
 
     setConfirmModal({ ...confirmModal, loading: true });
+
+    const approvedName = selectedRequest.name;
+    const approvedEmail = selectedRequest.email;
+    const approvedPassword = generatedPassword;
 
     const { data, error } = await callAdminFunction('admin-approve-registration', {
       requestId: selectedRequest.id,
       role: selectedRole,
+      password: generatedPassword,
     });
 
     if (error) {
@@ -145,11 +169,10 @@ export const Solicitudes = () => {
     setShowApproveModal(false);
     setConfirmModal({ ...confirmModal, isOpen: false, loading: false });
 
-    setSuccessModal({
-      isOpen: true,
-      title: 'Solicitud Aprobada',
-      message: `${selectedRequest.name} ha sido aprobado como ${MEMBER_ROLES.find(r => r.id === selectedRole)?.label}. Avisale por canal seguro las credenciales.`,
-    });
+    // Show the credentials modal so the pastor can copy and share them
+    // through a secure channel. Once it closes, the password is gone.
+    setCreatedMember({ name: approvedName, email: approvedEmail, password: approvedPassword });
+    setShowPasswordReveal(true);
 
     await initialize();
   };
@@ -538,9 +561,86 @@ export const Solicitudes = () => {
             </div>
           </div>
 
-          <div className="p-3 bg-blue-500/10 border border-blue-500/30 rounded-lg text-sm text-blue-300">
-            Se creará un usuario en el sistema con las credenciales que proporcionó. El miembro recibirá un email de confirmación.
+          <div>
+            <label className="text-xs text-gray-400 font-medium uppercase tracking-wide block mb-2">
+              Contraseña inicial *
+            </label>
+            <div className="flex gap-2">
+              <input
+                type="text"
+                value={generatedPassword}
+                onChange={(e) => setGeneratedPassword(e.target.value)}
+                className="flex-1 px-4 py-3 bg-neutral-900 border border-neutral-800 rounded-xl font-mono focus:outline-none focus:border-white transition-colors"
+                placeholder="Mínimo 6 caracteres"
+                minLength={6}
+              />
+              <Button
+                type="button"
+                variant="secondary"
+                onClick={() => setGeneratedPassword(generateRandomPassword())}
+              >
+                Regenerar
+              </Button>
+            </div>
+            <p className="text-xs text-gray-500 mt-2">
+              Esta es la contraseña inicial que se le va a asignar. Se la mostraremos una sola vez después de aprobar para que se la pases al usuario por canal seguro.
+            </p>
           </div>
+
+          <div className="p-3 bg-blue-500/10 border border-blue-500/30 rounded-lg text-sm text-blue-300">
+            Al aprobar se crea un usuario en el sistema con esta contraseña inicial. El miembro la podrá cambiar después.
+          </div>
+        </div>
+      </Modal>
+
+      {/* Credentials Reveal Modal — shown once after a successful approval */}
+      <Modal
+        isOpen={showPasswordReveal}
+        onClose={() => { setShowPasswordReveal(false); setCreatedMember(null); }}
+        title="Solicitud Aprobada"
+        size="md"
+      >
+        <div className="space-y-4">
+          <div className="flex items-center justify-center">
+            <div className="w-16 h-16 bg-green-500/20 rounded-full flex items-center justify-center">
+              <CheckCircle size={32} className="text-green-400" />
+            </div>
+          </div>
+
+          <div className="text-center">
+            <p className="text-lg font-semibold">{createdMember?.name}</p>
+            <p className="text-gray-400">fue aprobado y ya tiene cuenta de acceso</p>
+          </div>
+
+          <div className="bg-neutral-800/50 rounded-xl p-4 space-y-3">
+            <div>
+              <p className="text-xs text-gray-400">Email</p>
+              <p className="font-medium">{createdMember?.email}</p>
+            </div>
+            <div>
+              <p className="text-xs text-gray-400">Contraseña inicial</p>
+              <div className="flex items-center gap-2">
+                <p className="flex-1 font-medium font-mono bg-neutral-900 px-3 py-2 rounded-lg break-all">
+                  {createdMember?.password}
+                </p>
+                <Button
+                  type="button"
+                  variant="secondary"
+                  onClick={() => navigator.clipboard.writeText(createdMember?.password || '')}
+                >
+                  Copiar
+                </Button>
+              </div>
+            </div>
+          </div>
+
+          <div className="bg-yellow-500/10 border border-yellow-500/30 rounded-xl p-4 text-sm text-yellow-300">
+            <strong>Importante:</strong> compartí la contraseña por un canal seguro. Después de cerrar este aviso ya no la vas a poder ver de nuevo.
+          </div>
+
+          <Button onClick={() => { setShowPasswordReveal(false); setCreatedMember(null); }} className="w-full">
+            Entendido
+          </Button>
         </div>
       </Modal>
 
