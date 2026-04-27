@@ -286,23 +286,13 @@ const RegisterModal = ({ isOpen, onClose, onSuccess }) => {
     setLoading(true);
 
     try {
-      const { supabaseAdmin } = await import('../lib/supabase');
+      const { supabase } = await import('../lib/supabase');
 
-      // Check if email already exists in members or pending_registrations
-      const { data: existingMember } = await supabaseAdmin
-        .from('members')
-        .select('id')
-        .eq('email', formData.email.trim())
-        .single();
-
-      if (existingMember) {
-        setError('Este email ya está registrado. Contactá a los pastores.');
-        setLoading(false);
-        return;
-      }
-
-      // Create pending registration
-      const { error: insertError } = await supabaseAdmin
+      // Anonymous insert into pending_registrations (RLS policy allows anon insert).
+      // If the email is already pending, the UNIQUE constraint trips and we surface
+      // a friendly message. We do NOT pre-check `members` from the public form because
+      // anonymous reads of members are not allowed (and shouldn't be).
+      const { error: insertError } = await supabase
         .from('pending_registrations')
         .insert({
           name: formData.name.trim(),
@@ -312,13 +302,17 @@ const RegisterModal = ({ isOpen, onClose, onSuccess }) => {
           pastor_area: formData.pastor_area.trim() || null,
           leader_of: formData.leader_of.trim() || null,
           instruments: formData.instruments,
-          password_hash: formData.password, // Will be hashed by trigger
+          password_hash: formData.password,
           status: 'pending',
         });
 
       if (insertError) {
         console.error('Registration error:', insertError);
-        setError('No se pudo enviar la solicitud. Intentá de nuevo.');
+        if (insertError.code === '23505') {
+          setError('Ya existe una solicitud o cuenta con ese email. Contactá a los pastores.');
+        } else {
+          setError('No se pudo enviar la solicitud. Intentá de nuevo.');
+        }
         setLoading(false);
         return;
       }

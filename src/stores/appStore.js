@@ -1,5 +1,5 @@
 import { create } from 'zustand';
-import { supabase, supabaseAdmin } from '../lib/supabase';
+import { supabase, callAdminFunction } from '../lib/supabase';
 import { v4 as uuidv4 } from 'uuid';
 
 // Musical key transposition table
@@ -329,52 +329,35 @@ export const useAppStore = create((set, get) => ({
     }
   },
 
-  // Member CRUD
+  // Member CRUD — admin operations go through edge functions, never the client.
   addMember: async (member) => {
     try {
-      const memberId = uuidv4();
-      let userId = null;
+      const { data, error } = await callAdminFunction('admin-create-member', {
+        name: member.name,
+        email: member.email || null,
+        password: member.password || null,
+        phone: member.phone || null,
+        pastor_area: member.pastor_area || null,
+        leader_of: member.leader_of || null,
+        birthdate: member.birthdate || null,
+        role: member.role || 'member',
+        editor: member.editor || false,
+        instruments: member.instruments || [],
+        active: member.active !== false,
+      });
 
-      // Create auth user if email and password are provided
-      if (member.email && member.password) {
-        const { data: authData, error: authError } = await supabaseAdmin.auth.admin.createUser({
-          email: member.email,
-          password: member.password,
-          email_confirm: true,
-          user_metadata: { name: member.name },
-        });
-
-        if (authError) {
-          console.error('Auth creation error:', authError);
-          // Continue anyway - the member record is still created
-        } else if (authData?.user) {
-          userId = authData.user.id;
-        }
+      if (error) {
+        console.error('Error adding member:', error);
+        set({ error });
+        return null;
       }
 
-      const newMember = {
-        ...convertMemberToDB(member),
-        id: memberId,
-        user_id: userId,
-      };
-
-      // Remove password from data before storing
-      delete newMember.password;
-
-      const { data, error } = await supabase
-        .from('members')
-        .insert(newMember)
-        .select()
-        .single();
-
-      if (error) throw error;
-
+      const newMember = data.member;
       set((state) => ({
-        members: [...state.members, convertMemberFromDB(data)],
+        members: [...state.members, convertMemberFromDB(newMember)],
       }));
 
-      // Return the created member along with the generated password
-      return { ...data, generatedPassword: member.password };
+      return { ...newMember, generatedPassword: data.generatedPassword || member.password };
     } catch (err) {
       console.error('Error adding member:', err);
       set({ error: err.message });
@@ -431,29 +414,14 @@ export const useAppStore = create((set, get) => ({
   deleteMember: async (id, permanent = false) => {
     try {
       if (permanent) {
-        // Permanent deletion - remove from database completely
-        const member = get().members.find(m => m.id === id);
-
-        // Delete the auth user if exists
-        if (member?.userId) {
-          try {
-            const { error: authError } = await supabaseAdmin.auth.admin.deleteUser(member.userId);
-            if (authError) {
-              console.error('Error deleting auth user:', authError);
-              // Continue with member deletion even if auth delete fails
-            }
-          } catch (authErr) {
-            console.error('Auth delete error:', authErr);
-          }
+        // Permanent deletion goes through the edge function (verifies pastor role,
+        // deletes auth user + member row atomically server-side).
+        const { error } = await callAdminFunction('admin-delete-member', { memberId: id });
+        if (error) {
+          console.error('Error deleting member:', error);
+          set({ error });
+          return false;
         }
-
-        // Delete from members table
-        const { error } = await supabase
-          .from('members')
-          .delete()
-          .eq('id', id);
-
-        if (error) throw error;
 
         set((state) => ({
           members: state.members.filter(m => m.id !== id),

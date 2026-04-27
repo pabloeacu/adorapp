@@ -7,7 +7,7 @@ import {
 } from 'lucide-react';
 import { useAuthStore } from '../stores/authStore';
 import { useAppStore, MEMBER_ROLES, INSTRUMENTS } from '../stores/appStore';
-import { supabaseAdmin } from '../lib/supabase';
+import { supabase, callAdminFunction } from '../lib/supabase';
 import { Card } from '../components/ui/Card';
 import { Button } from '../components/ui/Button';
 import { Badge } from '../components/ui/Badge';
@@ -73,7 +73,7 @@ export const Solicitudes = () => {
     const loadRequests = async () => {
       setLoading(true);
       try {
-        const { data, error } = await supabaseAdmin
+        const { data, error } = await supabase
           .from('pending_registrations')
           .select('*')
           .order('created_at', { ascending: false });
@@ -125,79 +125,33 @@ export const Solicitudes = () => {
 
     setConfirmModal({ ...confirmModal, loading: true });
 
-    try {
-      // Create auth user
-      const { data: authData, error: authError } = await supabaseAdmin.auth.admin.createUser({
-        email: selectedRequest.email,
-        password: selectedRequest.password_hash,
-        email_confirm: true,
-        user_metadata: { name: selectedRequest.name },
-      });
+    const { data, error } = await callAdminFunction('admin-approve-registration', {
+      requestId: selectedRequest.id,
+      role: selectedRole,
+    });
 
-      if (authError) {
-        console.error('Auth creation error:', authError);
-        throw authError;
-      }
-
-      const userId = authData?.user?.id;
-
-      // Create member record
-      const { error: memberError } = await supabaseAdmin
-        .from('members')
-        .insert({
-          id: userId || selectedRequest.id,
-          name: selectedRequest.name,
-          email: selectedRequest.email,
-          phone: selectedRequest.phone,
-          pastor_area: selectedRequest.pastor_area,
-          leader_of: selectedRequest.leader_of,
-          birthdate: selectedRequest.birthdate,
-          instruments: selectedRequest.instruments || [],
-          role: selectedRole,
-          active: true,
-          user_id: userId,
-        });
-
-      if (memberError) {
-        console.error('Member creation error:', memberError);
-        throw memberError;
-      }
-
-      // Update pending registration status
-      await supabaseAdmin
-        .from('pending_registrations')
-        .update({
-          status: 'approved',
-          approved_by: profile?.id,
-          approved_at: new Date().toISOString(),
-          assigned_role: selectedRole
-        })
-        .eq('id', selectedRequest.id);
-
-      // Remove from local state
-      setPendingRequests(prev => prev.filter(r => r.id !== selectedRequest.id));
-
-      setShowApproveModal(false);
-      setConfirmModal({ ...confirmModal, isOpen: false, loading: false });
-
-      setSuccessModal({
-        isOpen: true,
-        title: 'Solicitud Aprobada',
-        message: `${selectedRequest.name} ha sido aprobado como ${MEMBER_ROLES.find(r => r.id === selectedRole)?.label}. Se le enviará un email con sus credenciales.`
-      });
-
-      // Refresh app data
-      await initialize();
-
-    } catch (err) {
-      console.error('Approval error:', err);
+    if (error) {
+      console.error('Approval error:', error);
       setConfirmModal({ ...confirmModal, isOpen: false, loading: false });
       setErrorModal({
         isOpen: true,
         title: 'Error',
-        message: 'No se pudo aprobar la solicitud. ' + err.message
+        message: 'No se pudo aprobar la solicitud. ' + error,
       });
+      return;
     }
+
+    setPendingRequests(prev => prev.filter(r => r.id !== selectedRequest.id));
+    setShowApproveModal(false);
+    setConfirmModal({ ...confirmModal, isOpen: false, loading: false });
+
+    setSuccessModal({
+      isOpen: true,
+      title: 'Solicitud Aprobada',
+      message: `${selectedRequest.name} ha sido aprobado como ${MEMBER_ROLES.find(r => r.id === selectedRole)?.label}. Avisale por canal seguro las credenciales.`,
+    });
+
+    await initialize();
   };
 
   const handleReject = (request) => {
@@ -212,33 +166,24 @@ export const Solicitudes = () => {
       icon: XCircle,
       onConfirm: async () => {
         setConfirmModal(prev => ({ ...prev, loading: true }));
-        try {
-          await supabaseAdmin
-            .from('pending_registrations')
-            .update({
-              status: 'rejected',
-              rejected_by: profile?.id,
-              rejected_at: new Date().toISOString()
-            })
-            .eq('id', request.id);
-
-          setPendingRequests(prev => prev.filter(r => r.id !== request.id));
-          setConfirmModal(prev => ({ ...prev, isOpen: false, loading: false }));
-
-          setSuccessModal({
-            isOpen: true,
-            title: 'Solicitud Rechazada',
-            message: `La solicitud de ${request.name} ha sido rechazada.`
-          });
-        } catch (err) {
-          console.error('Reject error:', err);
+        const { error } = await callAdminFunction('admin-reject-registration', { requestId: request.id });
+        if (error) {
+          console.error('Reject error:', error);
           setConfirmModal(prev => ({ ...prev, loading: false }));
           setErrorModal({
             isOpen: true,
             title: 'Error',
-            message: 'No se pudo rechazar la solicitud.'
+            message: 'No se pudo rechazar la solicitud. ' + error,
           });
+          return;
         }
+        setPendingRequests(prev => prev.filter(r => r.id !== request.id));
+        setConfirmModal(prev => ({ ...prev, isOpen: false, loading: false }));
+        setSuccessModal({
+          isOpen: true,
+          title: 'Solicitud Rechazada',
+          message: `La solicitud de ${request.name} ha sido rechazada.`,
+        });
       }
     });
   };

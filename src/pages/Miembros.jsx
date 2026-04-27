@@ -279,44 +279,37 @@ export const Miembros = () => {
   const handleSaveNewPassword = async () => {
     if (!newPassword.trim() || !memberToReset) return;
 
-    try {
-      // Import supabaseAdmin for admin operations
-      const { supabaseAdmin } = await import('../lib/supabase');
-
-      if (memberToReset.user_id) {
-        // Update password in auth
-        const { error } = await supabaseAdmin.auth.admin.updateUserById(
-          memberToReset.user_id,
-          { password: newPassword }
-        );
-
-        if (error) {
-          console.error('Error resetting password:', error);
-          setErrorModal({
-            isOpen: true,
-            title: 'Error',
-            message: 'No se pudo restablecer la contraseña: ' + error.message
-          });
-          return;
-        }
-      }
-
-      setShowResetPasswordModal(false);
-      setSuccessModal({
-        isOpen: true,
-        title: 'Contraseña Restablecida',
-        message: `La contraseña de ${memberToReset.name} ha sido actualizada.`
-      });
-      setMemberToReset(null);
-      setNewPassword('');
-    } catch (err) {
-      console.error('Error:', err);
+    const userId = memberToReset.userId || memberToReset.user_id;
+    if (!userId) {
       setErrorModal({
         isOpen: true,
         title: 'Error',
-        message: 'No se pudo restablecer la contraseña.'
+        message: 'Este miembro no tiene una cuenta de autenticación vinculada. No se puede restablecer la contraseña.',
       });
+      return;
     }
+
+    const { callAdminFunction } = await import('../lib/supabase');
+    const { error } = await callAdminFunction('admin-reset-password', { userId, newPassword });
+
+    if (error) {
+      console.error('Error resetting password:', error);
+      setErrorModal({
+        isOpen: true,
+        title: 'Error',
+        message: 'No se pudo restablecer la contraseña: ' + error,
+      });
+      return;
+    }
+
+    setShowResetPasswordModal(false);
+    setSuccessModal({
+      isOpen: true,
+      title: 'Contraseña Restablecida',
+      message: `La contraseña de ${memberToReset.name} ha sido actualizada.`,
+    });
+    setMemberToReset(null);
+    setNewPassword('');
   };
 
   const handleToggleActive = (memberId) => {
