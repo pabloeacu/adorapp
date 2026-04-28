@@ -1,4 +1,4 @@
-import React, { useEffect, useState, lazy, Suspense } from 'react';
+import React, { useEffect, useState, useCallback, lazy, Suspense } from 'react';
 import { BrowserRouter, Routes, Route, useLocation } from 'react-router-dom';
 import { Layout } from './components/layout/Layout';
 import { useAuthStore } from './stores/authStore';
@@ -34,29 +34,40 @@ const RouteFallback = () => (
 );
 
 // Auto-sync strategy:
-//   - On route change: re-fetch (kept; cheap and gives fresh data on user navigation).
-//   - On window focus / tab visibility change: re-fetch (catches changes made in
-//     other tabs or after returning from background without spamming the DB).
-//   - Realtime subscriptions on individual tables handle live changes.
+//   - On route change: re-fetch, but throttled — if the realtime layer ran <15s
+//     ago, skip; the data is already fresh and re-spamming the DB on every tap
+//     causes flickering on slow networks.
+//   - On window focus / tab visibility change: same throttle. Realtime sync
+//     handles in-session changes, so the focus refresh is just a safety net
+//     for the case where the WS was dropped while the app was suspended.
+//   - Live data updates flow through src/lib/realtimeSync.js (postgres_changes
+//     on members/bands/songs/orders, mounted from Layout).
+const REFRESH_THROTTLE_MS = 15_000;
+let lastRefreshAt = 0;
+
 const RouteSync = ({ children }) => {
   const location = useLocation();
   const initializeApp = useAppStore((state) => state.initialize);
   const refreshProfile = useAuthStore((state) => state.refreshProfile);
   const user = useAuthStore((state) => state.user);
 
-  useEffect(() => {
-    if (!user) return;
+  const refreshIfStale = useCallback(() => {
+    const now = Date.now();
+    if (now - lastRefreshAt < REFRESH_THROTTLE_MS) return;
+    lastRefreshAt = now;
     initializeApp();
     refreshProfile();
-  }, [location.pathname, user, initializeApp, refreshProfile]);
+  }, [initializeApp, refreshProfile]);
+
+  useEffect(() => {
+    if (!user) return;
+    refreshIfStale();
+  }, [location.pathname, user, refreshIfStale]);
 
   useEffect(() => {
     if (!user) return;
     const onFocus = () => {
-      if (document.visibilityState === 'visible') {
-        initializeApp();
-        refreshProfile();
-      }
+      if (document.visibilityState === 'visible') refreshIfStale();
     };
     window.addEventListener('focus', onFocus);
     document.addEventListener('visibilitychange', onFocus);
@@ -64,7 +75,7 @@ const RouteSync = ({ children }) => {
       window.removeEventListener('focus', onFocus);
       document.removeEventListener('visibilitychange', onFocus);
     };
-  }, [user, initializeApp, refreshProfile]);
+  }, [user, refreshIfStale]);
 
   return children;
 };

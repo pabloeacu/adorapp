@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Sidebar } from './Sidebar';
 import { Header } from './Header';
 import { MobileNav } from './MobileNav';
@@ -8,11 +8,21 @@ import { UpdateBanner } from '../UpdateBanner';
 import { Navigate, Outlet } from 'react-router-dom';
 import { useAuthStore } from '../../stores/authStore';
 import { useCurrentMember } from '../../hooks/useCurrentMember';
+import { startRealtimeSync, stopRealtimeSync } from '../../lib/realtimeSync';
 
 export const Layout = () => {
   const user = useAuthStore((state) => state.user);
   const [wizardDismissed, setWizardDismissed] = useState(false);
   const currentMember = useCurrentMember();
+
+  // Realtime sync for members/bands/songs/orders. Mounted only while the
+  // user is logged in (Layout itself only renders post-auth). Stops on logout
+  // via the cleanup return.
+  useEffect(() => {
+    if (!user) return;
+    startRealtimeSync();
+    return () => stopRealtimeSync();
+  }, [user]);
 
   if (!user) {
     return <Navigate to="/login" replace />;

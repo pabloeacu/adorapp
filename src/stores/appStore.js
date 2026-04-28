@@ -723,6 +723,44 @@ export const useAppStore = create((set, get) => ({
     return state.songs.filter(song => !recentlyUsedSongIds.has(song.id));
   },
 
+  // Merge a realtime change from Supabase into the store. Called by the
+  // realtime subscription layer in src/lib/realtimeSync.js. We patch in place
+  // instead of refetching so changes appear instantly without a network hop.
+  // The localStorage mirror is updated so a navigation away+back shows the
+  // same data we just merged.
+  mergeRealtimeChange: ({ table, eventType, newRow, oldRow }) => {
+    const id = (newRow && newRow.id) || (oldRow && oldRow.id);
+    if (!id) return;
+
+    const tableSpec = {
+      members: { key: 'members', from: convertMemberFromDB, lsKey: 'appMembers' },
+      bands:   { key: 'bands',   from: convertBandFromDB,   lsKey: 'appBands'   },
+      songs:   { key: 'songs',   from: convertSongFromDB,   lsKey: 'appSongs'   },
+      orders:  { key: 'orders',  from: convertOrderFromDB,  lsKey: 'appOrders'  },
+    };
+    const spec = tableSpec[table];
+    if (!spec) return;
+
+    set((state) => {
+      const list = state[spec.key] || [];
+      let next;
+      if (eventType === 'DELETE') {
+        next = list.filter((r) => r.id !== id);
+      } else if (eventType === 'INSERT') {
+        // Avoid duplicates if the optimistic-update path already inserted the row.
+        if (list.some((r) => r.id === id)) return state;
+        next = [spec.from(newRow), ...list];
+      } else {
+        // UPDATE
+        const updated = spec.from(newRow);
+        const idx = list.findIndex((r) => r.id === id);
+        next = idx >= 0 ? list.map((r, i) => (i === idx ? updated : r)) : [updated, ...list];
+      }
+      try { localStorage.setItem(spec.lsKey, JSON.stringify(next)); } catch (_) { /* non-fatal */ }
+      return { [spec.key]: next };
+    });
+  },
+
   // Reset all data on logout. Also clears the localStorage caches that
   // mirror this store, so a different user logging in on the same device
   // does not see the previous user's data flash before fresh data loads.
