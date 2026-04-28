@@ -93,8 +93,6 @@ export const Header = () => {
   const fileInputRef = useRef(null);
   const title = pageTitles[location.pathname] || 'AdorAPP';
 
-  const isPastor = profile?.role === 'pastor';
-  const isLeader = profile?.role === 'leader';
 
   // CRITICAL: Get profile from appStore.members (single source of truth for role, name, photo)
   // The authStore.profile might not have the correct role, so we MUST check members table
@@ -152,85 +150,51 @@ export const Header = () => {
 
 
   // Load notifications from Supabase. Devotional + reflection are global rows
-  // emitted by daily pg_cron jobs (06:00 ART y 17:00 ART) — viven en la tabla
-  // y se autoexpiran a las 00:00 ART. Resto de las notifs (canciones, miembros,
-  // comunicaciones) se derivan de otras tablas.
+  // emitted by DB triggers (cron, songs/bands/members inserts, registrations
+  // pending, etc.) and live in `notifications`. Communications use their own
+  // table because they carry sender + subject + full body, which doesn't fit
+  // the title/message shape.
   useEffect(() => {
+    const iconForType = (t) => ({
+      devotional: 'cross',
+      reflection: 'sunset',
+      song: 'music',
+      band: 'users',
+      member: 'heart',
+      request: 'file',
+    }[t] || 'cross');
+
     const loadNotifications = async () => {
       try {
         const notifs = [];
+        const nowIso = new Date().toISOString();
 
-        // Check for new songs from Supabase
-        const { data: newSongs } = await supabase
-          .from('songs')
-          .select('id, title, created_at')
+        // All non-comm notifications: globals (devotional/reflection/song/band/member)
+        // plus per-user (request notifs go to each pastor with user_id set).
+        let q = supabase
+          .from('notifications')
+          .select('id, title, message, type, user_id, is_global, created_at, expires_at')
+          .or(`expires_at.is.null,expires_at.gt.${nowIso}`)
           .order('created_at', { ascending: false })
-          .limit(5);
+          .limit(20);
+        q = user?.id
+          ? q.or(`is_global.eq.true,user_id.eq.${user.id}`)
+          : q.eq('is_global', true);
+        const { data: notifRows, error: notifErr } = await q;
+        if (notifErr) console.error('Error fetching notifications:', notifErr);
 
-        if (newSongs && newSongs.length > 0) {
+        (notifRows || []).forEach((n) => {
           notifs.push({
-            id: 'song-' + newSongs[0].id,
-            type: 'song',
-            message: `¡Nueva canción en el repertorio! "${newSongs[0].title}" - ¡Es hora de aprenderla!`,
-            icon: 'music',
-            time: new Date(newSongs[0].created_at).toLocaleTimeString('es-AR', { hour: '2-digit', minute: '2-digit' })
+            id: n.id,
+            type: n.type,
+            title: n.title,
+            message: n.message,
+            icon: iconForType(n.type),
+            time: new Date(n.created_at).toLocaleTimeString('es-AR', { hour: '2-digit', minute: '2-digit' }),
           });
-        }
+        });
 
-        // Check for new bands from Supabase
-        const { data: newBands } = await supabase
-          .from('bands')
-          .select('id, name, created_at')
-          .order('created_at', { ascending: false })
-          .limit(3);
-
-        if (newBands && newBands.length > 0) {
-          notifs.push({
-            id: 'band-' + newBands[0].id,
-            type: 'band',
-            message: `¡Tenemos una nueva banda en línea! "${newBands[0].name}" te está esperando.`,
-            icon: 'users',
-            time: new Date(newBands[0].created_at).toLocaleTimeString('es-AR', { hour: '2-digit', minute: '2-digit' })
-          });
-        }
-
-        // Check for new members from Supabase
-        const { data: newMembers } = await supabase
-          .from('members')
-          .select('id, name, created_at')
-          .order('created_at', { ascending: false })
-          .limit(3);
-
-        if (newMembers && newMembers.length > 0) {
-          notifs.push({
-            id: 'member-' + newMembers[0].id,
-            type: 'member',
-            message: `¡Recibimos a un nuevo miembro en la familia de adoración! Bienvenido/a ${newMembers[0].name}.`,
-            icon: 'heart',
-            time: new Date(newMembers[0].created_at).toLocaleTimeString('es-AR', { hour: '2-digit', minute: '2-digit' })
-          });
-        }
-
-        // Check for pending registration requests (pastors only)
-        if (isPastor) {
-          const { data: pendingRequests } = await supabase
-            .from('pending_registrations')
-            .select('id, name, created_at')
-            .eq('status', 'pending')
-            .order('created_at', { ascending: false });
-
-          if (pendingRequests && pendingRequests.length > 0) {
-            notifs.push({
-              id: 'pending-request-' + pendingRequests[0].id,
-              type: 'request',
-              message: `${pendingRequests.length} nueva${pendingRequests.length > 1 ? 's' : ''} solicitud${pendingRequests.length > 1 ? 'es' : ''} de registro pendiente${pendingRequests.length > 1 ? 's' : ''}.`,
-              icon: 'file',
-              time: new Date(pendingRequests[0].created_at).toLocaleTimeString('es-AR', { hour: '2-digit', minute: '2-digit' })
-            });
-          }
-        }
-
-        // Load communication notifications for current user
+        // Communications (separate shape: sender + subject + preview + full body).
         if (user?.id) {
           const { data: commNotifs } = await supabase
             .from('communication_notifications')
@@ -240,57 +204,25 @@ export const Header = () => {
             .order('created_at', { ascending: false })
             .limit(10);
 
-          if (commNotifs && commNotifs.length > 0) {
-            commNotifs.forEach(cn => {
-              notifs.push({
-                id: cn.id,
-                type: 'communication',
-                communicationId: cn.communication_id,
-                senderName: cn.sender_name,
-                senderPhoto: cn.sender_photo,
-                subject: cn.subject,
-                preview: cn.preview,
-                fullMessage: cn.full_message,
-                message: cn.subject,
-                icon: 'send',
-                time: new Date(cn.created_at).toLocaleTimeString('es-AR', { hour: '2-digit', minute: '2-digit' })
-              });
-            });
-          }
-        }
-
-        // Load GLOBAL devotional + reflection from notifications table.
-        // Filter out expired (the cron sets expires_at to next 00:00 ART so the
-        // bell doesn't show yesterday's items after midnight even if the new
-        // ones haven't been inserted yet).
-        const nowIso = new Date().toISOString();
-        const { data: globalNotifs, error: globalError } = await supabase
-          .from('notifications')
-          .select('id, title, message, type, created_at, expires_at')
-          .eq('is_global', true)
-          .or(`expires_at.is.null,expires_at.gt.${nowIso}`)
-          .order('created_at', { ascending: false })
-          .limit(5);
-
-        if (globalError) {
-          console.error('Error fetching global notifications:', globalError);
-        }
-
-        if (globalNotifs && globalNotifs.length > 0) {
-          globalNotifs.forEach(n => {
+          (commNotifs || []).forEach((cn) => {
             notifs.push({
-              id: n.id,
-              type: n.type, // 'devotional' or 'reflection'
-              title: n.title,
-              message: n.message,
-              icon: n.type === 'reflection' ? 'sunset' : 'cross',
-              time: new Date(n.created_at).toLocaleTimeString('es-AR', { hour: '2-digit', minute: '2-digit' })
+              id: cn.id,
+              type: 'communication',
+              communicationId: cn.communication_id,
+              senderName: cn.sender_name,
+              senderPhoto: cn.sender_photo,
+              subject: cn.subject,
+              preview: cn.preview,
+              fullMessage: cn.full_message,
+              message: cn.subject,
+              icon: 'send',
+              time: new Date(cn.created_at).toLocaleTimeString('es-AR', { hour: '2-digit', minute: '2-digit' }),
             });
           });
         }
 
         setNotifications(notifs);
-        const unread = notifs.filter(n => !readNotificationIds.includes(n.id)).length;
+        const unread = notifs.filter((n) => !readNotificationIds.includes(n.id)).length;
         setUnreadCount(unread);
       } catch (err) {
         console.error('Error loading notifications:', err);
@@ -298,28 +230,23 @@ export const Header = () => {
     };
 
     // Load immediately, then keep fresh through Supabase Realtime + a slower
-    // 2-minute fallback poll for the "derived" notifications (new songs count etc.)
-    // that don't have a direct Realtime hook.
+    // 2-minute fallback poll.
     loadNotifications();
     const interval = setInterval(loadNotifications, 2 * 60 * 1000);
 
     // Realtime: refresh as soon as relevant rows are inserted, instead of waiting
-    // up to 2 minutes for the next poll.
+    // up to 2 minutes for the next poll. One subscription on `notifications`
+    // covers globals + per-user (the trigger pipeline writes both there).
     const channel = supabase
       .channel(`bell-${user?.id || 'anon'}`)
       .on(
         'postgres_changes',
-        { event: 'INSERT', schema: 'public', table: 'notifications', filter: 'is_global=eq.true' },
+        { event: 'INSERT', schema: 'public', table: 'notifications' },
         () => loadNotifications()
       )
       .on(
         'postgres_changes',
         { event: 'INSERT', schema: 'public', table: 'communication_notifications', filter: `recipient_id=eq.${user?.id}` },
-        () => loadNotifications()
-      )
-      .on(
-        'postgres_changes',
-        { event: 'INSERT', schema: 'public', table: 'songs' },
         () => loadNotifications()
       )
       .subscribe();
