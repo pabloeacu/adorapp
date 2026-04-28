@@ -7,11 +7,11 @@
  * input already starts with that shape avoids the off-by-one that comes from
  * Date(...).toISOString() drifting across UTC.
  */
-export function dayKey(dateLike) {
+export function dayKey(dateLike: string | number | Date | null | undefined): string {
   if (!dateLike) return '';
   const s = String(dateLike);
   if (/^\d{4}-\d{2}-\d{2}/.test(s)) return s.slice(0, 10);
-  const d = new Date(dateLike);
+  const d = new Date(dateLike as string | number | Date);
   if (Number.isNaN(d.getTime())) return '';
   const y = d.getFullYear();
   const m = String(d.getMonth() + 1).padStart(2, '0');
@@ -19,23 +19,40 @@ export function dayKey(dateLike) {
   return `${y}-${m}-${day}`;
 }
 
+export type OrderSongRef = {
+  songId: string;
+  directorId?: string | null;
+};
+
+export type OrderForSuggestion = {
+  bandId?: string | null;
+  songs?: OrderSongRef[] | null;
+};
+
+export type SuggestDirectorArgs = {
+  singerIds: Set<string>;
+  orders: OrderForSuggestion[];
+  songId: string;
+  bandId?: string | null;
+};
+
 /**
  * Suggest the most-likely director for a song based on history.
  *
- *   `singerIds`  — set of candidate member ids (active members who can sing)
- *   `orders`     — the full orders list (each entry has songs[]: { songId, directorId })
- *   `songId`     — the song we're about to add
- *   `bandId`     — the band the new order is for; band-specific history wins,
- *                  global history is the fallback. Pass `null` to skip the
- *                  band-prefer step.
- *
- * Returns a member id, or `null` when there's no signal.
+ * Prefers the director who has led it most often in the chosen band; falls
+ * back to most-frequent across any band. Returns null when the song has
+ * never been led, or when no candidate is in the active singers set.
  */
-export function suggestDirectorForSong({ singerIds, orders, songId, bandId }) {
+export function suggestDirectorForSong({
+  singerIds,
+  orders,
+  songId,
+  bandId,
+}: SuggestDirectorArgs): string | null {
   if (!songId || !singerIds || singerIds.size === 0) return null;
 
-  const tally = (filter) => {
-    const counts = new Map();
+  const tally = (filter: (o: OrderForSuggestion) => boolean): string | null => {
+    const counts = new Map<string, number>();
     for (const o of orders) {
       if (!filter(o)) continue;
       if (!Array.isArray(o.songs)) continue;

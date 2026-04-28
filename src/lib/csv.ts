@@ -6,16 +6,21 @@
  * Normalize a string for diacritic-insensitive comparison.
  * "Océanos" → "oceanos". Used for fuzzy search and export sorting.
  */
-export function foldText(s) {
+export function foldText(s: unknown): string {
   if (s == null) return '';
   return String(s).toLowerCase().normalize('NFD').replace(/\p{Diacritic}/gu, '');
 }
+
+export type CSVColumn<Row> = {
+  header: string;
+  get: (row: Row) => unknown;
+};
 
 /**
  * Escape a CSV field. Quotes if needed and defuses leading =, +, -, @ to
  * prevent CSV-injection when opened in Excel/Sheets.
  */
-function escapeField(v) {
+function escapeField(v: unknown): string {
   if (v == null) return '';
   let s = typeof v === 'string' ? v : Array.isArray(v) ? v.join('; ') : String(v);
   if (/^[=+\-@]/.test(s)) s = "'" + s;
@@ -34,7 +39,7 @@ function escapeField(v) {
  *     { header: 'Instrumentos', get: (m) => m.instruments },
  *   ]);
  */
-export function toCSV(rows, columns) {
+export function toCSV<Row>(rows: Row[], columns: CSVColumn<Row>[]): string {
   const head = columns.map((c) => escapeField(c.header)).join(',');
   const body = rows
     .map((r) => columns.map((c) => escapeField(c.get(r))).join(','))
@@ -46,7 +51,7 @@ export function toCSV(rows, columns) {
 /**
  * Trigger a browser download of a CSV string with the given filename.
  */
-export function downloadCSV(filename, csvText) {
+export function downloadCSV(filename: string, csvText: string): void {
   const blob = new Blob([csvText], { type: 'text/csv;charset=utf-8;' });
   const url = URL.createObjectURL(blob);
   const a = document.createElement('a');
