@@ -81,75 +81,49 @@ export const MobileNav = () => {
     }
   }, []);
 
-  // Load notifications from Supabase
+  // Load notifications from `notifications` (globals + per-user) and
+  // `communication_notifications`. DB triggers populate the first table when
+  // songs/bands/members are created or pending registrations come in.
   useEffect(() => {
+    const iconForType = (t) => ({
+      devotional: 'cross',
+      reflection: 'sunset',
+      song: 'music',
+      band: 'users',
+      member: 'heart',
+      request: 'file',
+    }[t] || 'cross');
+
     const loadNotifications = async () => {
       try {
         const notifs = [];
-        const { user, profile } = useAuthStore.getState();
-        const isPastor = profile?.role === 'pastor';
-
-        // Check for new songs
-        const { data: newSongs } = await supabase
-          .from('songs')
-          .select('id, title, created_at')
-          .order('created_at', { ascending: false })
-          .limit(3);
-
-        if (newSongs && newSongs.length > 0) {
-          notifs.push({
-            id: 'song-' + newSongs[0].id,
-            type: 'song',
-            message: `¡Nueva canción: "${newSongs[0].title}"`,
-            icon: 'music',
-            time: new Date(newSongs[0].created_at).toLocaleTimeString('es-AR', { hour: '2-digit', minute: '2-digit' })
-          });
-        }
-
-        // Check for pending requests (pastors only)
-        if (isPastor) {
-          const { data: pendingRequests } = await supabase
-            .from('pending_registrations')
-            .select('id, name, created_at')
-            .eq('status', 'pending')
-            .order('created_at', { ascending: false });
-
-          if (pendingRequests && pendingRequests.length > 0) {
-            notifs.push({
-              id: 'pending-' + pendingRequests[0].id,
-              type: 'request',
-              message: `${pendingRequests.length} solicitud(es) de registro pendiente(s)`,
-              icon: 'file',
-              time: new Date(pendingRequests[0].created_at).toLocaleTimeString('es-AR', { hour: '2-digit', minute: '2-digit' })
-            });
-          }
-        }
-
-        // Global devotional + reflection (filter expired)
+        const { user } = useAuthStore.getState();
         const nowIso = new Date().toISOString();
-        const { data: globalNotifs } = await supabase
+
+        let q = supabase
           .from('notifications')
-          .select('id, title, message, type, created_at, expires_at')
-          .eq('is_global', true)
+          .select('id, title, message, type, user_id, is_global, created_at, expires_at')
           .or(`expires_at.is.null,expires_at.gt.${nowIso}`)
           .order('created_at', { ascending: false })
-          .limit(5);
+          .limit(20);
+        q = user?.id
+          ? q.or(`is_global.eq.true,user_id.eq.${user.id}`)
+          : q.eq('is_global', true);
+        const { data: notifRows } = await q;
 
-        if (globalNotifs && globalNotifs.length > 0) {
-          globalNotifs.forEach(n => {
-            notifs.push({
-              id: n.id,
-              type: n.type,
-              title: n.title,
-              message: n.message,
-              icon: n.type === 'reflection' ? 'sunset' : 'cross',
-              time: new Date(n.created_at).toLocaleTimeString('es-AR', { hour: '2-digit', minute: '2-digit' })
-            });
+        (notifRows || []).forEach((n) => {
+          notifs.push({
+            id: n.id,
+            type: n.type,
+            title: n.title,
+            message: n.message,
+            icon: iconForType(n.type),
+            time: new Date(n.created_at).toLocaleTimeString('es-AR', { hour: '2-digit', minute: '2-digit' }),
           });
-        }
+        });
 
         setNotifications(notifs);
-        const unread = notifs.filter(n => !readNotificationIds.includes(n.id)).length;
+        const unread = notifs.filter((n) => !readNotificationIds.includes(n.id)).length;
         setUnreadCount(unread);
       } catch (err) {
         console.error('Error loading notifications:', err);
@@ -164,17 +138,12 @@ export const MobileNav = () => {
       .channel(`bell-mobile-${user?.id || 'anon'}`)
       .on(
         'postgres_changes',
-        { event: 'INSERT', schema: 'public', table: 'notifications', filter: 'is_global=eq.true' },
+        { event: 'INSERT', schema: 'public', table: 'notifications' },
         () => loadNotifications()
       )
       .on(
         'postgres_changes',
         { event: 'INSERT', schema: 'public', table: 'communication_notifications', filter: `recipient_id=eq.${user?.id}` },
-        () => loadNotifications()
-      )
-      .on(
-        'postgres_changes',
-        { event: 'INSERT', schema: 'public', table: 'songs' },
         () => loadNotifications()
       )
       .subscribe();
@@ -1241,12 +1210,16 @@ export const MobileNav = () => {
                         <div className="flex items-start gap-3">
                           <div className={`p-2 rounded-xl ${
                             notif.type === 'song' ? 'bg-purple-500/20' :
+                            notif.type === 'band' ? 'bg-blue-500/20' :
+                            notif.type === 'member' ? 'bg-green-500/20' :
                             notif.type === 'request' ? 'bg-yellow-500/20' :
                             notif.type === 'devotional' ? 'bg-amber-500/20' :
                             notif.type === 'reflection' ? 'bg-indigo-500/20' :
                             'bg-blue-500/20'
                           }`}>
                             {notif.icon === 'music' && <Music size={18} className="text-purple-400" />}
+                            {notif.icon === 'users' && <Users2 size={18} className="text-blue-400" />}
+                            {notif.icon === 'heart' && <Heart size={18} className="text-green-400" />}
                             {notif.icon === 'file' && <FileText size={18} className="text-yellow-400" />}
                             {notif.icon === 'cross' && <Cross size={18} className="text-amber-400" />}
                             {notif.icon === 'sunset' && <Sunset size={18} className="text-indigo-400" />}
@@ -1282,6 +1255,7 @@ export const MobileNav = () => {
               <NavLink
                 key={path}
                 to={path}
+                data-tour={`nav-${path === '/' ? 'inicio' : path.replace('/', '')}`}
                 className={`flex flex-col items-center justify-center w-full h-full transition-all ${
                   isActive ? 'text-white' : 'text-gray-500'
                 }`}
