@@ -7,6 +7,7 @@ import {
   Cross, Users2, Clock, AlertTriangle, UserX
 } from 'lucide-react';
 import { useAuthStore } from '../stores/authStore';
+import { PageLoader } from '../components/ui/PageLoader';
 import { useAppStore, MEMBER_ROLES, INSTRUMENTS } from '../stores/appStore';
 import { supabase, callAdminFunction } from '../lib/supabase';
 import { Card } from '../components/ui/Card';
@@ -312,10 +313,7 @@ export const Solicitudes = () => {
 
       {/* Content */}
       {loading ? (
-        <div className="text-center py-12">
-          <div className="animate-spin w-8 h-8 border-2 border-white border-t-transparent rounded-full mx-auto" />
-          <p className="text-gray-400 mt-4">Cargando solicitudes...</p>
-        </div>
+        <PageLoader label="Cargando solicitudes…" />
       ) : filteredRequests.length === 0 ? (
         <div className="text-center py-12">
           <UserPlus size={48} className="mx-auto text-gray-600 mb-4" />

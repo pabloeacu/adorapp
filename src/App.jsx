@@ -1,6 +1,7 @@
 import React, { useEffect, useState, useCallback, lazy, Suspense } from 'react';
 import { BrowserRouter, Routes, Route, useLocation } from 'react-router-dom';
 import { Layout } from './components/layout/Layout';
+import { PageLoader } from './components/ui/PageLoader';
 import { useAuthStore } from './stores/authStore';
 import { useAppStore } from './stores/appStore';
 
@@ -22,16 +23,7 @@ const Miembros = lazyPage(() => import('./pages/Miembros'), 'Miembros');
 const Solicitudes = lazyPage(() => import('./pages/Solicitudes'), 'Solicitudes');
 const Comunicaciones = lazyPage(() => import('./pages/Comunicaciones'), 'Comunicaciones');
 
-const RouteFallback = () => (
-  <div
-    role="status"
-    aria-live="polite"
-    className="min-h-[40vh] flex items-center justify-center"
-  >
-    <span className="sr-only">Cargando…</span>
-    <div className="w-10 h-10 rounded-full border-2 border-white/20 border-t-white animate-spin" />
-  </div>
-);
+const RouteFallback = () => <PageLoader />;
 
 // Auto-sync strategy:
 //   - On route change: re-fetch, but throttled — if the realtime layer ran <15s
@@ -96,18 +88,7 @@ function App() {
   }, [initializeAuth, initializeApp]);
 
   if (!initialized || authLoading) {
-    return (
-      <div className="min-h-screen bg-black flex items-center justify-center">
-        <div className="text-center">
-          <img
-            src="/logo.png"
-            alt="AdorAPP Logo"
-            className="w-16 h-16 rounded-2xl mx-auto mb-4 object-contain animate-pulse"
-          />
-          <p className="text-gray-500">Cargando AdorAPP...</p>
-        </div>
-      </div>
-    );
+    return <PageLoader fullscreen label="Cargando AdorAPP..." />;
   }
 
   return (

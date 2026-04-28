@@ -38,3 +38,6 @@ coverage
 *.log
 .vercel
 .env*.local
+presentation/
+AdorAPP-Presentacion.pdf
+/tmp/adorapp_auth.json
