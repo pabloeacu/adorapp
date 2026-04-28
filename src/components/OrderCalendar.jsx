@@ -4,26 +4,13 @@
 
 import React, { useMemo, useState } from 'react';
 import { ChevronLeft, ChevronRight } from 'lucide-react';
+import { dayKey } from '../lib/orders';
 
 const MONTHS_ES = [
   'Enero', 'Febrero', 'Marzo', 'Abril', 'Mayo', 'Junio',
   'Julio', 'Agosto', 'Septiembre', 'Octubre', 'Noviembre', 'Diciembre',
 ];
 const WEEKDAYS_ES = ['Lun', 'Mar', 'Mié', 'Jue', 'Vie', 'Sáb', 'Dom'];
-
-// Treat order.date as a local-day key. Slicing the YYYY-MM-DD prefix avoids
-// the off-by-one that comes from Date(...).toISOString() drifting across UTC.
-function dayKey(dateLike) {
-  if (!dateLike) return '';
-  const s = String(dateLike);
-  if (/^\d{4}-\d{2}-\d{2}/.test(s)) return s.slice(0, 10);
-  const d = new Date(dateLike);
-  if (Number.isNaN(d.getTime())) return '';
-  const y = d.getFullYear();
-  const m = String(d.getMonth() + 1).padStart(2, '0');
-  const day = String(d.getDate()).padStart(2, '0');
-  return `${y}-${m}-${day}`;
-}
 
 function startOfMonth(year, month) {
   return new Date(year, month, 1);

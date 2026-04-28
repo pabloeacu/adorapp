@@ -20,6 +20,7 @@ import { Input } from '../components/ui/Input';
 import { ConfirmModal, SuccessModal, ErrorModal } from '../components/ui/ConfirmModal';
 import { OrderHistoryTimeline } from '../components/OrderHistoryTimeline';
 import { OrderCalendar } from '../components/OrderCalendar';
+import { suggestDirectorForSong } from '../lib/orders';
 import {
   DndContext,
   closestCenter,
@@ -620,35 +621,14 @@ export const Ordenes = () => {
     doc.save(fileName);
   };
 
-  // Suggest the most-likely director for a given song.
-  // Prefers the director who has led it most often in this band; falls back to
-  // most-frequent across any band. Returns a member id only if the suggestion
-  // points to a singer who's still active (otherwise the dropdown wouldn't list them).
-  const suggestDirectorForSong = (songId, bandId) => {
-    if (!songId || singers.length === 0) return null;
-    const validIds = new Set(singers.map(s => s.id));
-    const tally = (filterFn) => {
-      const counts = new Map();
-      orders.forEach(o => {
-        if (!filterFn(o)) return;
-        o.songs?.forEach(s => {
-          if (s.songId === songId && s.directorId && validIds.has(s.directorId)) {
-            counts.set(s.directorId, (counts.get(s.directorId) || 0) + 1);
-          }
-        });
-      });
-      if (counts.size === 0) return null;
-      return [...counts.entries()].sort((a, b) => b[1] - a[1])[0][0];
-    };
-    return (
-      tally(o => bandId && o.bandId === bandId) ||
-      tally(() => true) ||
-      null
-    );
-  };
-
   const addSongToOrder = async (song) => {
-    const suggestedDirectorId = suggestDirectorForSong(song.id, formData.bandId);
+    const singerIds = new Set(singers.map((s) => s.id));
+    const suggestedDirectorId = suggestDirectorForSong({
+      singerIds,
+      orders,
+      songId: song.id,
+      bandId: formData.bandId,
+    });
     const defaultKey = song.key || song.originalKey || 'C';
     const newIndex = formData.songs.length;
 
