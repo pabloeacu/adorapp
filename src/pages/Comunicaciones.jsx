@@ -174,6 +174,27 @@ export const Comunicaciones = () => {
     window.lastSentCount = data?.inserted ?? recipientIds.length;
     setShowSuccess(true);
     resetForm();
+
+    // Fire-and-forget push fan-out. Failures here must not block the UX —
+    // the comunicación is already saved server-side. Convert auth user_ids
+    // (what admin-send-communication uses) into member_ids (what
+    // push_subscriptions are keyed by).
+    try {
+      const recipientUserIds = new Set(recipientIds);
+      const memberIdsForPush = members
+        .filter((m) => m.userId && recipientUserIds.has(m.userId))
+        .map((m) => m.id);
+      if (memberIdsForPush.length > 0) {
+        callAdminFunction('send-push', {
+          to: memberIdsForPush,
+          title: subject.trim() || 'Comunicación de Adoración',
+          body: message.trim().slice(0, 140),
+          url: '/',
+        }).catch(() => {});
+      }
+    } catch {
+      // intentionally swallow — push is best-effort.
+    }
   };
 
   // If not a pastor, show access denied

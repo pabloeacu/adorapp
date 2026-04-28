@@ -15,7 +15,7 @@
 // On activate, old caches are pruned. clients.claim() so the new SW takes
 // over immediately when the user accepts the "update available" prompt.
 
-const CACHE_VERSION = 'v3';
+const CACHE_VERSION = 'v4';
 const SHELL_CACHE = `adorapp-shell-${CACHE_VERSION}`;
 const ASSET_CACHE = `adorapp-assets-${CACHE_VERSION}`;
 const IMAGE_CACHE = `adorapp-images-${CACHE_VERSION}`;
@@ -104,6 +104,7 @@ self.addEventListener('fetch', (event) => {
     return;
   }
 
+  // (push handlers below — they don't intercept fetch.)
   // Static images / fonts at root — cache-first.
   if (isImageRequest(url)) {
     event.respondWith(
@@ -123,4 +124,53 @@ self.addEventListener('fetch', (event) => {
       })()
     );
   }
+});
+
+// ---- Web Push -------------------------------------------------------------
+// Server posts an empty push (no payload encryption) and the SW shows a
+// generic notification. If we ever switch to encrypted payloads, parse from
+// `event.data` here. Title/body live in the SW so we don't need encryption
+// to render something useful.
+
+self.addEventListener('push', (event) => {
+  let title = 'AdorAPP';
+  let body = 'Tenés una novedad';
+  let url = '/';
+  if (event.data) {
+    try {
+      const payload = event.data.json();
+      if (payload.title) title = payload.title;
+      if (payload.body) body = payload.body;
+      if (payload.url) url = payload.url;
+    } catch {
+      // If payload isn't JSON, fall back to defaults.
+    }
+  }
+  event.waitUntil(
+    self.registration.showNotification(title, {
+      body,
+      icon: '/adorapp-logo.png',
+      badge: '/adorapp-logo.png',
+      data: { url },
+    })
+  );
+});
+
+self.addEventListener('notificationclick', (event) => {
+  event.notification.close();
+  const target = event.notification?.data?.url || '/';
+  event.waitUntil(
+    (async () => {
+      const all = await self.clients.matchAll({ type: 'window', includeUncontrolled: true });
+      // Focus an existing tab on the same origin if there's one.
+      for (const c of all) {
+        if (c.url && new URL(c.url).origin === self.location.origin) {
+          c.focus();
+          c.navigate?.(target);
+          return;
+        }
+      }
+      await self.clients.openWindow(target);
+    })()
+  );
 });

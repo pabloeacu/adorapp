@@ -29,6 +29,7 @@ import {
 import { useAuthStore } from '../../stores/authStore';
 import { supabase } from '../../lib/supabase';
 import { useAppStore } from '../../stores/appStore';
+import { PushToggle } from '../PushToggle';
 
 const navItems = [
   { path: '/', icon: LayoutDashboard, label: 'Inicio' },
@@ -188,7 +189,12 @@ export const MobileNav = () => {
   const [editBirthdate, setEditBirthdate] = useState('');
 
   const location = useLocation();
-  const { profile, logout, refreshProfile } = useAuthStore();
+  const { profile, user, logout, refreshProfile } = useAuthStore();
+  const members = useAppStore((s) => s.members);
+  const currentUserMember = useMemo(
+    () => (user?.email ? members.find((m) => m.email === user.email) : null),
+    [user, members]
+  );
   const isPastor = profile?.role === 'pastor';
 
   // Add Solicitudes & Comunicaciones for pastors only
@@ -819,6 +825,10 @@ export const MobileNav = () => {
                     </button>
 
                     <div className="h-px bg-neutral-800 my-2" />
+
+                    <div className="px-1">
+                      <PushToggle memberId={currentUserMember?.id} />
+                    </div>
 
                     <button
                       onClick={handleLogout}

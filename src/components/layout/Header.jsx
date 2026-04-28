@@ -8,6 +8,7 @@ import { useAppStore } from '../../stores/appStore';
 import { supabase } from '../../lib/supabase';
 import { Avatar } from '../ui/Avatar';
 import { Modal } from '../ui/Modal';
+import { PushToggle } from '../PushToggle';
 import { Button } from '../ui/Button';
 
 // Helper to format dates WITHOUT timezone shift (for birthdates and stored dates)
@@ -1227,6 +1228,9 @@ export const Header = () => {
               </>
             )}
           </div>
+
+          {/* Push notification toggle */}
+          <PushToggle memberId={currentUserMember?.id} />
 
           {/* Logout Button */}
           <button
