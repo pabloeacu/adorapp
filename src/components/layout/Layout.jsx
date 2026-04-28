@@ -4,6 +4,7 @@ import { Header } from './Header';
 import { MobileNav } from './MobileNav';
 import { CommandPalette } from '../CommandPalette';
 import { OnboardingWizard } from '../OnboardingWizard';
+import { UpdateBanner } from '../UpdateBanner';
 import { Navigate, Outlet } from 'react-router-dom';
 import { useAuthStore } from '../../stores/authStore';
 import { useAppStore } from '../../stores/appStore';
@@ -29,6 +30,9 @@ export const Layout = () => {
     <div className="w-full h-full min-h-screen min-h [-webkit-fill-available] bg-black text-white flex flex-col">
       {/* Global ⌘K / Ctrl+K palette — mounted once at the layout root */}
       <CommandPalette />
+
+      {/* New-build available toast (driven by the service worker) */}
+      <UpdateBanner />
 
       {/* Welcome wizard for newly-approved members */}
       {currentMember && currentMember.onboarded === false && !wizardDismissed && (
