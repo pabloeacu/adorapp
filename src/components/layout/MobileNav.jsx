@@ -124,6 +124,29 @@ export const MobileNav = () => {
           }
         }
 
+        // Global devotional + reflection (filter expired)
+        const nowIso = new Date().toISOString();
+        const { data: globalNotifs } = await supabase
+          .from('notifications')
+          .select('id, title, message, type, created_at, expires_at')
+          .eq('is_global', true)
+          .or(`expires_at.is.null,expires_at.gt.${nowIso}`)
+          .order('created_at', { ascending: false })
+          .limit(5);
+
+        if (globalNotifs && globalNotifs.length > 0) {
+          globalNotifs.forEach(n => {
+            notifs.push({
+              id: n.id,
+              type: n.type,
+              title: n.title,
+              message: n.message,
+              icon: 'cross',
+              time: new Date(n.created_at).toLocaleTimeString('es-AR', { hour: '2-digit', minute: '2-digit' })
+            });
+          });
+        }
+
         setNotifications(notifs);
         const unread = notifs.filter(n => !readNotificationIds.includes(n.id)).length;
         setUnreadCount(unread);
