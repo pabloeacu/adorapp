@@ -19,6 +19,48 @@ import { Modal } from '../components/ui/Modal';
 import { Input } from '../components/ui/Input';
 import { ConfirmModal, SuccessModal, ErrorModal } from '../components/ui/ConfirmModal';
 import { OrderHistoryTimeline } from '../components/OrderHistoryTimeline';
+import {
+  DndContext,
+  closestCenter,
+  KeyboardSensor,
+  PointerSensor,
+  useSensor,
+  useSensors,
+} from '@dnd-kit/core';
+import {
+  arrayMove,
+  SortableContext,
+  sortableKeyboardCoordinates,
+  verticalListSortingStrategy,
+  useSortable,
+} from '@dnd-kit/sortable';
+import { CSS } from '@dnd-kit/utilities';
+
+// Each song row in the order editor is wrapped in this so it can be dragged
+// to reorder. The grip handle is the only drag surface, so accidental drags
+// while clicking selects/buttons are impossible.
+function SortableSongRow({ id, children }) {
+  const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id });
+  const style = {
+    transform: CSS.Transform.toString(transform),
+    transition,
+    opacity: isDragging ? 0.6 : 1,
+  };
+  return (
+    <div ref={setNodeRef} style={style} className="flex items-stretch">
+      <button
+        type="button"
+        aria-label="Mover canción"
+        {...attributes}
+        {...listeners}
+        className="px-2 cursor-grab active:cursor-grabbing text-gray-500 hover:text-gray-300 touch-none focus:outline-none focus:ring-2 focus:ring-white/40 rounded"
+      >
+        ⋮⋮
+      </button>
+      <div className="flex-1">{children}</div>
+    </div>
+  );
+}
 
 const dayLabels = {
   domingo: 'Domingo', lunes: 'Lunes', martes: 'Martes',
@@ -566,15 +608,17 @@ export const Ordenes = () => {
     // Start with the original key of the song
     let defaultKey = song.key || song.originalKey || 'C';
 
-    // Try to find key history for no director (fallback to original key)
-    // The actual key history will be fetched when a director is selected
     setFormData(prev => ({
       ...prev,
       songs: [...prev.songs, {
         songId: song.id,
         directorId: null,
         key: defaultKey,
-        _pendingHistory: true // Flag to indicate we should check history when director is set
+        _pendingHistory: true,
+        // Stable client-side id used by drag-and-drop. Survives reorders.
+        _localId: typeof crypto !== 'undefined' && crypto.randomUUID
+          ? crypto.randomUUID()
+          : `${song.id}-${Date.now()}-${Math.random()}`,
       }]
     }));
     setShowUnused(false);
@@ -629,6 +673,26 @@ export const Ordenes = () => {
   // Handle key change - save to history when a song is saved
   const handleKeyChange = (index, newKey) => {
     updateSongInOrder(index, 'key', newKey);
+  };
+
+  // Drag-and-drop reorder of songs inside an order. Pointer for mouse/touch
+  // and Keyboard for screen-reader / keyboard users (Enter starts drag,
+  // arrows move, Enter again drops).
+  const dndSensors = useSensors(
+    useSensor(PointerSensor, { activationConstraint: { distance: 6 } }),
+    useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates })
+  );
+
+  const handleSongDragEnd = (event) => {
+    const { active, over } = event;
+    if (!over || active.id === over.id) return;
+    setFormData((prev) => {
+      const ids = prev.songs.map((s, i) => s._localId || `${s.songId}-${i}`);
+      const oldIndex = ids.indexOf(active.id);
+      const newIndex = ids.indexOf(over.id);
+      if (oldIndex < 0 || newIndex < 0) return prev;
+      return { ...prev, songs: arrayMove(prev.songs, oldIndex, newIndex) };
+    });
   };
 
   const removeSongFromOrder = (index) => {
@@ -1017,12 +1081,23 @@ export const Ordenes = () => {
               </div>
             )}
 
-            {/* All Songs */}
-            <div className="space-y-2 max-h-60 overflow-y-auto">
-              {formData.songs.map((songRef, index) => {
-                const song = getSongById(songRef.songId);
-                return (
-                  <div key={index} className="flex items-center gap-3 p-3 bg-neutral-800 rounded-xl">
+            {/* All Songs — drag the ⋮⋮ handle to reorder. */}
+            <DndContext
+              sensors={dndSensors}
+              collisionDetection={closestCenter}
+              onDragEnd={handleSongDragEnd}
+            >
+              <SortableContext
+                items={formData.songs.map((s, i) => s._localId || `${s.songId}-${i}`)}
+                strategy={verticalListSortingStrategy}
+              >
+                <div className="space-y-2 max-h-60 overflow-y-auto">
+                  {formData.songs.map((songRef, index) => {
+                    const song = getSongById(songRef.songId);
+                    const rowId = songRef._localId || `${songRef.songId}-${index}`;
+                    return (
+                      <SortableSongRow key={rowId} id={rowId}>
+                        <div className="flex items-center gap-3 p-3 bg-neutral-800 rounded-xl">
                     <span className="w-6 h-6 rounded-full bg-neutral-700 flex items-center justify-center text-xs shrink-0">
                       {index + 1}
                     </span>
@@ -1117,10 +1192,13 @@ export const Ordenes = () => {
                     >
                       <X size={16} />
                     </button>
-                  </div>
-                );
-              })}
-            </div>
+                        </div>
+                      </SortableSongRow>
+                    );
+                  })}
+                </div>
+              </SortableContext>
+            </DndContext>
 
             {/* Add from Repertoire - Searchable Dropdown */}
             <div className="mt-4 relative">
