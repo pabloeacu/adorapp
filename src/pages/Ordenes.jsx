@@ -1,4 +1,5 @@
 import React, { useState, useMemo, useEffect } from 'react';
+import { useDocumentTitle } from '../hooks/useDocumentTitle';
 import {
   Plus, Calendar, Music, Download, Clock, ChevronRight, Copy,
   MessageSquare, Eye, Edit, Trash2, Filter, Search, Check, X,
@@ -30,6 +31,7 @@ const statusConfig = {
 };
 
 export const Ordenes = () => {
+  useDocumentTitle('Órdenes');
   const { orders, bands, songs, members, addOrder, updateOrder, deleteOrder, cloneOrder, getUnusedByBand, getSongById, getBandById, getMemberById } = useAppStore();
   const { profile, user } = useAuthStore();
 

@@ -1,4 +1,5 @@
 import React from 'react';
+import { useDocumentTitle } from '../hooks/useDocumentTitle';
 import {
   Users,
   Music2,
@@ -30,6 +31,7 @@ const getInstrumentIcon = (instrument) => {
 };
 
 export const Dashboard = () => {
+  useDocumentTitle('Inicio');
   const { members, bands, songs, orders, getUnusedSongs } = useAppStore();
 
   const activeMembers = members.filter(m => m.active).length;

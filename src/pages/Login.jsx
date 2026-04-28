@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { useDocumentTitle } from '../hooks/useDocumentTitle';
 import { Mail, Lock, Eye, EyeOff, Loader2, UserPlus, CheckCircle } from 'lucide-react';
 import { useAuthStore } from '../stores/authStore';
 import { useNavigate, Navigate } from 'react-router-dom';
@@ -7,6 +8,7 @@ import { Button } from '../components/ui/Button';
 import { INSTRUMENTS, MEMBER_ROLES } from '../stores/appStore';
 
 export const Login = () => {
+  useDocumentTitle('Iniciar sesión');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);

@@ -1,4 +1,5 @@
 import React, { useState, useMemo } from 'react';
+import { useDocumentTitle } from '../hooks/useDocumentTitle';
 import { useSearchParams } from 'react-router-dom';
 import {
   Search, Mail, Phone, Shield, MoreVertical, Edit, Trash2,
@@ -29,6 +30,7 @@ const formatDateLocal = (dateStr) => {
 };
 
 export const Solicitudes = () => {
+  useDocumentTitle('Solicitudes');
   const { user, profile } = useAuthStore();
   const { addMember, initialize } = useAppStore();
   const isPastor = profile?.role === 'pastor';

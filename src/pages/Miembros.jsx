@@ -1,4 +1,5 @@
 import React, { useState, useMemo, useEffect } from 'react';
+import { useDocumentTitle } from '../hooks/useDocumentTitle';
 import { useSearchParams } from 'react-router-dom';
 import {
   Plus, Search, Mail, Phone, Shield, MoreVertical, Edit, Trash2,
@@ -36,6 +37,7 @@ const roleConfig = {
 };
 
 export const Miembros = () => {
+  useDocumentTitle('Miembros');
   const { members, addMember, updateMember, deleteMember, toggleMemberActive } = useAppStore();
   const { user, profile } = useAuthStore();
   const [searchParams, setSearchParams] = useSearchParams();

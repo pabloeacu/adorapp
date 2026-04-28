@@ -1,4 +1,5 @@
 import React, { useState, useMemo, useRef, useEffect } from 'react';
+import { useDocumentTitle } from '../hooks/useDocumentTitle';
 // jspdf is loaded on demand inside generateSongPDF (~140 KB; no need at first paint).
 import {
   Plus, Search, Music, Download, Edit, Trash2, Clock, MoreVertical,
@@ -42,6 +43,7 @@ const categoryConfig = {
 };
 
 export const Repertorio = () => {
+  useDocumentTitle('Repertorio');
   const { songs, addSong, updateSong, deleteSong, members, getUnusedSongs } = useAppStore();
   const { profile, user } = useAuthStore();
 

@@ -1,0 +1,55 @@
+name: Uptime check
+
+# Replaces the pg_net cron from FASE A that couldn't reach Vercel from the
+# Supabase worker network. GitHub-hosted runners can hit adorapp.net.ar
+# reliably, so we ping from there every 5 minutes and write the result back
+# to the health_checks table via the record-health-check edge function.
+
+on:
+  schedule:
+    # GitHub Actions schedule jobs run on UTC. Note that GitHub may delay
+    # cron-triggered runs by up to ~5-10 minutes during platform peaks;
+    # that's fine for our use case.
+    - cron: '*/5 * * * *'
+  workflow_dispatch:
+
+jobs:
+  ping:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Hit prod and record health
+        env:
+          SUPABASE_URL: ${{ vars.VITE_SUPABASE_URL }}
+          SUPABASE_ANON_KEY: ${{ vars.VITE_SUPABASE_ANON_KEY }}
+        run: |
+          set -e
+          ENDPOINT='https://adorapp.net.ar/'
+
+          start_ms=$(date +%s%3N)
+          STATUS=$(curl -sSL -o /tmp/prod.html -w '%{http_code}' --max-time 30 "$ENDPOINT" || echo "000")
+          end_ms=$(date +%s%3N)
+          elapsed=$((end_ms - start_ms))
+
+          # OK = 200 + SPA shell intact (title + asset reference).
+          OK=false
+          ERR_MSG=null
+          if [ "$STATUS" = "200" ] && grep -q '<title>AdorAPP' /tmp/prod.html && grep -q '/assets/index-' /tmp/prod.html; then
+            OK=true
+          else
+            ERR_MSG="\"status=$STATUS shell-check-failed\""
+          fi
+
+          curl -sS -X POST \
+            -H "Authorization: Bearer $SUPABASE_ANON_KEY" \
+            -H "apikey: $SUPABASE_ANON_KEY" \
+            -H "content-type: application/json" \
+            "$SUPABASE_URL/functions/v1/record-health-check" \
+            -d "{
+              \"endpoint\": \"$ENDPOINT\",
+              \"status_code\": $([ "$STATUS" = "000" ] && echo null || echo $STATUS),
+              \"response_time_ms\": $elapsed,
+              \"ok\": $OK,
+              \"error_message\": $ERR_MSG
+            }"
+          echo "status=$STATUS ok=$OK elapsed=${elapsed}ms"

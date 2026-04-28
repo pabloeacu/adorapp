@@ -1,4 +1,5 @@
 import React, { useState, useMemo } from 'react';
+import { useDocumentTitle } from '../hooks/useDocumentTitle';
 import {
   Plus, Users, Calendar, Clock, MoreVertical, Edit, Trash2,
   Music, Check, X, UserPlus, Shield, ChevronDown, AlertTriangle
@@ -24,6 +25,7 @@ const dayLabels = {
 };
 
 export const Bandas = () => {
+  useDocumentTitle('Bandas');
   const { bands, members, orders, addBand, updateBand, deleteBand, getBandMembers } = useAppStore();
   const { profile, user } = useAuthStore();
 
