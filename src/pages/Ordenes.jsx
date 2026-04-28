@@ -142,13 +142,27 @@ export const Ordenes = () => {
     message: ''
   });
 
+  const [sortBy, setSortBy] = useState('date_desc');
+
   const filteredOrders = useMemo(() => {
-    return orders.filter(order => {
+    const list = orders.filter(order => {
       const matchesStatus = filterStatus === 'all' || order.status === filterStatus;
       const matchesBand = filterBand === 'all' || order.bandId === filterBand;
       return matchesStatus && matchesBand;
-    }).sort((a, b) => new Date(b.date) - new Date(a.date));
-  }, [orders, filterStatus, filterBand]);
+    });
+    const byDateDesc = (a, b) => new Date(b.date) - new Date(a.date);
+    const byDateAsc = (a, b) => new Date(a.date) - new Date(b.date);
+    const byBand = (a, b) => {
+      const an = getBandById(a.bandId)?.name || '';
+      const bn = getBandById(b.bandId)?.name || '';
+      return an.localeCompare(bn, 'es') || byDateDesc(a, b);
+    };
+    const cmp =
+      sortBy === 'date_asc' ? byDateAsc :
+      sortBy === 'band' ? byBand :
+      byDateDesc;
+    return [...list].sort(cmp);
+  }, [orders, filterStatus, filterBand, sortBy, getBandById]);
 
   const unusedSongs = selectedBandForUnused ? getUnusedByBand(selectedBandForUnused, 4) : [];
 
@@ -604,17 +618,46 @@ export const Ordenes = () => {
     doc.save(fileName);
   };
 
+  // Suggest the most-likely director for a given song.
+  // Prefers the director who has led it most often in this band; falls back to
+  // most-frequent across any band. Returns a member id only if the suggestion
+  // points to a singer who's still active (otherwise the dropdown wouldn't list them).
+  const suggestDirectorForSong = (songId, bandId) => {
+    if (!songId || singers.length === 0) return null;
+    const validIds = new Set(singers.map(s => s.id));
+    const tally = (filterFn) => {
+      const counts = new Map();
+      orders.forEach(o => {
+        if (!filterFn(o)) return;
+        o.songs?.forEach(s => {
+          if (s.songId === songId && s.directorId && validIds.has(s.directorId)) {
+            counts.set(s.directorId, (counts.get(s.directorId) || 0) + 1);
+          }
+        });
+      });
+      if (counts.size === 0) return null;
+      return [...counts.entries()].sort((a, b) => b[1] - a[1])[0][0];
+    };
+    return (
+      tally(o => bandId && o.bandId === bandId) ||
+      tally(() => true) ||
+      null
+    );
+  };
+
   const addSongToOrder = async (song) => {
-    // Start with the original key of the song
-    let defaultKey = song.key || song.originalKey || 'C';
+    const suggestedDirectorId = suggestDirectorForSong(song.id, formData.bandId);
+    const defaultKey = song.key || song.originalKey || 'C';
+    const newIndex = formData.songs.length;
 
     setFormData(prev => ({
       ...prev,
       songs: [...prev.songs, {
         songId: song.id,
-        directorId: null,
+        directorId: suggestedDirectorId,
         key: defaultKey,
         _pendingHistory: true,
+        _suggestedDirector: !!suggestedDirectorId,
         // Stable client-side id used by drag-and-drop. Survives reorders.
         _localId: typeof crypto !== 'undefined' && crypto.randomUUID
           ? crypto.randomUUID()
@@ -622,6 +665,21 @@ export const Ordenes = () => {
       }]
     }));
     setShowUnused(false);
+
+    // If we pre-filled a director, fetch their saved key in the background so
+    // the row matches what handleDirectorChange would do for a manual pick.
+    if (suggestedDirectorId) {
+      fetchKeyHistory(suggestedDirectorId, song.id).then(result => {
+        if (result.found) {
+          setFormData(prev => ({
+            ...prev,
+            songs: prev.songs.map((s, i) =>
+              i === newIndex ? { ...s, key: result.key } : s
+            )
+          }));
+        }
+      }).catch(() => {});
+    }
   };
 
   // Handle director change - fetch key history and update
@@ -849,6 +907,16 @@ export const Ordenes = () => {
           {bands.map(band => (
             <option key={band.id} value={band.id}>{band.name}</option>
           ))}
+        </select>
+        <select
+          aria-label="Ordenar órdenes"
+          className="px-4 py-3 bg-neutral-900 border border-neutral-800 rounded-xl"
+          value={sortBy}
+          onChange={(e) => setSortBy(e.target.value)}
+        >
+          <option value="date_desc">Ordenar: fecha ↓</option>
+          <option value="date_asc">Ordenar: fecha ↑</option>
+          <option value="band">Ordenar: banda</option>
         </select>
       </div>
 
@@ -1106,19 +1174,41 @@ export const Ordenes = () => {
                       <p className="text-xs text-gray-400 truncate">{song?.artist}</p>
                     </div>
                     {/* Director selector - filtered to singers only */}
-                    <select
-                      className="bg-neutral-900 border border-neutral-700 rounded-lg px-2 py-1.5 text-sm w-40 shrink-0"
-                      value={songRef.directorId || ''}
-                      onChange={(e) => {
-                        const newDirectorId = e.target.value || null;
-                        handleDirectorChange(index, newDirectorId, songRef.songId);
-                      }}
-                    >
-                      <option value="">Director</option>
-                      {singers.map(member => (
-                        <option key={member.id} value={member.id}>{member.name}</option>
-                      ))}
-                    </select>
+                    <div className="relative shrink-0">
+                      <select
+                        className={`bg-neutral-900 border rounded-lg px-2 py-1.5 text-sm w-40 ${
+                          songRef._suggestedDirector
+                            ? 'border-purple-500/60'
+                            : 'border-neutral-700'
+                        }`}
+                        value={songRef.directorId || ''}
+                        title={songRef._suggestedDirector ? 'Director sugerido por historial' : undefined}
+                        onChange={(e) => {
+                          const newDirectorId = e.target.value || null;
+                          // Clear the "suggested" flag once the user makes a manual choice
+                          setFormData(prev => ({
+                            ...prev,
+                            songs: prev.songs.map((s, i) =>
+                              i === index ? { ...s, _suggestedDirector: false } : s
+                            )
+                          }));
+                          handleDirectorChange(index, newDirectorId, songRef.songId);
+                        }}
+                      >
+                        <option value="">Director</option>
+                        {singers.map(member => (
+                          <option key={member.id} value={member.id}>{member.name}</option>
+                        ))}
+                      </select>
+                      {songRef._suggestedDirector && (
+                        <span
+                          className="absolute -top-1.5 -right-1.5 text-[9px] bg-purple-500 text-white rounded-full px-1.5 py-0.5 leading-none pointer-events-none"
+                          aria-label="Sugerencia automática"
+                        >
+                          ★
+                        </span>
+                      )}
+                    </div>
                     {/* Key selector with history lookup icon */}
                     <div className="relative flex items-center shrink-0">
                       <select

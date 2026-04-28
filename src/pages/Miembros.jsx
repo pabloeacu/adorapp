@@ -52,6 +52,7 @@ export const Miembros = () => {
   const [editingMember, setEditingMember] = useState(null);
   const [showFilters, setShowFilters] = useState(false);
   const [selectedInstruments, setSelectedInstruments] = useState([]);
+  const [sortBy, setSortBy] = useState('name_asc');
   const [viewMode, setViewMode] = useState('cards'); // 'cards' or 'table'
 
   const [formData, setFormData] = useState({
@@ -100,7 +101,7 @@ export const Miembros = () => {
   });
 
   const filteredMembers = useMemo(() => {
-    return members.filter(member => {
+    const list = members.filter(member => {
       const matchesSearch = member.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
         member.email?.toLowerCase().includes(searchTerm.toLowerCase()) ||
         member.instruments?.some(i => i.toLowerCase().includes(searchTerm.toLowerCase()));
@@ -113,7 +114,16 @@ export const Miembros = () => {
 
       return matchesSearch && matchesRole && matchesActive && matchesInstrument;
     });
-  }, [members, searchTerm, filterRole, filterActive, selectedInstruments]);
+    const byName = (a, b) => (a.name || '').localeCompare(b.name || '', 'es');
+    const byRole = (a, b) => (a.role || '').localeCompare(b.role || '', 'es') || byName(a, b);
+    const byActive = (a, b) => Number(b.active) - Number(a.active) || byName(a, b);
+    const cmp =
+      sortBy === 'name_desc' ? (a, b) => byName(b, a) :
+      sortBy === 'role' ? byRole :
+      sortBy === 'active' ? byActive :
+      byName;
+    return [...list].sort(cmp);
+  }, [members, searchTerm, filterRole, filterActive, selectedInstruments, sortBy]);
 
   const handleOpenModal = (member = null) => {
     if (member) {
@@ -407,6 +417,17 @@ export const Miembros = () => {
               </Badge>
             )}
           </Button>
+          <select
+            aria-label="Ordenar miembros"
+            className="px-4 py-3 bg-neutral-900 border border-neutral-800 rounded-xl"
+            value={sortBy}
+            onChange={(e) => setSortBy(e.target.value)}
+          >
+            <option value="name_asc">Ordenar: nombre A→Z</option>
+            <option value="name_desc">Ordenar: nombre Z→A</option>
+            <option value="role">Ordenar: rol</option>
+            <option value="active">Ordenar: activos primero</option>
+          </select>
         </div>
 
         {/* Filter Panel */}
