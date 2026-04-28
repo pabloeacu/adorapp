@@ -92,6 +92,7 @@ export const MobileNav = () => {
       band: 'users',
       member: 'heart',
       request: 'file',
+      order: 'calendar',
     }[t] || 'cross');
 
     const loadNotifications = async () => {
@@ -1212,6 +1213,7 @@ export const MobileNav = () => {
                             notif.type === 'song' ? 'bg-purple-500/20' :
                             notif.type === 'band' ? 'bg-blue-500/20' :
                             notif.type === 'member' ? 'bg-green-500/20' :
+                            notif.type === 'order' ? 'bg-emerald-500/20' :
                             notif.type === 'request' ? 'bg-yellow-500/20' :
                             notif.type === 'devotional' ? 'bg-amber-500/20' :
                             notif.type === 'reflection' ? 'bg-indigo-500/20' :
@@ -1223,6 +1225,7 @@ export const MobileNav = () => {
                             {notif.icon === 'file' && <FileText size={18} className="text-yellow-400" />}
                             {notif.icon === 'cross' && <Cross size={18} className="text-amber-400" />}
                             {notif.icon === 'sunset' && <Sunset size={18} className="text-indigo-400" />}
+                            {notif.icon === 'calendar' && <Calendar size={18} className="text-emerald-400" />}
                           </div>
                           <div className="flex-1">
                             {notif.title && (
