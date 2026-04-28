@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState } from 'react';
 import { Sidebar } from './Sidebar';
 import { Header } from './Header';
 import { MobileNav } from './MobileNav';
@@ -7,20 +7,12 @@ import { OnboardingWizard } from '../OnboardingWizard';
 import { UpdateBanner } from '../UpdateBanner';
 import { Navigate, Outlet } from 'react-router-dom';
 import { useAuthStore } from '../../stores/authStore';
-import { useAppStore } from '../../stores/appStore';
+import { useCurrentMember } from '../../hooks/useCurrentMember';
 
 export const Layout = () => {
   const user = useAuthStore((state) => state.user);
-  const members = useAppStore((s) => s.members);
   const [wizardDismissed, setWizardDismissed] = useState(false);
-
-  // Resolve the current user's member row (single source of truth pattern
-  // mirroring Header.jsx). The wizard only fires if the row exists and
-  // explicitly marks onboarded=false.
-  const currentMember = useMemo(() => {
-    if (!user?.email) return null;
-    return members.find((m) => m.email === user.email) || null;
-  }, [user, members]);
+  const currentMember = useCurrentMember();
 
   if (!user) {
     return <Navigate to="/login" replace />;

@@ -9,7 +9,7 @@ import {
 // jspdf is loaded on demand inside generateOrderPDF / generateSongsPDF
 // (~140 KB; no need at first paint).
 import { useAppStore, MEETING_TYPES, MUSICAL_KEYS, transposeSongStructure } from '../stores/appStore';
-import { useAuthStore } from '../stores/authStore';
+import { useCurrentRole } from '../hooks/useCurrentMember';
 import { supabase } from '../lib/supabase';
 import { Card } from '../components/ui/Card';
 import { Button } from '../components/ui/Button';
@@ -78,18 +78,7 @@ const statusConfig = {
 export const Ordenes = () => {
   useDocumentTitle('Órdenes');
   const { orders, bands, songs, members, addOrder, updateOrder, deleteOrder, cloneOrder, getUnusedByBand, getSongById, getBandById, getMemberById } = useAppStore();
-  const { profile, user } = useAuthStore();
-
-  // Buscar miembro por email (mismo método que Header.jsx)
-  const currentMember = useMemo(() => {
-    if (user?.email && members) {
-      return members.find(m => m.email === user.email);
-    }
-    return null;
-  }, [user, members]);
-
-  // Usar el rol del member encontrado, fallback a profile.role
-  const userRole = currentMember?.role || profile?.role;
+  const userRole = useCurrentRole();
   const isPastor = userRole === 'pastor';
   const isLeader = userRole === 'leader';
 

@@ -7,7 +7,7 @@ import {
   LayoutGrid, List, FileDown, AlertTriangle, ChevronDown
 } from 'lucide-react';
 import { useAppStore, SONG_CATEGORIES, MUSICAL_KEYS, transposeSongStructure } from '../stores/appStore';
-import { useAuthStore } from '../stores/authStore';
+import { useCurrentMember } from '../hooks/useCurrentMember';
 import { Card } from '../components/ui/Card';
 import { Button } from '../components/ui/Button';
 import { Badge } from '../components/ui/Badge';
@@ -45,19 +45,9 @@ const categoryConfig = {
 
 export const Repertorio = () => {
   useDocumentTitle('Repertorio');
-  const { songs, addSong, updateSong, deleteSong, members, getUnusedSongs } = useAppStore();
-  const { profile, user } = useAuthStore();
-
-  // Buscar miembro por email (mismo método que Header.jsx)
-  const currentMember = useMemo(() => {
-    if (user?.email && members) {
-      return members.find(m => m.email === user.email);
-    }
-    return null;
-  }, [user, members]);
-
-  // Usar el rol del member encontrado, fallback a profile.role
-  const userRole = currentMember?.role || profile?.role;
+  const { songs, addSong, updateSong, deleteSong, getUnusedSongs } = useAppStore();
+  const currentMember = useCurrentMember();
+  const userRole = currentMember?.role || 'member';
   const isPastor = userRole === 'pastor';
   const isLeader = userRole === 'leader';
 

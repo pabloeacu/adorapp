@@ -1,11 +1,11 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState } from 'react';
 import { useDocumentTitle } from '../hooks/useDocumentTitle';
 import {
   Plus, Users, Calendar, Clock, MoreVertical, Edit, Trash2,
   Music, Check, X, UserPlus, Shield, ChevronDown, AlertTriangle
 } from 'lucide-react';
 import { useAppStore, MEETING_TYPES } from '../stores/appStore';
-import { useAuthStore } from '../stores/authStore';
+import { useCurrentRole } from '../hooks/useCurrentMember';
 import { Card } from '../components/ui/Card';
 import { Button } from '../components/ui/Button';
 import { Badge } from '../components/ui/Badge';
@@ -27,18 +27,7 @@ const dayLabels = {
 export const Bandas = () => {
   useDocumentTitle('Bandas');
   const { bands, members, orders, addBand, updateBand, deleteBand, getBandMembers } = useAppStore();
-  const { profile, user } = useAuthStore();
-
-  // Buscar miembro por email (mismo método que Header.jsx)
-  const currentMember = useMemo(() => {
-    if (user?.email && members) {
-      return members.find(m => m.email === user.email);
-    }
-    return null;
-  }, [user, members]);
-
-  // Usar el rol del member encontrado, fallback a profile.role
-  const userRole = currentMember?.role || profile?.role;
+  const userRole = useCurrentRole();
   const isPastor = userRole === 'pastor';
   const isLeader = userRole === 'leader';
 

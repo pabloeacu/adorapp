@@ -28,7 +28,7 @@ import {
 } from 'lucide-react';
 import { useAuthStore } from '../../stores/authStore';
 import { supabase } from '../../lib/supabase';
-import { useAppStore } from '../../stores/appStore';
+import { useCurrentMember } from '../../hooks/useCurrentMember';
 import { PushToggle } from '../PushToggle';
 
 const navItems = [
@@ -189,12 +189,8 @@ export const MobileNav = () => {
   const [editBirthdate, setEditBirthdate] = useState('');
 
   const location = useLocation();
-  const { profile, user, logout, refreshProfile } = useAuthStore();
-  const members = useAppStore((s) => s.members);
-  const currentUserMember = useMemo(
-    () => (user?.email ? members.find((m) => m.email === user.email) : null),
-    [user, members]
-  );
+  const { profile, logout, refreshProfile } = useAuthStore();
+  const currentUserMember = useCurrentMember();
   const isPastor = profile?.role === 'pastor';
 
   // Add Solicitudes & Comunicaciones for pastors only

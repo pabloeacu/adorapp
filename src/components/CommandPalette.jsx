@@ -8,6 +8,7 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Command } from 'cmdk';
+import { useCurrentRole } from '../hooks/useCurrentMember';
 import {
   Search,
   LayoutDashboard,
@@ -37,15 +38,8 @@ export function CommandPalette() {
   const [open, setOpen] = useState(false);
   const navigate = useNavigate();
   const { members, songs, orders, bands } = useAppStore();
-  const { profile, user } = useAuthStore();
-
-  // Source of truth for role: profile from authStore + members lookup as
-  // fallback (mirrors the pattern Header.jsx uses).
-  const myMember = useMemo(
-    () => (user?.email ? members.find((m) => m.email === user.email) : null),
-    [user, members]
-  );
-  const isPastor = (myMember?.role || profile?.role) === 'pastor';
+  const { user } = useAuthStore();
+  const isPastor = useCurrentRole() === 'pastor';
 
   // Open on Cmd/Ctrl+K from anywhere.
   useEffect(() => {
