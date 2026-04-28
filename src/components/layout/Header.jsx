@@ -2,7 +2,7 @@
 // Photo Cropper fix - Canvas API image processing
 import React, { useState, useRef, useEffect, useCallback, useMemo } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
-import { Bell, Search, ChevronRight, User, Mail, Shield, Camera, X, RotateCcw, ZoomIn, ZoomOut, Check, Move, LogOut, Trash2, Phone, Cross, Users2, Calendar, Loader2, Lock, Eye, EyeOff, RefreshCw, Music, Heart, FileText, Send } from 'lucide-react';
+import { Bell, Search, ChevronRight, User, Mail, Shield, Camera, X, RotateCcw, ZoomIn, ZoomOut, Check, Move, LogOut, Trash2, Phone, Cross, Users2, Calendar, Loader2, Lock, Eye, EyeOff, RefreshCw, Music, Heart, FileText, Send, Sunset } from 'lucide-react';
 import { useAuthStore } from '../../stores/authStore';
 import { useAppStore } from '../../stores/appStore';
 import { supabase } from '../../lib/supabase';
@@ -283,7 +283,7 @@ export const Header = () => {
               type: n.type, // 'devotional' or 'reflection'
               title: n.title,
               message: n.message,
-              icon: 'cross',
+              icon: n.type === 'reflection' ? 'sunset' : 'cross',
               time: new Date(n.created_at).toLocaleTimeString('es-AR', { hour: '2-digit', minute: '2-digit' })
             });
           });
@@ -1504,6 +1504,7 @@ export const Header = () => {
                         {notif.icon === 'users' && <Users2 size={18} className="text-blue-400" />}
                         {notif.icon === 'heart' && <Heart size={18} className="text-green-400" />}
                         {notif.icon === 'cross' && <Cross size={18} className="text-amber-400" />}
+                        {notif.icon === 'sunset' && <Sunset size={18} className="text-indigo-400" />}
                         {notif.icon === 'file' && <FileText size={18} className="text-yellow-400" />}
                         {notif.icon === 'send' && <Send size={18} className="text-blue-400" />}
                       </div>
@@ -1532,7 +1533,10 @@ export const Header = () => {
                           </>
                         ) : (
                           <>
-                            <p className="text-sm text-white leading-relaxed">{notif.message}</p>
+                            {notif.title && (
+                              <p className="text-sm text-white font-semibold leading-snug mb-1">{notif.title}</p>
+                            )}
+                            <p className="text-sm text-gray-200 leading-relaxed">{notif.message}</p>
                             <p className="text-xs text-gray-500 mt-1">{notif.time}</p>
                           </>
                         )}

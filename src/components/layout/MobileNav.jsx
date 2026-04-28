@@ -24,7 +24,8 @@ import {
   Send,
   Bell,
   Music,
-  Heart
+  Heart,
+  Sunset
 } from 'lucide-react';
 import { useAuthStore } from '../../stores/authStore';
 import { supabase } from '../../lib/supabase';
@@ -141,7 +142,7 @@ export const MobileNav = () => {
               type: n.type,
               title: n.title,
               message: n.message,
-              icon: 'cross',
+              icon: n.type === 'reflection' ? 'sunset' : 'cross',
               time: new Date(n.created_at).toLocaleTimeString('es-AR', { hour: '2-digit', minute: '2-digit' })
             });
           });
@@ -1241,13 +1242,20 @@ export const MobileNav = () => {
                           <div className={`p-2 rounded-xl ${
                             notif.type === 'song' ? 'bg-purple-500/20' :
                             notif.type === 'request' ? 'bg-yellow-500/20' :
+                            notif.type === 'devotional' ? 'bg-amber-500/20' :
+                            notif.type === 'reflection' ? 'bg-indigo-500/20' :
                             'bg-blue-500/20'
                           }`}>
                             {notif.icon === 'music' && <Music size={18} className="text-purple-400" />}
                             {notif.icon === 'file' && <FileText size={18} className="text-yellow-400" />}
+                            {notif.icon === 'cross' && <Cross size={18} className="text-amber-400" />}
+                            {notif.icon === 'sunset' && <Sunset size={18} className="text-indigo-400" />}
                           </div>
                           <div className="flex-1">
-                            <p className="text-sm text-white leading-relaxed">{notif.message}</p>
+                            {notif.title && (
+                              <p className="text-sm text-white font-semibold leading-snug mb-1">{notif.title}</p>
+                            )}
+                            <p className="text-sm text-gray-200 leading-relaxed">{notif.message}</p>
                             <p className="text-xs text-gray-500 mt-1">{notif.time}</p>
                           </div>
                           <span className="w-2 h-2 bg-blue-500 rounded-full mt-2" />
