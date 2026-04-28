@@ -125,6 +125,7 @@ const convertMemberFromDB = (m) => ({
   editor: m.editor || false, // Editor permission for songs
   instruments: m.instruments || [],
   active: m.active,
+  onboarded: m.onboarded !== false, // default true so existing rows skip the wizard
   userId: m.user_id,
   avatar_url: m.avatar_url, // Keep BOTH for compatibility
   avatarUrl: m.avatar_url,   // Both fields point to same value
@@ -174,20 +175,27 @@ const convertOrderFromDB = (o) => ({
 });
 
 // Convert camelCase to snake_case for Supabase
-const convertMemberToDB = (m) => ({
-  name: m.name,
-  email: m.email,
-  phone: m.phone || null,
-  pastor_area: m.pastor_area || null,
-  leader_of: m.leader_of || null,
-  birthdate: m.birthdate || null,
-  role: m.role || 'member',
-  editor: m.editor || false, // Editor permission for songs
-  instruments: m.instruments || [],
-  active: m.active ?? true,
-  user_id: m.userId || null,
-  avatar_url: m.avatarUrl || null,
-});
+const convertMemberToDB = (m) => {
+  const out = {
+    name: m.name,
+    email: m.email,
+    phone: m.phone || null,
+    pastor_area: m.pastor_area || null,
+    leader_of: m.leader_of || null,
+    birthdate: m.birthdate || null,
+    role: m.role || 'member',
+    editor: m.editor || false, // Editor permission for songs
+    instruments: m.instruments || [],
+    active: m.active ?? true,
+    user_id: m.userId || null,
+    avatar_url: m.avatarUrl || null,
+  };
+  // Only forward onboarded when the caller passed it explicitly — otherwise
+  // the column keeps its current value (DB default true for old rows; the
+  // edge functions for new members set it to false explicitly).
+  if (m.onboarded !== undefined) out.onboarded = m.onboarded;
+  return out;
+};
 
 const convertBandToDB = (b) => ({
   name: b.name,

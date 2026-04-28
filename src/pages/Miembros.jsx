@@ -15,6 +15,7 @@ import { Avatar } from '../components/ui/Avatar';
 import { Modal } from '../components/ui/Modal';
 import { Input } from '../components/ui/Input';
 import { ConfirmModal, SuccessModal, ErrorModal } from '../components/ui/ConfirmModal';
+import { toCSV, downloadCSV } from '../lib/csv';
 
 // Helper to format dates WITHOUT timezone shift (for birthdates and stored dates)
 const formatDateLocal = (dateStr) => {
@@ -347,6 +348,31 @@ export const Miembros = () => {
               <List size={18} />
             </button>
           </div>
+          {/* Pastor-only export. We export the currently filtered list,
+              so the user can pre-narrow by role/instrument before exporting. */}
+          {isPastor && (
+            <Button
+              variant="secondary"
+              onClick={() => {
+                const csv = toCSV(filteredMembers, [
+                  { header: 'Nombre', get: (m) => m.name },
+                  { header: 'Email', get: (m) => m.email },
+                  { header: 'Teléfono', get: (m) => m.phone },
+                  { header: 'Rol', get: (m) => m.role },
+                  { header: 'Editor', get: (m) => (m.editor ? 'sí' : 'no') },
+                  { header: 'Activo', get: (m) => (m.active ? 'sí' : 'no') },
+                  { header: 'Pastor de área', get: (m) => m.pastor_area },
+                  { header: 'Líder de', get: (m) => m.leader_of },
+                  { header: 'Fecha nacimiento', get: (m) => m.birthdate },
+                  { header: 'Instrumentos', get: (m) => m.instruments },
+                ]);
+                const today = new Date().toISOString().slice(0, 10);
+                downloadCSV(`miembros-${today}.csv`, csv);
+              }}
+            >
+              Exportar CSV
+            </Button>
+          )}
           {/* Only show Add Member button for pastors - NEVER for members */}
           {isPastor && (
             <Button icon={Plus} onClick={() => handleOpenModal()}>

@@ -61,8 +61,7 @@ export function CommandPalette() {
     return () => window.removeEventListener('keydown', onKey);
   }, [open]);
 
-  if (!user) return null; // hide the palette before login
-
+  // All hooks must run unconditionally (rules of hooks).
   const pageItems = isPastor ? [...PAGE_ITEMS_BASE, ...PASTOR_PAGE_ITEMS] : PAGE_ITEMS_BASE;
 
   const recentOrders = useMemo(
@@ -72,6 +71,8 @@ export function CommandPalette() {
         .slice(0, 8),
     [orders]
   );
+
+  if (!user) return null; // hide the palette before login
 
   const go = (path) => {
     setOpen(false);

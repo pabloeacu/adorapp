@@ -14,6 +14,7 @@ import { Badge } from '../components/ui/Badge';
 import { Modal } from '../components/ui/Modal';
 import { Input } from '../components/ui/Input';
 import { ConfirmModal, SuccessModal, ErrorModal } from '../components/ui/ConfirmModal';
+import { foldText, toCSV, downloadCSV } from '../lib/csv';
 
 const sectionTypes = [
   { id: 'intro', label: 'Intro' },
@@ -115,18 +116,17 @@ export const Repertorio = () => {
     let result = songs;
 
     if (searchTerm) {
-      const search = searchTerm.toLowerCase();
+      // Diacritic-insensitive search: "ocean" → "Océanos", "humillacion" →
+      // "Humillación". foldText lowercases + strips accents.
+      const search = foldText(searchTerm);
       result = result.filter(s => {
-        // Search in title and artist
-        if (s.title.toLowerCase().includes(search) ||
-            s.artist?.toLowerCase().includes(search)) {
+        if (foldText(s.title).includes(search) || foldText(s.artist).includes(search)) {
           return true;
         }
-        // Search in song structure (lyrics and chords)
         if (s.structure) {
           return s.structure.some(section =>
-            section.content?.toLowerCase().includes(search) ||
-            section.chords?.toLowerCase().includes(search)
+            foldText(section.content).includes(search) ||
+            foldText(section.chords).includes(search)
           );
         }
         return false;
@@ -516,6 +516,28 @@ export const Repertorio = () => {
                 <List size={18} />
               </button>
             </div>
+            {/* Pastor / leader can export the visible song list. */}
+            {(isPastor || isLeader) && (
+              <Button
+                variant="secondary"
+                onClick={() => {
+                  const csv = toCSV(filteredSongs, [
+                    { header: 'Título', get: (s) => s.title },
+                    { header: 'Artista', get: (s) => s.artist },
+                    { header: 'Tono original', get: (s) => s.originalKey || s.key },
+                    { header: 'Categorías', get: (s) => s.categories },
+                    { header: 'Compás', get: (s) => s.compass },
+                    { header: 'BPM', get: (s) => s.bpm },
+                    { header: 'YouTube', get: (s) => s.youtubeUrl },
+                    { header: 'Última vez usada', get: (s) => s.lastUsed },
+                  ]);
+                  const today = new Date().toISOString().slice(0, 10);
+                  downloadCSV(`repertorio-${today}.csv`, csv);
+                }}
+              >
+                Exportar CSV
+              </Button>
+            )}
             {/* Pastors, leaders and editors can add songs */}
             {(isPastor || isLeader || currentMember?.editor) && (
               <Button icon={Plus} onClick={() => handleOpenModal()}>
