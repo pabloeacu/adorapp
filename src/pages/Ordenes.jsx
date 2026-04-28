@@ -19,6 +19,7 @@ import { Modal } from '../components/ui/Modal';
 import { Input } from '../components/ui/Input';
 import { ConfirmModal, SuccessModal, ErrorModal } from '../components/ui/ConfirmModal';
 import { OrderHistoryTimeline } from '../components/OrderHistoryTimeline';
+import { OrderCalendar } from '../components/OrderCalendar';
 import {
   DndContext,
   closestCenter,
@@ -143,6 +144,7 @@ export const Ordenes = () => {
   });
 
   const [sortBy, setSortBy] = useState('date_desc');
+  const [viewMode, setViewMode] = useState('list'); // 'list' | 'calendar'
 
   const filteredOrders = useMemo(() => {
     const list = orders.filter(order => {
@@ -879,11 +881,37 @@ export const Ordenes = () => {
             {orders.length} órdenes · {orders.filter(o => o.status === 'scheduled').length} programadas
           </p>
         </div>
-        {(isPastor || isLeader) && (
-          <Button icon={Plus} onClick={handleOpenModal}>
-            Nueva Orden
-          </Button>
-        )}
+        <div className="flex items-center gap-2">
+          <div role="tablist" aria-label="Modo de visualización" className="flex bg-neutral-900 border border-neutral-800 rounded-xl p-1">
+            <button
+              type="button"
+              role="tab"
+              aria-selected={viewMode === 'list'}
+              onClick={() => setViewMode('list')}
+              className={`px-3 py-1.5 text-sm rounded-lg transition-colors ${
+                viewMode === 'list' ? 'bg-white/10 text-white' : 'text-gray-400 hover:text-white'
+              }`}
+            >
+              Lista
+            </button>
+            <button
+              type="button"
+              role="tab"
+              aria-selected={viewMode === 'calendar'}
+              onClick={() => setViewMode('calendar')}
+              className={`px-3 py-1.5 text-sm rounded-lg transition-colors ${
+                viewMode === 'calendar' ? 'bg-white/10 text-white' : 'text-gray-400 hover:text-white'
+              }`}
+            >
+              Calendario
+            </button>
+          </div>
+          {(isPastor || isLeader) && (
+            <Button icon={Plus} onClick={handleOpenModal}>
+              Nueva Orden
+            </Button>
+          )}
+        </div>
       </div>
 
       {/* Filters */}
@@ -920,7 +948,19 @@ export const Ordenes = () => {
         </select>
       </div>
 
+      {viewMode === 'calendar' && (
+        <OrderCalendar
+          orders={filteredOrders}
+          getBandById={getBandById}
+          onSelectOrder={(o) => {
+            setViewingOrder(o);
+            setIsDetailOpen(true);
+          }}
+        />
+      )}
+
       {/* Orders List */}
+      {viewMode === 'list' && (
       <div className="space-y-4">
         {filteredOrders.map((order) => {
           const band = getBandById(order.bandId);
@@ -1038,8 +1078,9 @@ export const Ordenes = () => {
           );
         })}
       </div>
+      )}
 
-      {filteredOrders.length === 0 && (
+      {filteredOrders.length === 0 && viewMode === 'list' && (
         <div className="text-center py-12">
           <Calendar size={48} className="mx-auto text-gray-600 mb-4" />
           <p className="text-gray-400">No hay órdenes {filterStatus !== 'all' ? 'con este filtro' : ''}</p>
