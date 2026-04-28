@@ -2,6 +2,7 @@ import React from 'react';
 import { Sidebar } from './Sidebar';
 import { Header } from './Header';
 import { MobileNav } from './MobileNav';
+import { CommandPalette } from '../CommandPalette';
 import { Navigate, Outlet } from 'react-router-dom';
 import { useAuthStore } from '../../stores/authStore';
 
@@ -14,6 +15,9 @@ export const Layout = () => {
 
   return (
     <div className="w-full h-full min-h-screen min-h [-webkit-fill-available] bg-black text-white flex flex-col">
+      {/* Global ⌘K / Ctrl+K palette — mounted once at the layout root */}
+      <CommandPalette />
+
       {/* Mobile Navigation */}
       <MobileNav />
 

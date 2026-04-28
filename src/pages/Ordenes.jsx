@@ -18,6 +18,7 @@ import { Avatar } from '../components/ui/Avatar';
 import { Modal } from '../components/ui/Modal';
 import { Input } from '../components/ui/Input';
 import { ConfirmModal, SuccessModal, ErrorModal } from '../components/ui/ConfirmModal';
+import { OrderHistoryTimeline } from '../components/OrderHistoryTimeline';
 
 const dayLabels = {
   domingo: 'Domingo', lunes: 'Lunes', martes: 'Martes',
@@ -1263,11 +1264,23 @@ export const Ordenes = () => {
                   Devolución del Pastor
                 </label>
                 <textarea
-                  className="w-full h-24 bg-neutral-800 border border-neutral-700 rounded-xl px-4 py-3 resize-none"
+                  className="w-full h-24 bg-neutral-800 border border-neutral-700 rounded-xl px-4 py-3 resize-none focus:outline-none focus:ring-2 focus:ring-white/40"
                   placeholder="Agregar comentarios sobre la ejecución del servicio..."
                   value={viewingOrder.feedback || ''}
                   onChange={(e) => handleUpdateFeedback(viewingOrder.id, e.target.value)}
                 />
+              </div>
+            )}
+
+            {/* Pastor-only history timeline. RLS enforces the gate; the
+                component just renders empty for non-pastors so it's safe to
+                always mount it. */}
+            {isPastor && (
+              <div className="pt-4 border-t border-neutral-800">
+                <label className="text-xs text-gray-400 font-medium uppercase block mb-3">
+                  Historial de cambios
+                </label>
+                <OrderHistoryTimeline orderId={viewingOrder.id} />
               </div>
             )}
           </div>
