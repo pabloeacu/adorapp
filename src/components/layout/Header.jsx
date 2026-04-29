@@ -67,19 +67,45 @@ export const Header = () => {
   const [unreadCount, setUnreadCount] = useState(0);
   const [readNotificationIds, setReadNotificationIds] = useState([]);
 
-  // Load read notification IDs specific to current user
+  // Load read notification IDs for current user. Source of truth is the
+  // `notifications_read` table in DB (cross-device). localStorage is kept as
+  // an optimistic cache so the bell doesn't flicker between mount and first
+  // DB response.
   useEffect(() => {
-    if (user?.id) {
-      const userKey = `readNotificationIds_${user.id}`;
-      const saved = JSON.parse(localStorage.getItem(userKey) || '[]');
-      setReadNotificationIds(saved);
-      // Clean up old global key if exists (migration)
-      const oldKey = localStorage.getItem('readNotificationIds');
-      if (oldKey && !localStorage.getItem(userKey)) {
-        localStorage.setItem(userKey, oldKey);
-        localStorage.removeItem('readNotificationIds');
-      }
+    if (!user?.id) return;
+    const userKey = `readNotificationIds_${user.id}`;
+
+    // 1. Hydrate from localStorage immediately to avoid flicker.
+    const cached = JSON.parse(localStorage.getItem(userKey) || '[]');
+    setReadNotificationIds(cached);
+    // Migrate old global key if present (legacy).
+    const oldKey = localStorage.getItem('readNotificationIds');
+    if (oldKey && !localStorage.getItem(userKey)) {
+      localStorage.setItem(userKey, oldKey);
+      localStorage.removeItem('readNotificationIds');
     }
+
+    // 2. Replace with DB truth as soon as it arrives.
+    let cancelled = false;
+    (async () => {
+      const { data, error } = await supabase
+        .from('notifications_read')
+        .select('notification_id')
+        .eq('user_id', user.id);
+      if (cancelled) return;
+      if (error) {
+        console.error('Error fetching notifications_read:', error);
+        return;
+      }
+      const dbIds = (data || []).map((r) => r.notification_id);
+      // Union with the cache so any optimistic mark from this session that
+      // hasn't round-tripped yet doesn't disappear momentarily.
+      const merged = Array.from(new Set([...cached, ...dbIds]));
+      setReadNotificationIds(merged);
+      localStorage.setItem(userKey, JSON.stringify(merged));
+    })();
+
+    return () => { cancelled = true; };
   }, [user?.id]);
 
   // Custom success/error modals - replaces browser alerts
@@ -255,6 +281,24 @@ export const Header = () => {
         { event: 'UPDATE', schema: 'public', table: 'communication_notifications', filter: `recipient_id=eq.${user?.id}` },
         () => loadNotifications()
       )
+      // Same for notifications_read: when the same user marks a global notif
+      // as read on another device, that row INSERTs here too and the bell
+      // refreshes its readNotificationIds set so the badge count drops.
+      .on(
+        'postgres_changes',
+        { event: 'INSERT', schema: 'public', table: 'notifications_read', filter: `user_id=eq.${user?.id}` },
+        (payload) => {
+          const newId = payload?.new?.notification_id;
+          if (!newId) return;
+          setReadNotificationIds((prev) => {
+            if (prev.includes(newId)) return prev;
+            const next = [...prev, newId];
+            const userKey = `readNotificationIds_${user?.id}`;
+            try { localStorage.setItem(userKey, JSON.stringify(next)); } catch { /* ignore quota */ }
+            return next;
+          });
+        }
+      )
       .subscribe();
 
     return () => {
@@ -268,33 +312,67 @@ export const Header = () => {
     if (!user?.id) return;
     const userKey = `readNotificationIds_${user.id}`;
     const newReadIds = [...readNotificationIds, notificationId];
+    // Optimistic UI: update state + cache immediately so the bell reacts
+    // without waiting for the round-trip.
     setReadNotificationIds(newReadIds);
     localStorage.setItem(userKey, JSON.stringify(newReadIds));
     setUnreadCount(Math.max(0, unreadCount - 1));
 
-    // Read state of global notifs (devotional/reflection) lives in the
-    // per-user read list above — no extra localStorage to maintain.
     const notif = notifications.find(n => n.id === notificationId);
 
-    // Find if this is a communication notification
     if (notif?.type === 'communication' && notif?.communicationId) {
-      // Mark as read in database
+      // Communications track their own is_read column (one row per recipient).
       await supabase
         .from('communication_notifications')
         .update({ is_read: true })
         .eq('id', notificationId)
         .eq('recipient_id', user.id);
+    } else {
+      // Global notifications (devotional/reflection/song/band/member/order/request)
+      // persist read state per user in notifications_read so it syncs across
+      // devices. ON CONFLICT DO NOTHING via the (user_id, notification_id) PK.
+      await supabase
+        .from('notifications_read')
+        .upsert(
+          { user_id: user.id, notification_id: notificationId },
+          { onConflict: 'user_id,notification_id', ignoreDuplicates: true }
+        );
     }
   };
 
-  // Mark all as read (user-specific)
-  const markAllAsRead = () => {
+  // Mark all visible items as read.
+  const markAllAsRead = async () => {
     if (!user?.id) return;
     const userKey = `readNotificationIds_${user.id}`;
     const allIds = notifications.map(n => n.id);
     setReadNotificationIds(allIds);
     localStorage.setItem(userKey, JSON.stringify(allIds));
     setUnreadCount(0);
+
+    // Split by type: comms get is_read=true on their own row, the rest go
+    // through notifications_read.
+    const commIds = notifications
+      .filter((n) => n.type === 'communication')
+      .map((n) => n.id);
+    const globalIds = notifications
+      .filter((n) => n.type !== 'communication')
+      .map((n) => n.id);
+
+    if (commIds.length > 0) {
+      await supabase
+        .from('communication_notifications')
+        .update({ is_read: true })
+        .in('id', commIds)
+        .eq('recipient_id', user.id);
+    }
+    if (globalIds.length > 0) {
+      await supabase
+        .from('notifications_read')
+        .upsert(
+          globalIds.map((id) => ({ user_id: user.id, notification_id: id })),
+          { onConflict: 'user_id,notification_id', ignoreDuplicates: true }
+        );
+    }
   };
 
   const handleEditProfile = () => {
