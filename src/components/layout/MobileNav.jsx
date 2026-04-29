@@ -123,6 +123,33 @@ export const MobileNav = () => {
           });
         });
 
+        // Communications (separate shape: sender + subject + preview + full body).
+        if (user?.id) {
+          const { data: commNotifs } = await supabase
+            .from('communication_notifications')
+            .select('id, communication_id, sender_name, sender_photo, subject, preview, full_message, is_read, created_at')
+            .eq('recipient_id', user.id)
+            .eq('is_read', false)
+            .order('created_at', { ascending: false })
+            .limit(10);
+
+          (commNotifs || []).forEach((cn) => {
+            notifs.push({
+              id: cn.id,
+              type: 'communication',
+              communicationId: cn.communication_id,
+              senderName: cn.sender_name,
+              senderPhoto: cn.sender_photo,
+              subject: cn.subject,
+              preview: cn.preview,
+              fullMessage: cn.full_message,
+              message: cn.subject,
+              icon: 'send',
+              time: new Date(cn.created_at).toLocaleTimeString('es-AR', { hour: '2-digit', minute: '2-digit' }),
+            });
+          });
+        }
+
         setNotifications(notifs);
         const unread = notifs.filter((n) => !readNotificationIds.includes(n.id)).length;
         setUnreadCount(unread);
@@ -155,7 +182,7 @@ export const MobileNav = () => {
     };
   }, [readNotificationIds]);
 
-  const markAsRead = (notificationId) => {
+  const markAsRead = async (notificationId) => {
     const { user } = useAuthStore.getState();
     if (!user?.id) return;
     const userKey = `readNotificationIds_${user.id}`;
@@ -163,6 +190,17 @@ export const MobileNav = () => {
     setReadNotificationIds(newReadIds);
     localStorage.setItem(userKey, JSON.stringify(newReadIds));
     setUnreadCount(Math.max(0, unreadCount - 1));
+
+    // Communications also persist their read state in the DB so the same row
+    // doesn't reappear on the next load (the loader filters is_read=false).
+    const notif = notifications.find((n) => n.id === notificationId);
+    if (notif?.type === 'communication') {
+      await supabase
+        .from('communication_notifications')
+        .update({ is_read: true })
+        .eq('id', notificationId)
+        .eq('recipient_id', user.id);
+    }
   };
 
   const markAllAsRead = () => {
@@ -1217,6 +1255,7 @@ export const MobileNav = () => {
                             notif.type === 'request' ? 'bg-yellow-500/20' :
                             notif.type === 'devotional' ? 'bg-amber-500/20' :
                             notif.type === 'reflection' ? 'bg-indigo-500/20' :
+                            notif.type === 'communication' ? 'bg-blue-500/20' :
                             'bg-blue-500/20'
                           }`}>
                             {notif.icon === 'music' && <Music size={18} className="text-purple-400" />}
@@ -1226,13 +1265,45 @@ export const MobileNav = () => {
                             {notif.icon === 'cross' && <Cross size={18} className="text-amber-400" />}
                             {notif.icon === 'sunset' && <Sunset size={18} className="text-indigo-400" />}
                             {notif.icon === 'calendar' && <Calendar size={18} className="text-emerald-400" />}
+                            {notif.icon === 'send' && <Send size={18} className="text-blue-400" />}
                           </div>
                           <div className="flex-1">
-                            {notif.title && (
-                              <p className="text-sm text-white font-semibold leading-snug mb-1">{notif.title}</p>
+                            {notif.type === 'communication' ? (
+                              <>
+                                <div className="flex items-center gap-2 mb-1">
+                                  {notif.senderPhoto ? (
+                                    <img
+                                      src={notif.senderPhoto}
+                                      alt={notif.senderName}
+                                      className="w-5 h-5 rounded-full object-cover"
+                                    />
+                                  ) : (
+                                    <div className="w-5 h-5 rounded-full bg-blue-500/30 flex items-center justify-center">
+                                      <UserCircle size={12} className="text-blue-400" />
+                                    </div>
+                                  )}
+                                  <span className="text-xs text-blue-400 font-medium">{notif.senderName}</span>
+                                </div>
+                                <p className="text-sm text-white font-medium leading-relaxed">{notif.subject}</p>
+                                {notif.preview && (
+                                  <p className="text-xs text-gray-400 mt-1 leading-relaxed">{notif.preview}</p>
+                                )}
+                                {notif.fullMessage && notif.fullMessage !== notif.preview && (
+                                  <div className="mt-2 pt-2 border-t border-neutral-700">
+                                    <p className="text-sm text-gray-300 leading-relaxed">{notif.fullMessage}</p>
+                                  </div>
+                                )}
+                                <p className="text-xs text-gray-500 mt-1">{notif.time}</p>
+                              </>
+                            ) : (
+                              <>
+                                {notif.title && (
+                                  <p className="text-sm text-white font-semibold leading-snug mb-1">{notif.title}</p>
+                                )}
+                                <p className="text-sm text-gray-200 leading-relaxed">{notif.message}</p>
+                                <p className="text-xs text-gray-500 mt-1">{notif.time}</p>
+                              </>
                             )}
-                            <p className="text-sm text-gray-200 leading-relaxed">{notif.message}</p>
-                            <p className="text-xs text-gray-500 mt-1">{notif.time}</p>
                           </div>
                           <span className="w-2 h-2 bg-blue-500 rounded-full mt-2" />
                         </div>
