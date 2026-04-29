@@ -32,6 +32,21 @@ import { supabase } from '../../lib/supabase';
 import { useCurrentMember } from '../../hooks/useCurrentMember';
 import { PushToggle } from '../PushToggle';
 
+// Formato es-AR sin timezone shift — mismo helper que Header.jsx para mantener
+// paridad visual de fechas (cumpleaños, etc.) entre layouts.
+const formatDateLocal = (dateStr) => {
+  if (!dateStr) return '';
+  const parts = dateStr.split('T')[0].split('-');
+  if (parts.length !== 3) return dateStr;
+  const [year, month, day] = parts;
+  const date = new Date(parseInt(year), parseInt(month) - 1, parseInt(day));
+  return date.toLocaleDateString('es-AR', {
+    year: 'numeric',
+    month: 'long',
+    day: 'numeric',
+  });
+};
+
 const navItems = [
   { path: '/', icon: LayoutDashboard, label: 'Inicio' },
   { path: '/ordenes', icon: CalendarDays, label: 'Órdenes' },
@@ -223,7 +238,20 @@ export const MobileNav = () => {
   const location = useLocation();
   const { profile, logout, refreshProfile } = useAuthStore();
   const currentUserMember = useCurrentMember();
-  const isPastor = profile?.role === 'pastor';
+  // CRITICAL: derive role from members table (single source of truth), same as
+  // Header.jsx. authStore.profile may be stale after a role change in DB.
+  const isPastor = (currentUserMember?.role || profile?.role) === 'pastor';
+  const displayName = currentUserMember?.name || profile?.name || 'Usuario';
+  const displayRole = currentUserMember?.role || profile?.role || 'member';
+  const displayPhoto =
+    currentUserMember?.avatar_url ||
+    currentUserMember?.avatarUrl ||
+    profile?.avatar_url ||
+    profile?.avatarUrl;
+  const displayPhone = currentUserMember?.phone || profile?.phone;
+  const displayPastorArea = currentUserMember?.pastor_area || profile?.pastor_area;
+  const displayLeaderOf = currentUserMember?.leader_of || profile?.leader_of;
+  const displayBirthdate = currentUserMember?.birthdate || profile?.birthdate;
 
   // Add Solicitudes & Comunicaciones for pastors only
   const allNavItems = useMemo(() => {
@@ -254,11 +282,11 @@ export const MobileNav = () => {
   const handleEditProfileClick = (e) => {
     e.stopPropagation();
     setEditMode(true);
-    setEditName(profile?.name || '');
-    setEditPhone(profile?.phone || '');
-    setEditPastorArea(profile?.pastor_area || '');
-    setEditLeaderOf(profile?.leader_of || '');
-    setEditBirthdate(profile?.birthdate || '');
+    setEditName(displayName === 'Usuario' ? '' : displayName);
+    setEditPhone(displayPhone || '');
+    setEditPastorArea(displayPastorArea || '');
+    setEditLeaderOf(displayLeaderOf || '');
+    setEditBirthdate(displayBirthdate || '');
   };
 
   const handleMouseDown = (e) => {
@@ -308,10 +336,19 @@ export const MobileNav = () => {
         birthdate: editBirthdate || null
       };
 
+      // Use members.id (PK) like Header does. Targeting eq('user_id', profile?.user_id)
+      // would silently miss the row when authStore.profile.user_id wasn't populated,
+      // and could in theory match a different member if user_id wiring drifted.
+      const memberIdToUpdate = currentUserMember?.id;
+      if (!memberIdToUpdate) {
+        alert('No pudimos identificar tu fila de miembro. Probá recargar la página.');
+        return;
+      }
+
       const { error } = await supabase
         .from('members')
         .update(updateData)
-        .eq('user_id', profile?.user_id);
+        .eq('id', memberIdToUpdate);
 
       if (error) {
         console.error('Error updating profile:', error);
@@ -587,10 +624,10 @@ export const MobileNav = () => {
             }}
             className="flex items-center gap-2 p-1 rounded-full hover:bg-neutral-800 transition-colors"
           >
-            {profile?.avatar_url ? (
+            {displayPhoto ? (
               <img
-                src={profile.avatar_url}
-                alt={profile?.name}
+                src={displayPhoto}
+                alt={displayName}
                 className="w-8 h-8 rounded-full object-cover border-2 border-neutral-700"
               />
             ) : (
@@ -653,10 +690,10 @@ export const MobileNav = () => {
                   {/* Profile Photo with Edit */}
                   <div className="flex flex-col items-center mb-6">
                     <div className="relative">
-                      {profile?.avatar_url ? (
+                      {displayPhoto ? (
                         <img
-                          src={profile.avatar_url}
-                          alt={profile?.name}
+                          src={displayPhoto}
+                          alt={displayName}
                           className="w-20 h-20 rounded-full object-cover border-2 border-neutral-700"
                         />
                       ) : (
@@ -766,10 +803,10 @@ export const MobileNav = () => {
                   {/* Profile Info */}
                   <div className="flex items-center gap-4 mb-6">
                     <div className="relative">
-                      {profile?.avatar_url ? (
+                      {displayPhoto ? (
                         <img
-                          src={profile.avatar_url}
-                          alt={profile?.name}
+                          src={displayPhoto}
+                          alt={displayName}
                           className="w-16 h-16 rounded-full object-cover border-2 border-neutral-700"
                         />
                       ) : (
@@ -785,9 +822,9 @@ export const MobileNav = () => {
                       </button>
                     </div>
                     <div>
-                      <h3 className="text-white font-semibold text-lg">{profile?.name || 'Usuario'}</h3>
+                      <h3 className="text-white font-semibold text-lg">{displayName}</h3>
                       <p className="text-neutral-400 text-sm capitalize">
-                        {profile?.role === 'pastor' ? 'Pastor' : profile?.role === 'leader' ? 'Líder' : 'Miembro'}
+                        {displayRole === 'pastor' ? 'Pastor' : displayRole === 'leader' ? 'Líder' : 'Miembro'}
                       </p>
                     </div>
                   </div>
@@ -800,7 +837,7 @@ export const MobileNav = () => {
                       </div>
                       <div className="flex-1">
                         <p className="text-xs text-neutral-500">Teléfono</p>
-                        <p className="text-white text-sm">{profile?.phone || 'No configurado'}</p>
+                        <p className="text-white text-sm">{displayPhone || 'No configurado'}</p>
                       </div>
                     </div>
                     <div className="flex items-center gap-3">
@@ -809,7 +846,7 @@ export const MobileNav = () => {
                       </div>
                       <div className="flex-1">
                         <p className="text-xs text-neutral-500">Pastor de área</p>
-                        <p className="text-white text-sm">{profile?.pastor_area || 'No configurado'}</p>
+                        <p className="text-white text-sm">{displayPastorArea || 'No configurado'}</p>
                       </div>
                     </div>
                     <div className="flex items-center gap-3">
@@ -818,7 +855,7 @@ export const MobileNav = () => {
                       </div>
                       <div className="flex-1">
                         <p className="text-xs text-neutral-500">Líder de</p>
-                        <p className="text-white text-sm">{profile?.leader_of || 'No configurado'}</p>
+                        <p className="text-white text-sm">{displayLeaderOf || 'No configurado'}</p>
                       </div>
                     </div>
                     <div className="flex items-center gap-3">
@@ -827,7 +864,7 @@ export const MobileNav = () => {
                       </div>
                       <div className="flex-1">
                         <p className="text-xs text-neutral-500">Fecha de nacimiento</p>
-                        <p className="text-white text-sm">{profile?.birthdate || 'No configurada'}</p>
+                        <p className="text-white text-sm">{displayBirthdate ? formatDateLocal(displayBirthdate) : 'No configurada'}</p>
                       </div>
                     </div>
                   </div>
@@ -900,10 +937,10 @@ export const MobileNav = () => {
 
               <div className="flex flex-col items-center mb-6">
                 <div className="w-32 h-32 rounded-full bg-neutral-800 flex items-center justify-center mb-4 overflow-hidden border-2 border-neutral-700">
-                  {profile?.avatar_url ? (
+                  {displayPhoto ? (
                     <img
-                      src={profile.avatar_url}
-                      alt={profile?.name}
+                      src={displayPhoto}
+                      alt={displayName}
                       className="w-full h-full object-cover"
                     />
                   ) : (
@@ -1123,10 +1160,10 @@ export const MobileNav = () => {
           >
             <div className="flex items-center justify-between px-5 mb-6">
               <div className="flex items-center gap-3">
-                {profile?.avatar_url ? (
+                {displayPhoto ? (
                   <img
-                    src={profile.avatar_url}
-                    alt={profile?.name}
+                    src={displayPhoto}
+                    alt={displayName}
                     className="w-10 h-10 rounded-full object-cover"
                   />
                 ) : (
@@ -1135,9 +1172,9 @@ export const MobileNav = () => {
                   </div>
                 )}
                 <div>
-                  <p className="text-white font-medium">{profile?.name || 'Usuario'}</p>
+                  <p className="text-white font-medium">{displayName}</p>
                   <p className="text-neutral-500 text-sm capitalize">
-                    {profile?.role === 'pastor' ? 'Pastor' : profile?.role === 'leader' ? 'Líder' : 'Miembro'}
+                    {displayRole === 'pastor' ? 'Pastor' : displayRole === 'leader' ? 'Líder' : 'Miembro'}
                   </p>
                 </div>
               </div>
