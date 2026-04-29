@@ -51,6 +51,7 @@ export const Sidebar = () => {
             <NavLink
               key={path}
               to={path}
+              data-tour={`nav-${path === '/' ? 'inicio' : path.replace('/', '')}`}
               className={({ isActive }) =>
                 `flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-medium transition-all duration-200 ${
                   isActive

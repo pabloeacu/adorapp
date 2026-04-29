@@ -25,12 +25,17 @@ import {
   Bell,
   Music,
   Heart,
-  Sunset
+  Sunset,
+  Search,
+  Lock,
+  Eye,
+  EyeOff,
 } from 'lucide-react';
 import { useAuthStore } from '../../stores/authStore';
 import { supabase } from '../../lib/supabase';
 import { useCurrentMember } from '../../hooks/useCurrentMember';
 import { PushToggle } from '../PushToggle';
+import { titleForPath } from '../../lib/pageTitles';
 
 // Formato es-AR sin timezone shift — mismo helper que Header.jsx para mantener
 // paridad visual de fechas (cumpleaños, etc.) entre layouts.
@@ -55,22 +60,19 @@ const navItems = [
   { path: '/miembros', icon: UserCircle, label: 'Miembros' },
 ];
 
-// Page titles shown in the mobile header so users always know where they are.
-// Kept in sync with the desktop pageTitles map in Header.jsx.
-const pageTitles = {
-  '/': 'Inicio',
-  '/ordenes': 'Órdenes',
-  '/repertorio': 'Repertorio',
-  '/bandas': 'Bandas',
-  '/miembros': 'Miembros',
-  '/solicitudes': 'Solicitudes',
-  '/comunicaciones': 'Comunicaciones',
-};
+// pageTitles lives in src/lib/pageTitles.js — single source of truth shared
+// with Header so both layouts always show the same name for each page.
 
 export const MobileNav = () => {
   const [menuOpen, setMenuOpen] = useState(false);
   const [profileOpen, setProfileOpen] = useState(false);
   const [showPhotoModal, setShowPhotoModal] = useState(false);
+  const [showPasswordChange, setShowPasswordChange] = useState(false);
+  const [pwNew, setPwNew] = useState('');
+  const [pwConfirm, setPwConfirm] = useState('');
+  const [pwSaving, setPwSaving] = useState(false);
+  const [pwShowNew, setPwShowNew] = useState(false);
+  const [pwShowConfirm, setPwShowConfirm] = useState(false);
   const [editMode, setEditMode] = useState(false);
   const [showCropper, setShowCropper] = useState(false);
   const [previewUrl, setPreviewUrl] = useState(null);
@@ -177,8 +179,13 @@ export const MobileNav = () => {
     const interval = setInterval(loadNotifications, 2 * 60 * 1000);
 
     const { user } = useAuthStore.getState();
+    // Use a per-user channel name (no `-mobile-` suffix) so a user with the
+    // app open on both desktop and mobile lands on the same logical channel.
+    // Each browser still gets its own websocket — supabase-js scopes channels
+    // per client — but the name being identical makes the intent clearer and
+    // matches the Header naming.
     const channel = supabase
-      .channel(`bell-mobile-${user?.id || 'anon'}`)
+      .channel(`bell-${user?.id || 'anon'}-mobile`)
       .on(
         'postgres_changes',
         { event: 'INSERT', schema: 'public', table: 'notifications' },
@@ -187,6 +194,15 @@ export const MobileNav = () => {
       .on(
         'postgres_changes',
         { event: 'INSERT', schema: 'public', table: 'communication_notifications', filter: `recipient_id=eq.${user?.id}` },
+        () => loadNotifications()
+      )
+      // Listen for UPDATE too: when the user marks a comm as read on another
+      // device (Header / desktop), is_read=true persists in DB and we want the
+      // mobile bell to drop that row instantly instead of waiting for the next
+      // 2-min poll.
+      .on(
+        'postgres_changes',
+        { event: 'UPDATE', schema: 'public', table: 'communication_notifications', filter: `recipient_id=eq.${user?.id}` },
         () => loadNotifications()
       )
       .subscribe();
@@ -361,6 +377,39 @@ export const MobileNav = () => {
     } catch (err) {
       console.error('Error saving profile:', err);
       alert('Error al guardar los cambios');
+    }
+  };
+
+  // Change own password — same flow as Header.jsx, simpler UI (alerts vs modals)
+  // since MobileNav doesn't have the success/error modal infrastructure.
+  const handleChangePassword = async () => {
+    if (!pwNew.trim()) {
+      alert('Ingresá la nueva contraseña.');
+      return;
+    }
+    if (pwNew.length < 6) {
+      alert('La contraseña debe tener al menos 6 caracteres.');
+      return;
+    }
+    if (pwNew !== pwConfirm) {
+      alert('Las contraseñas no coinciden.');
+      return;
+    }
+    setPwSaving(true);
+    try {
+      const { error } = await supabase.auth.updateUser({ password: pwNew });
+      if (error) throw error;
+      setShowPasswordChange(false);
+      setPwNew('');
+      setPwConfirm('');
+      setPwShowNew(false);
+      setPwShowConfirm(false);
+      alert('Contraseña actualizada correctamente.');
+    } catch (err) {
+      console.error('Error changing password:', err);
+      alert('No se pudo cambiar la contraseña. Probá de nuevo.');
+    } finally {
+      setPwSaving(false);
     }
   };
 
@@ -596,9 +645,22 @@ export const MobileNav = () => {
           <div className="flex items-center gap-3 min-w-0 flex-1">
             <img src="/logo.png" alt="AdorAPP" className="w-8 h-8 rounded-lg object-contain shrink-0" />
             <h1 className="text-base font-semibold text-white truncate">
-              {pageTitles[location.pathname] || 'AdorAPP'}
+              {titleForPath(location.pathname)}
             </h1>
           </div>
+
+          {/* Search — opens the same CommandPalette desktop has on Cmd/Ctrl+K */}
+          <button
+            onClick={(e) => {
+              e.stopPropagation();
+              window.dispatchEvent(new CustomEvent('openCommandPalette'));
+            }}
+            className="p-2 rounded-full hover:bg-neutral-800 transition-colors"
+            title="Buscar"
+            aria-label="Buscar"
+          >
+            <Search size={22} className="text-neutral-400 hover:text-white transition-colors" />
+          </button>
 
           {/* Notification Bell - Left of profile */}
           <button
@@ -894,6 +956,22 @@ export const MobileNav = () => {
                     <div className="px-1">
                       <PushToggle memberId={currentUserMember?.id} />
                     </div>
+
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        setProfileOpen(false);
+                        setPwNew('');
+                        setPwConfirm('');
+                        setPwShowNew(false);
+                        setPwShowConfirm(false);
+                        setShowPasswordChange(true);
+                      }}
+                      className="w-full flex items-center gap-4 px-4 py-4 rounded-xl hover:bg-neutral-800 transition-colors"
+                    >
+                      <Lock size={20} className="text-neutral-400" />
+                      <span className="flex-1 text-left text-white font-medium">Cambiar contraseña</span>
+                    </button>
 
                     <button
                       onClick={handleLogout}
@@ -1206,6 +1284,107 @@ export const MobileNav = () => {
                 );
               })}
             </nav>
+          </div>
+        </div>
+      )}
+
+      {/* Password Change Modal */}
+      {showPasswordChange && (
+        <div
+          className="lg:hidden fixed inset-0 z-[70] bg-black/85 backdrop-blur-sm flex items-end sm:items-center justify-center"
+          onClick={(e) => {
+            if (e.target === e.currentTarget) setShowPasswordChange(false);
+          }}
+        >
+          <div
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="mobile-pw-title"
+            className="w-full sm:max-w-md bg-neutral-900 border-t sm:border border-neutral-800 sm:rounded-2xl rounded-t-3xl p-5 max-h-[90dvh] overflow-y-auto"
+          >
+            <div className="flex items-center justify-between mb-4">
+              <h2 id="mobile-pw-title" className="text-lg font-semibold text-white flex items-center gap-2">
+                <Lock size={18} /> Cambiar contraseña
+              </h2>
+              <button
+                onClick={() => setShowPasswordChange(false)}
+                className="p-2 rounded-full hover:bg-neutral-800 text-gray-400 hover:text-white"
+                aria-label="Cerrar"
+              >
+                <X size={18} />
+              </button>
+            </div>
+
+            <p className="text-sm text-gray-400 mb-4">
+              La nueva contraseña debe tener al menos 6 caracteres.
+            </p>
+
+            <label className="block mb-3">
+              <span className="text-xs uppercase text-gray-500 block mb-1">Nueva contraseña</span>
+              <div className="relative">
+                <input
+                  type={pwShowNew ? 'text' : 'password'}
+                  value={pwNew}
+                  onChange={(e) => setPwNew(e.target.value)}
+                  autoComplete="new-password"
+                  className="w-full px-4 py-2.5 pr-10 bg-neutral-800 border border-neutral-700 rounded-lg focus:outline-none focus:ring-2 focus:ring-white/40 focus:border-white text-white"
+                />
+                <button
+                  type="button"
+                  onClick={() => setPwShowNew((v) => !v)}
+                  className="absolute right-2 top-1/2 -translate-y-1/2 p-1.5 text-gray-400 hover:text-white"
+                  aria-label={pwShowNew ? 'Ocultar' : 'Mostrar'}
+                >
+                  {pwShowNew ? <EyeOff size={16} /> : <Eye size={16} />}
+                </button>
+              </div>
+            </label>
+
+            <label className="block mb-2">
+              <span className="text-xs uppercase text-gray-500 block mb-1">Confirmar contraseña</span>
+              <div className="relative">
+                <input
+                  type={pwShowConfirm ? 'text' : 'password'}
+                  value={pwConfirm}
+                  onChange={(e) => setPwConfirm(e.target.value)}
+                  autoComplete="new-password"
+                  className={`w-full px-4 py-2.5 pr-10 bg-neutral-800 border rounded-lg focus:outline-none focus:ring-2 text-white ${
+                    pwConfirm && pwConfirm !== pwNew
+                      ? 'border-red-500 focus:ring-red-500/40'
+                      : pwConfirm && pwConfirm === pwNew
+                      ? 'border-green-500 focus:ring-green-500/40'
+                      : 'border-neutral-700 focus:ring-white/40 focus:border-white'
+                  }`}
+                />
+                <button
+                  type="button"
+                  onClick={() => setPwShowConfirm((v) => !v)}
+                  className="absolute right-2 top-1/2 -translate-y-1/2 p-1.5 text-gray-400 hover:text-white"
+                  aria-label={pwShowConfirm ? 'Ocultar' : 'Mostrar'}
+                >
+                  {pwShowConfirm ? <EyeOff size={16} /> : <Eye size={16} />}
+                </button>
+              </div>
+              {pwConfirm && pwConfirm !== pwNew && (
+                <span className="text-xs text-red-400 mt-1 inline-block">Las contraseñas no coinciden.</span>
+              )}
+            </label>
+
+            <div className="flex gap-2 pt-3">
+              <button
+                onClick={() => setShowPasswordChange(false)}
+                className="flex-1 py-2.5 bg-neutral-800 hover:bg-neutral-700 rounded-lg text-white font-medium"
+              >
+                Cancelar
+              </button>
+              <button
+                onClick={handleChangePassword}
+                disabled={pwSaving || !pwNew || !pwConfirm || pwNew !== pwConfirm}
+                className="flex-1 py-2.5 bg-white text-black font-semibold rounded-lg hover:bg-gray-200 disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                {pwSaving ? 'Guardando…' : 'Guardar'}
+              </button>
+            </div>
           </div>
         </div>
       )}

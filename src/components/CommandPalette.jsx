@@ -41,7 +41,9 @@ export function CommandPalette() {
   const { user } = useAuthStore();
   const isPastor = useCurrentRole() === 'pastor';
 
-  // Open on Cmd/Ctrl+K from anywhere.
+  // Open on Cmd/Ctrl+K from anywhere (desktop), or on a custom event dispatched
+  // by mobile UI (where there's no keyboard) so the palette is reachable from
+  // the mobile header search button.
   useEffect(() => {
     const onKey = (e) => {
       const meta = e.metaKey || e.ctrlKey;
@@ -51,8 +53,13 @@ export function CommandPalette() {
       }
       if (e.key === 'Escape' && open) setOpen(false);
     };
+    const onOpenEvent = () => setOpen(true);
     window.addEventListener('keydown', onKey);
-    return () => window.removeEventListener('keydown', onKey);
+    window.addEventListener('openCommandPalette', onOpenEvent);
+    return () => {
+      window.removeEventListener('keydown', onKey);
+      window.removeEventListener('openCommandPalette', onOpenEvent);
+    };
   }, [open]);
 
   // All hooks must run unconditionally (rules of hooks).
