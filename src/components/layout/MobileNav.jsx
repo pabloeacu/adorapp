@@ -88,14 +88,38 @@ export const MobileNav = () => {
   const [unreadCount, setUnreadCount] = useState(0);
   const [readNotificationIds, setReadNotificationIds] = useState([]);
 
-  // Load read notification IDs for current user
+  // Load read notification IDs for current user. Source of truth is the
+  // `notifications_read` table in DB (cross-device). localStorage is kept as
+  // an optimistic cache so the bell doesn't flicker between mount and the
+  // first DB response.
   useEffect(() => {
     const { user } = useAuthStore.getState();
-    if (user?.id) {
-      const userKey = `readNotificationIds_${user.id}`;
-      const saved = JSON.parse(localStorage.getItem(userKey) || '[]');
-      setReadNotificationIds(saved);
-    }
+    if (!user?.id) return;
+    const userKey = `readNotificationIds_${user.id}`;
+
+    // 1. Hydrate from cache immediately.
+    const cached = JSON.parse(localStorage.getItem(userKey) || '[]');
+    setReadNotificationIds(cached);
+
+    // 2. Replace with DB truth as soon as it arrives.
+    let cancelled = false;
+    (async () => {
+      const { data, error } = await supabase
+        .from('notifications_read')
+        .select('notification_id')
+        .eq('user_id', user.id);
+      if (cancelled) return;
+      if (error) {
+        console.error('Error fetching notifications_read:', error);
+        return;
+      }
+      const dbIds = (data || []).map((r) => r.notification_id);
+      const merged = Array.from(new Set([...cached, ...dbIds]));
+      setReadNotificationIds(merged);
+      localStorage.setItem(userKey, JSON.stringify(merged));
+    })();
+
+    return () => { cancelled = true; };
   }, []);
 
   // Load notifications from `notifications` (globals + per-user) and
@@ -205,6 +229,24 @@ export const MobileNav = () => {
         { event: 'UPDATE', schema: 'public', table: 'communication_notifications', filter: `recipient_id=eq.${user?.id}` },
         () => loadNotifications()
       )
+      // Same for notifications_read: when this user marks a global notif as
+      // read on another device, the INSERT lands here too — we patch the local
+      // readNotificationIds set so the badge count drops instantly.
+      .on(
+        'postgres_changes',
+        { event: 'INSERT', schema: 'public', table: 'notifications_read', filter: `user_id=eq.${user?.id}` },
+        (payload) => {
+          const newId = payload?.new?.notification_id;
+          if (!newId) return;
+          setReadNotificationIds((prev) => {
+            if (prev.includes(newId)) return prev;
+            const next = [...prev, newId];
+            const userKey = `readNotificationIds_${user?.id}`;
+            try { localStorage.setItem(userKey, JSON.stringify(next)); } catch { /* ignore quota */ }
+            return next;
+          });
+        }
+      )
       .subscribe();
 
     return () => {
@@ -218,23 +260,33 @@ export const MobileNav = () => {
     if (!user?.id) return;
     const userKey = `readNotificationIds_${user.id}`;
     const newReadIds = [...readNotificationIds, notificationId];
+    // Optimistic UI: update state + cache immediately.
     setReadNotificationIds(newReadIds);
     localStorage.setItem(userKey, JSON.stringify(newReadIds));
     setUnreadCount(Math.max(0, unreadCount - 1));
 
-    // Communications also persist their read state in the DB so the same row
-    // doesn't reappear on the next load (the loader filters is_read=false).
     const notif = notifications.find((n) => n.id === notificationId);
+
     if (notif?.type === 'communication') {
+      // Communications track is_read per-row.
       await supabase
         .from('communication_notifications')
         .update({ is_read: true })
         .eq('id', notificationId)
         .eq('recipient_id', user.id);
+    } else {
+      // Global notifications persist read state in notifications_read so it
+      // syncs across devices via Realtime.
+      await supabase
+        .from('notifications_read')
+        .upsert(
+          { user_id: user.id, notification_id: notificationId },
+          { onConflict: 'user_id,notification_id', ignoreDuplicates: true }
+        );
     }
   };
 
-  const markAllAsRead = () => {
+  const markAllAsRead = async () => {
     const { user } = useAuthStore.getState();
     if (!user?.id) return;
     const userKey = `readNotificationIds_${user.id}`;
@@ -242,6 +294,25 @@ export const MobileNav = () => {
     setReadNotificationIds(allIds);
     localStorage.setItem(userKey, JSON.stringify(allIds));
     setUnreadCount(0);
+
+    const commIds = notifications.filter((n) => n.type === 'communication').map((n) => n.id);
+    const globalIds = notifications.filter((n) => n.type !== 'communication').map((n) => n.id);
+
+    if (commIds.length > 0) {
+      await supabase
+        .from('communication_notifications')
+        .update({ is_read: true })
+        .in('id', commIds)
+        .eq('recipient_id', user.id);
+    }
+    if (globalIds.length > 0) {
+      await supabase
+        .from('notifications_read')
+        .upsert(
+          globalIds.map((id) => ({ user_id: user.id, notification_id: id })),
+          { onConflict: 'user_id,notification_id', ignoreDuplicates: true }
+        );
+    }
   };
 
   // Edit profile form state
