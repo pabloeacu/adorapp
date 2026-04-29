@@ -35,6 +35,7 @@ import { useAuthStore } from '../../stores/authStore';
 import { supabase } from '../../lib/supabase';
 import { useCurrentMember } from '../../hooks/useCurrentMember';
 import { PushToggle } from '../PushToggle';
+import { titleForPath } from '../../lib/pageTitles';
 
 // Formato es-AR sin timezone shift — mismo helper que Header.jsx para mantener
 // paridad visual de fechas (cumpleaños, etc.) entre layouts.
@@ -59,17 +60,8 @@ const navItems = [
   { path: '/miembros', icon: UserCircle, label: 'Miembros' },
 ];
 
-// Page titles shown in the mobile header so users always know where they are.
-// Kept in sync with the desktop pageTitles map in Header.jsx.
-const pageTitles = {
-  '/': 'Inicio',
-  '/ordenes': 'Órdenes',
-  '/repertorio': 'Repertorio',
-  '/bandas': 'Bandas',
-  '/miembros': 'Miembros',
-  '/solicitudes': 'Solicitudes',
-  '/comunicaciones': 'Comunicaciones',
-};
+// pageTitles lives in src/lib/pageTitles.js — single source of truth shared
+// with Header so both layouts always show the same name for each page.
 
 export const MobileNav = () => {
   const [menuOpen, setMenuOpen] = useState(false);
@@ -187,8 +179,13 @@ export const MobileNav = () => {
     const interval = setInterval(loadNotifications, 2 * 60 * 1000);
 
     const { user } = useAuthStore.getState();
+    // Use a per-user channel name (no `-mobile-` suffix) so a user with the
+    // app open on both desktop and mobile lands on the same logical channel.
+    // Each browser still gets its own websocket — supabase-js scopes channels
+    // per client — but the name being identical makes the intent clearer and
+    // matches the Header naming.
     const channel = supabase
-      .channel(`bell-mobile-${user?.id || 'anon'}`)
+      .channel(`bell-${user?.id || 'anon'}-mobile`)
       .on(
         'postgres_changes',
         { event: 'INSERT', schema: 'public', table: 'notifications' },
@@ -197,6 +194,15 @@ export const MobileNav = () => {
       .on(
         'postgres_changes',
         { event: 'INSERT', schema: 'public', table: 'communication_notifications', filter: `recipient_id=eq.${user?.id}` },
+        () => loadNotifications()
+      )
+      // Listen for UPDATE too: when the user marks a comm as read on another
+      // device (Header / desktop), is_read=true persists in DB and we want the
+      // mobile bell to drop that row instantly instead of waiting for the next
+      // 2-min poll.
+      .on(
+        'postgres_changes',
+        { event: 'UPDATE', schema: 'public', table: 'communication_notifications', filter: `recipient_id=eq.${user?.id}` },
         () => loadNotifications()
       )
       .subscribe();
@@ -639,7 +645,7 @@ export const MobileNav = () => {
           <div className="flex items-center gap-3 min-w-0 flex-1">
             <img src="/logo.png" alt="AdorAPP" className="w-8 h-8 rounded-lg object-contain shrink-0" />
             <h1 className="text-base font-semibold text-white truncate">
-              {pageTitles[location.pathname] || 'AdorAPP'}
+              {titleForPath(location.pathname)}
             </h1>
           </div>
 
