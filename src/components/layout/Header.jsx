@@ -10,6 +10,7 @@ import { Avatar } from '../ui/Avatar';
 import { Modal } from '../ui/Modal';
 import { PushToggle } from '../PushToggle';
 import { Button } from '../ui/Button';
+import { titleForPath } from '../../lib/pageTitles';
 
 // Helper to format dates WITHOUT timezone shift (for birthdates and stored dates)
 // When we store YYYY-MM-DD, we want to display it as-is, not shifted by timezone
@@ -28,13 +29,8 @@ const formatDateLocal = (dateStr) => {
   });
 };
 
-const pageTitles = {
-  '/': 'Dashboard',
-  '/ordenes': 'Órdenes de Servicio',
-  '/repertorio': 'Repertorio',
-  '/bandas': 'Bandas',
-  '/miembros': 'Miembros',
-};
+// pageTitles lives in src/lib/pageTitles.js — single source of truth shared
+// with MobileNav so both layouts always show the same name for each page.
 
 export const Header = () => {
   const location = useLocation();
@@ -91,7 +87,7 @@ export const Header = () => {
   const [errorModal, setErrorModal] = useState({ isOpen: false, title: '', message: '' });
   const canvasRef = useRef(null);
   const fileInputRef = useRef(null);
-  const title = pageTitles[location.pathname] || 'AdorAPP';
+  const title = titleForPath(location.pathname);
 
 
   // CRITICAL: Get profile from appStore.members (single source of truth for role, name, photo)
@@ -239,7 +235,7 @@ export const Header = () => {
     // up to 2 minutes for the next poll. One subscription on `notifications`
     // covers globals + per-user (the trigger pipeline writes both there).
     const channel = supabase
-      .channel(`bell-${user?.id || 'anon'}`)
+      .channel(`bell-${user?.id || 'anon'}-desktop`)
       .on(
         'postgres_changes',
         { event: 'INSERT', schema: 'public', table: 'notifications' },
@@ -248,6 +244,15 @@ export const Header = () => {
       .on(
         'postgres_changes',
         { event: 'INSERT', schema: 'public', table: 'communication_notifications', filter: `recipient_id=eq.${user?.id}` },
+        () => loadNotifications()
+      )
+      // Listen for UPDATE too: when the user marks a comm as read on another
+      // device (mobile / PWA), is_read=true persists in DB and we want the
+      // desktop bell to drop that row instantly instead of waiting for the
+      // next 2-min poll.
+      .on(
+        'postgres_changes',
+        { event: 'UPDATE', schema: 'public', table: 'communication_notifications', filter: `recipient_id=eq.${user?.id}` },
         () => loadNotifications()
       )
       .subscribe();
