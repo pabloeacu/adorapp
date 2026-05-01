@@ -30,7 +30,7 @@ export async function callAdminFunction(name, body) {
         const parsed = await error.context.json();
         detail = parsed?.error || parsed?.detail || detail;
       }
-    } catch (_) {
+    } catch {
       // ignore parse errors, keep the original message
     }
     return { error: detail };

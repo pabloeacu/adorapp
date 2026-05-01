@@ -2,8 +2,8 @@ import React, { useState, useMemo, useEffect } from 'react';
 import { useDocumentTitle } from '../hooks/useDocumentTitle';
 import { useSearchParams } from 'react-router-dom';
 import {
-  Plus, Search, Mail, Phone, Shield, MoreVertical, Edit, Trash2,
-  UserPlus, Check, X, ChevronDown, ChevronUp, Filter, Lock, Key,
+  Plus, Search, Mail, Phone, Shield, Edit, Trash2,
+  UserPlus, Check, X, Filter, Key,
   LayoutGrid, List, AlertTriangle, UserX, Cross, Users2, Calendar
 } from 'lucide-react';
 import { useAppStore, MEMBER_ROLES, INSTRUMENTS } from '../stores/appStore';
@@ -43,7 +43,6 @@ export const Miembros = () => {
   const { user, profile } = useAuthStore();
   const [searchParams, setSearchParams] = useSearchParams();
   const isPastor = profile?.role === 'pastor';
-  const isLeader = profile?.role === 'leader';
 
   const [searchTerm, setSearchTerm] = useState('');
   const [filterRole, setFilterRole] = useState('all');
@@ -169,12 +168,17 @@ export const Miembros = () => {
       // Find the current user's member record
       const currentUserMember = members.find(m => m.userId === user.id);
       if (currentUserMember) {
+        // eslint-disable-next-line react-hooks/set-state-in-effect
         handleOpenModal(currentUserMember);
       }
       // Clear the URL param after handling
       setSearchParams({});
     }
-  }, [searchParams, members, user, handleOpenModal]);
+    // handleOpenModal is intentionally excluded — wrapping it in useCallback
+    // would just push the same problem one level up. The effect only needs to
+    // re-run when the URL param or auth/members data change.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [searchParams, members, user]);
 
   const handleCloseModal = () => {
     setIsModalOpen(false);

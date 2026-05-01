@@ -2,7 +2,7 @@ import React, { useState, useMemo, useRef, useEffect } from 'react';
 import { useDocumentTitle } from '../hooks/useDocumentTitle';
 // jspdf is loaded on demand inside generateSongPDF (~140 KB; no need at first paint).
 import {
-  Plus, Search, Music, Download, Edit, Trash2, Clock, MoreVertical,
+  Plus, Search, Music, Edit, Trash2, Clock,
   Eye, ExternalLink, Filter, X, GripVertical, Music2, Save,
   LayoutGrid, List, FileDown, AlertTriangle, ChevronDown
 } from 'lucide-react';
@@ -270,7 +270,6 @@ export const Repertorio = () => {
 
   const addStructureSection = () => {
     setFormData(prev => {
-      const newIndex = prev.structure.length;
       const newLabel = getDefaultSectionLabel('verse', prev.structure);
       return {
         ...prev,

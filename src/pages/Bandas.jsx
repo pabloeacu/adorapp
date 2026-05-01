@@ -1,8 +1,8 @@
 import React, { useState } from 'react';
 import { useDocumentTitle } from '../hooks/useDocumentTitle';
 import {
-  Plus, Users, Calendar, Clock, MoreVertical, Edit, Trash2,
-  Music, Check, X, UserPlus, Shield, ChevronDown, AlertTriangle
+  Plus, Users, Calendar, Clock, Edit, Trash2,
+  Check, ChevronDown, AlertTriangle
 } from 'lucide-react';
 import { useAppStore, MEETING_TYPES } from '../stores/appStore';
 import { useCurrentRole } from '../hooks/useCurrentMember';
@@ -34,7 +34,6 @@ export const Bandas = () => {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingBand, setEditingBand] = useState(null);
   const [expandedBand, setExpandedBand] = useState(null);
-  const [showAddMembers, setShowAddMembers] = useState(null);
 
   const [formData, setFormData] = useState({
     name: '',

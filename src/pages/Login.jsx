@@ -5,7 +5,7 @@ import { useAuthStore } from '../stores/authStore';
 import { useNavigate, Navigate } from 'react-router-dom';
 import { Modal } from '../components/ui/Modal';
 import { Button } from '../components/ui/Button';
-import { INSTRUMENTS, MEMBER_ROLES } from '../stores/appStore';
+import { INSTRUMENTS } from '../stores/appStore';
 
 export const Login = () => {
   useDocumentTitle('Iniciar sesión');
@@ -34,6 +34,9 @@ export const Login = () => {
     const savedRemember = localStorage.getItem('rememberMe') === 'true';
 
     if (savedRemember && savedEmail) {
+      // Hydrating "remember me" form fields from localStorage at mount;
+      // ok to setState here, no synchronous render data is available.
+      // eslint-disable-next-line react-hooks/set-state-in-effect
       setEmail(savedEmail);
       // Password should NEVER be stored - user must re-enter it
       setRememberMe(true);

@@ -17,7 +17,6 @@ import {
   Users2,
   Calendar,
   RotateCcw,
-  ZoomIn,
   ZoomOut,
   Move,
   FileText,
@@ -97,8 +96,10 @@ export const MobileNav = () => {
     if (!user?.id) return;
     const userKey = `readNotificationIds_${user.id}`;
 
-    // 1. Hydrate from cache immediately.
+    // 1. Hydrate from cache immediately. Depends on user?.id (set by auth
+    // after first render), so this can't be lazy initial state.
     const cached = JSON.parse(localStorage.getItem(userKey) || '[]');
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     setReadNotificationIds(cached);
 
     // 2. Replace with DB truth as soon as it arrives.
@@ -352,7 +353,6 @@ export const MobileNav = () => {
 
   const profileSheetRef = useRef(null);
   const fileInputRef = useRef(null);
-  const imageContainerRef = useRef(null);
 
   const handleLogout = async (e) => {
     e.stopPropagation();
@@ -620,7 +620,7 @@ export const MobileNav = () => {
       const fileName = `avatars/${userId}-${Date.now()}.png`;
 
       // Upload processed image to Supabase Storage
-      const { data: uploadData, error: uploadError } = await supabase.storage
+      const { error: uploadError } = await supabase.storage
         .from('avatars')
         .upload(fileName, blob, {
           upsert: true,
