@@ -6,8 +6,6 @@ import {
   CalendarDays,
   UsersRound,
   TrendingUp,
-  Clock,
-  ChevronRight,
   Zap,
   Calendar,
   Guitar,

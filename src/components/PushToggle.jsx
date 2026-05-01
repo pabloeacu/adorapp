@@ -19,15 +19,16 @@ import {
 } from '../lib/push';
 
 export function PushToggle({ memberId }) {
-  const [supported, setSupported] = useState(false);
-  const [perm, setPerm] = useState('default');
+  // Hydrate sync values from APIs at mount time (lazy initial state) so we
+  // skip the setState-in-effect anti-pattern. Only the async subscription
+  // status needs a real effect.
+  const [supported] = useState(() => isPushSupported());
+  const [perm, setPerm] = useState(() => notificationPermission());
   const [subscribed, setSubscribed] = useState(false);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
 
   useEffect(() => {
-    setSupported(isPushSupported());
-    setPerm(notificationPermission());
     isCurrentlySubscribed().then(setSubscribed);
   }, []);
 

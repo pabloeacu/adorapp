@@ -1,8 +1,8 @@
-import React, { useState, useMemo, useEffect } from 'react';
+import React, { useState, useMemo } from 'react';
 import { useDocumentTitle } from '../hooks/useDocumentTitle';
 import {
-  Plus, Calendar, Music, Download, Clock, ChevronRight, Copy,
-  MessageSquare, Eye, Edit, Trash2, Filter, Search, Check, X,
+  Plus, Calendar, Music, Clock, Copy,
+  MessageSquare, Eye, Trash2, Search, Check, X,
   User, Zap, AlertCircle, ChevronDown, FileDown, History, Award,
   FileText, Printer, Copy as CopyIcon
 } from 'lucide-react';
@@ -14,7 +14,6 @@ import { supabase } from '../lib/supabase';
 import { Card } from '../components/ui/Card';
 import { Button } from '../components/ui/Button';
 import { Badge } from '../components/ui/Badge';
-import { Avatar } from '../components/ui/Avatar';
 import { Modal } from '../components/ui/Modal';
 import { Input } from '../components/ui/Input';
 import { ConfirmModal, SuccessModal, ErrorModal } from '../components/ui/ConfirmModal';
@@ -63,11 +62,6 @@ function SortableSongRow({ id, children }) {
     </div>
   );
 }
-
-const dayLabels = {
-  domingo: 'Domingo', lunes: 'Lunes', martes: 'Martes',
-  miercoles: 'Miércoles', jueves: 'Jueves', viernes: 'Viernes', sabado: 'Sábado'
-};
 
 const statusConfig = {
   scheduled: { label: 'Programado', color: 'text-blue-400', bg: 'bg-blue-500/20' },
@@ -273,7 +267,6 @@ export const Ordenes = () => {
     const white = [255, 255, 255];
     const lightGray = [200, 200, 200];
     const mediumGray = [153, 153, 153];
-    const purpleLight = [200, 150, 255];
 
     // Helper function to add dark background to a page
     const addDarkBackground = () => {

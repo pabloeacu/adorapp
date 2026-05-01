@@ -54,6 +54,10 @@ export function WizardSpotlight({
   }, [targetSelector]);
 
   useEffect(() => {
+    // Initial measure runs at mount: we need the live DOM rect of the target
+    // before we can position the spotlight, so this setState-in-effect is the
+    // intended pattern (no synchronous render data is available).
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     measure();
     const ro = new ResizeObserver(measure);
     document.body && ro.observe(document.body);

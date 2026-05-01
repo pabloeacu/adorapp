@@ -1,18 +1,16 @@
 import React, { useState, useMemo } from 'react';
 import { useDocumentTitle } from '../hooks/useDocumentTitle';
-import { useSearchParams } from 'react-router-dom';
 import {
-  Search, Mail, Phone, Shield, MoreVertical, Edit, Trash2,
-  Check, X, Filter, UserPlus, CheckCircle, XCircle, Calendar,
-  Cross, Users2, Clock, AlertTriangle, UserX
+  Search, Mail, Phone, Shield,
+  Check, X, Filter, UserPlus, CheckCircle, XCircle,
+  Cross, Clock, AlertTriangle
 } from 'lucide-react';
 import { useAuthStore } from '../stores/authStore';
 import { PageLoader } from '../components/ui/PageLoader';
-import { useAppStore, MEMBER_ROLES, INSTRUMENTS } from '../stores/appStore';
+import { useAppStore, MEMBER_ROLES } from '../stores/appStore';
 import { supabase, callAdminFunction } from '../lib/supabase';
 import { Card } from '../components/ui/Card';
 import { Button } from '../components/ui/Button';
-import { Badge } from '../components/ui/Badge';
 import { Modal } from '../components/ui/Modal';
 import { ConfirmModal, SuccessModal, ErrorModal } from '../components/ui/ConfirmModal';
 
@@ -32,8 +30,8 @@ const formatDateLocal = (dateStr) => {
 
 export const Solicitudes = () => {
   useDocumentTitle('Solicitudes');
-  const { user, profile } = useAuthStore();
-  const { addMember, initialize } = useAppStore();
+  const { profile } = useAuthStore();
+  const { initialize } = useAppStore();
   const isPastor = profile?.role === 'pastor';
 
   const [searchTerm, setSearchTerm] = useState('');
@@ -45,7 +43,6 @@ export const Solicitudes = () => {
 
   // Modal states
   const [selectedRequest, setSelectedRequest] = useState(null);
-  const [showDetailModal, setShowDetailModal] = useState(false);
   const [showApproveModal, setShowApproveModal] = useState(false);
   const [selectedRole, setSelectedRole] = useState('member');
   const [generatedPassword, setGeneratedPassword] = useState('');
@@ -115,11 +112,6 @@ export const Solicitudes = () => {
     });
   }, [pendingRequests, searchTerm, filterStatus]);
 
-  const handleViewRequest = (request) => {
-    setSelectedRequest(request);
-    setShowDetailModal(true);
-  };
-
   // Generate a reasonably-strong random password (alphanumeric, 12 chars).
   // Uses crypto.getRandomValues for unbiased entropy.
   const generateRandomPassword = () => {
@@ -151,7 +143,7 @@ export const Solicitudes = () => {
     const approvedEmail = selectedRequest.email;
     const approvedPassword = generatedPassword;
 
-    const { data, error } = await callAdminFunction('admin-approve-registration', {
+    const { error } = await callAdminFunction('admin-approve-registration', {
       requestId: selectedRequest.id,
       role: selectedRole,
       password: generatedPassword,

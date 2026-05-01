@@ -219,7 +219,7 @@ export const useAuthStore = create((set, get) => ({
           if (key && key.startsWith('readNotificationIds_')) toDelete.push(key);
         }
         toDelete.forEach(k => localStorage.removeItem(k));
-      } catch (_) { /* non-fatal */ }
+      } catch { /* non-fatal */ }
 
       sessionStorage.clear();
 

@@ -96,11 +96,6 @@ const transposeChordString = (chordString, semitones) => {
   return transposedChords.join(' ');
 };
 
-// Legacy function for single chord (now uses the token function)
-const transposeChord = (chord, semitones) => {
-  return transposeChordToken(chord, semitones);
-};
-
 export const transposeSongStructure = (structure, fromKey, toKey) => {
   const fromSemitones = semitoneSteps[fromKey] || 0;
   const toSemitones = semitoneSteps[toKey] || 0;
@@ -756,7 +751,7 @@ export const useAppStore = create((set, get) => ({
         const idx = list.findIndex((r) => r.id === id);
         next = idx >= 0 ? list.map((r, i) => (i === idx ? updated : r)) : [updated, ...list];
       }
-      try { localStorage.setItem(spec.lsKey, JSON.stringify(next)); } catch (_) { /* non-fatal */ }
+      try { localStorage.setItem(spec.lsKey, JSON.stringify(next)); } catch { /* non-fatal */ }
       return { [spec.key]: next };
     });
   },
@@ -770,7 +765,7 @@ export const useAppStore = create((set, get) => ({
       localStorage.removeItem('appBands');
       localStorage.removeItem('appSongs');
       localStorage.removeItem('appOrders');
-    } catch (_) {
+    } catch {
       // localStorage may be unavailable in some embedded contexts; non-fatal.
     }
     set({

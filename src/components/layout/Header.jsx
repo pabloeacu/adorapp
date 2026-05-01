@@ -2,7 +2,7 @@
 // Photo Cropper fix - Canvas API image processing
 import React, { useState, useRef, useEffect, useCallback, useMemo } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
-import { Bell, Search, ChevronRight, User, Mail, Shield, Camera, X, RotateCcw, ZoomIn, ZoomOut, Check, Move, LogOut, Trash2, Phone, Cross, Users2, Calendar, Loader2, Lock, Eye, EyeOff, RefreshCw, Music, Heart, FileText, Send, Sunset } from 'lucide-react';
+import { Bell, Search, ChevronRight, User, Mail, Shield, Camera, X, RotateCcw, ZoomOut, Check, Move, LogOut, Trash2, Phone, Cross, Users2, Calendar, Loader2, Lock, Eye, EyeOff, RefreshCw, Music, Heart, FileText, Send, Sunset } from 'lucide-react';
 import { useAuthStore } from '../../stores/authStore';
 import { useAppStore } from '../../stores/appStore';
 import { supabase } from '../../lib/supabase';
@@ -36,7 +36,7 @@ export const Header = () => {
   const location = useLocation();
   const navigate = useNavigate();
   const { user, profile, logout, refreshProfile: authRefreshProfile } = useAuthStore();
-  const { updateMember, members } = useAppStore();
+  const { members } = useAppStore();
   const [showProfile, setShowProfile] = useState(false);
   const [isEditing, setIsEditing] = useState(false);
   const [editName, setEditName] = useState('');
@@ -75,8 +75,11 @@ export const Header = () => {
     if (!user?.id) return;
     const userKey = `readNotificationIds_${user.id}`;
 
-    // 1. Hydrate from localStorage immediately to avoid flicker.
+    // 1. Hydrate from localStorage immediately to avoid flicker. Depends on
+    // user?.id so it can't be lazy initial state — must run when the user
+    // arrives.
     const cached = JSON.parse(localStorage.getItem(userKey) || '[]');
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     setReadNotificationIds(cached);
     // Migrate old global key if present (legacy).
     const oldKey = localStorage.getItem('readNotificationIds');
@@ -111,7 +114,6 @@ export const Header = () => {
   // Custom success/error modals - replaces browser alerts
   const [successModal, setSuccessModal] = useState({ isOpen: false, title: '', message: '' });
   const [errorModal, setErrorModal] = useState({ isOpen: false, title: '', message: '' });
-  const canvasRef = useRef(null);
   const fileInputRef = useRef(null);
   const title = titleForPath(location.pathname);
 
@@ -133,10 +135,13 @@ export const Header = () => {
   const displayRole = currentUserMember?.role || profile?.role || 'member';
   const displayPhoto = currentUserMember?.avatar_url || currentUserMember?.avatarUrl || profile?.avatar_url || profile?.avatarUrl;
 
-  // Load saved photo on mount
+  // Load saved photo on mount. Depends on profile/displayPhoto so we can't
+  // use lazy initial state — those values arrive from the auth/app stores
+  // after first render.
   useEffect(() => {
     const savedPhoto = localStorage.getItem('userPhoto');
     if (savedPhoto) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect
       setUserPhoto(savedPhoto);
     } else if (displayPhoto) {
       setUserPhoto(displayPhoto);
@@ -382,22 +387,6 @@ export const Header = () => {
     setEditLeaderOf(currentUserMember?.leader_of || profile?.leader_of || '');
     setEditBirthdate(currentUserMember?.birthdate || profile?.birthdate || '');
     setIsEditing(true);
-  };
-
-  const handleSaveProfile = () => {
-    if (editName.trim()) {
-      useAuthStore.setState({
-        user: { ...user, name: editName.trim() }
-      });
-      localStorage.setItem('user', JSON.stringify({ ...user, name: editName.trim() }));
-
-      const memberIndex = members.findIndex(m => m.email === user?.email);
-      if (memberIndex !== -1) {
-        updateMember(members[memberIndex].id, { name: editName.trim() });
-      }
-
-      setIsEditing(false);
-    }
   };
 
   const handleSaveExtendedProfile = async () => {
@@ -769,7 +758,7 @@ export const Header = () => {
       const memberId = currentUserMember?.id || user?.id || 'unknown';
       const fileName = `avatars/${memberId}-${Date.now()}.${fileExt}`;
 
-      const { data: uploadData, error: uploadError } = await supabase.storage
+      const { error: uploadError } = await supabase.storage
         .from('avatars')
         .upload(fileName, blob, {
           upsert: true,
@@ -811,7 +800,6 @@ export const Header = () => {
 
         if (updateError) {
           console.error('Failed to update member avatar_url:', updateError);
-        } else {
         }
 
         // Sync appStore.members immediately so changes are visible everywhere

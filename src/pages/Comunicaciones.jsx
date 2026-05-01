@@ -1,6 +1,6 @@
 // AdorAPP - Centro de Avivamiento Familiar
 // Communications Page - Send messages to members
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useMemo } from 'react';
 import { useDocumentTitle } from '../hooks/useDocumentTitle';
 import { Send, Users, X, Check, Loader2, AlertCircle } from 'lucide-react';
 import { useAuthStore } from '../stores/authStore';
@@ -11,7 +11,7 @@ import { Button } from '../components/ui/Button';
 
 export const Comunicaciones = () => {
   useDocumentTitle('Comunicaciones');
-  const { user, profile } = useAuthStore();
+  const { profile } = useAuthStore();
   const { bands, members } = useAppStore();
   const isPastor = profile?.role === 'pastor';
 
