@@ -60,7 +60,6 @@ export const Repertorio = () => {
   const [viewingKey, setViewingKey] = useState(null);
   const [editingSong, setEditingSong] = useState(null);
   const [viewMode, setViewMode] = useState('cards'); // 'cards' or 'table'
-  const [exportKey, setExportKey] = useState('C'); // Key for PDF export
   const [exportModalSong, setExportModalSong] = useState(null);
   const [exportSongKey, setExportSongKey] = useState('C');
   const [showCategoryDropdown, setShowCategoryDropdown] = useState(false);
@@ -783,15 +782,15 @@ export const Repertorio = () => {
                       </div>
                     </td>
                     <td className="px-4 py-3">
-                      <select
-                        className="bg-neutral-800 border border-neutral-700 rounded px-2 py-1 text-sm"
-                        value={exportKey}
-                        onChange={(e) => setExportKey(e.target.value)}
-                      >
-                        {MUSICAL_KEYS.map(k => (
-                          <option key={k} value={k}>{k}</option>
-                        ))}
-                      </select>
+                      {/* Read-only display of the song's actual key — the source of
+                          truth, just like the Card view. The previous version
+                          rendered a <select bound to exportKey> here, which made
+                          every row show "C" (the export-modal default) regardless
+                          of the real key — and worse, changing it would change
+                          every row at once. Edit happens in the modal. */}
+                      <Badge variant="primary" size="sm">
+                        {song.key || song.originalKey || '-'}
+                      </Badge>
                     </td>
                     <td className="px-4 py-3 text-sm text-gray-500">
                       {song.lastUsed ? new Date(song.lastUsed).toLocaleDateString('es-ES') : 'Nunca'}
