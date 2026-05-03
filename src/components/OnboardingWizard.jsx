@@ -1,22 +1,29 @@
 // OnboardingWizard — first-login welcome flow for new members.
 //
-// 4-step structure (Paul's spec):
+// 5-step structure (Paul's spec):
 //   0. Bienvenida
 //   1. Tour visual con WizardSpotlight (señala los íconos del bottom-nav)
 //   2. Datos personales — sub-pasos: contacto + instrumentos
 //   3. Activá las notificaciones (botón grande + "Más tarde")
+//   4. Guardar como app en el escritorio (Chrome/Android: prompt nativo;
+//      iOS: instrucciones visuales; otros: instrucciones genéricas).
+//      Si ya está instalada, se salta automáticamente.
 //
 // Triggered from Layout.jsx when the current user's member row has
 // onboarded=false. The pastor's first member (Paul) was migrated as
 // onboarded=true so this flow only fires for newly-approved members.
 
 import React, { useState } from 'react';
-import { Phone, Calendar, Cross, Music, Check, ArrowRight, Bell } from 'lucide-react';
+import {
+  Phone, Calendar, Cross, Music, Check, ArrowRight, Bell,
+  Smartphone, Share, Plus, Download, Menu,
+} from 'lucide-react';
 import { supabase } from '../lib/supabase';
 import { useAppStore, INSTRUMENTS } from '../stores/appStore';
 import { useAuthStore } from '../stores/authStore';
 import { WizardSpotlight } from './WizardSpotlight';
 import { subscribePush, isPushSupported } from '../lib/push';
+import { useInstallPrompt } from '../hooks/useInstallPrompt';
 
 const TOUR_STOPS = [
   {
@@ -54,14 +61,20 @@ export function OnboardingWizard({ member, onClose }) {
   const [pushError, setPushError] = useState(null);
   const [pushDone, setPushDone] = useState(false);
 
+  const [installBusy, setInstallBusy] = useState(false);
+  const [installError, setInstallError] = useState(null);
+  const { canPrompt: canPromptInstall, installed: alreadyInstalled, platform, install } =
+    useInstallPrompt();
+
   const refreshProfile = useAuthStore((s) => s.refreshProfile);
   const reloadApp = useAppStore((s) => s.initialize);
 
   const toggleInstrument = (i) =>
     setInstruments((prev) => (prev.includes(i) ? prev.filter((x) => x !== i) : [...prev, i]));
 
-  // Persist all collected data and mark onboarded=true. Used by the final
-  // step (whether they activate notifications or skip).
+  // Persist all collected data and mark onboarded=true. After saving, advance
+  // to the install step — unless the app is already installed, in which case
+  // we close the wizard since there's nothing left to offer.
   const finish = async () => {
     setSaving(true);
     setError(null);
@@ -83,7 +96,11 @@ export function OnboardingWizard({ member, onClose }) {
     await refreshProfile();
     await reloadApp();
     setSaving(false);
-    onClose();
+    if (alreadyInstalled) {
+      onClose();
+    } else {
+      setStep(4);
+    }
   };
 
   // "Más tarde" from the welcome screen — skip everything, mark onboarded.
@@ -129,9 +146,9 @@ export function OnboardingWizard({ member, onClose }) {
     >
       <div className="bg-neutral-900 border border-neutral-800 rounded-2xl w-full max-w-lg max-h-[90dvh] overflow-y-auto">
         <div className="p-6 space-y-5">
-          {/* Step indicator (4 segments) */}
+          {/* Step indicator (5 segments) */}
           <div className="flex items-center justify-center gap-2">
-            {[0, 1, 2, 3].map((i) => (
+            {[0, 1, 2, 3, 4].map((i) => (
               <div
                 key={i}
                 className={`h-1.5 rounded-full transition-all ${
@@ -336,6 +353,91 @@ export function OnboardingWizard({ member, onClose }) {
               </button>
               <p className="text-xs text-gray-600 text-center">
                 Podés activarlas o desactivarlas más adelante desde tu perfil.
+              </p>
+            </>
+          )}
+
+          {/* ---------- STEP 4: Guardar como app en el escritorio ---------- */}
+          {step === 4 && (
+            <>
+              <div className="text-center space-y-3">
+                <div className="w-16 h-16 mx-auto bg-violet-500/20 rounded-full flex items-center justify-center">
+                  <Smartphone size={32} className="text-violet-300" />
+                </div>
+                <h2 className="text-xl font-bold">¿Guardás la app en tu pantalla?</h2>
+                <p className="text-sm text-gray-400">
+                  Queda como un ícono más en tu celu, abre a pantalla completa y entrás más rápido.
+                </p>
+              </div>
+
+              {installError && <p className="text-sm text-red-400 text-center">{installError}</p>}
+
+              {/* Chrome / Edge / Android: prompt nativo en un click */}
+              {canPromptInstall && (
+                <button
+                  onClick={async () => {
+                    setInstallBusy(true);
+                    setInstallError(null);
+                    const outcome = await install();
+                    setInstallBusy(false);
+                    if (outcome === 'accepted') {
+                      // appinstalled event will fire and update state; close after a beat.
+                      setTimeout(() => onClose(), 600);
+                    } else if (outcome === 'unavailable') {
+                      setInstallError('No pudimos abrir el instalador. Probá desde el menú del navegador.');
+                    }
+                    // 'dismissed' → quedate en este paso, el usuario puede usar "Más tarde".
+                  }}
+                  disabled={installBusy}
+                  className="w-full py-3.5 bg-violet-500 hover:bg-violet-600 text-white font-semibold rounded-xl disabled:opacity-50 flex items-center justify-center gap-2 focus:outline-none focus:ring-2 focus:ring-violet-300"
+                >
+                  <Download size={18} />
+                  {installBusy ? 'Abriendo instalador…' : 'Instalar AdorAPP'}
+                </button>
+              )}
+
+              {/* iOS Safari: no hay API, mini-tutorial visual */}
+              {!canPromptInstall && platform === 'ios' && (
+                <div className="space-y-3 bg-neutral-800/60 border border-neutral-700 rounded-xl p-4">
+                  <p className="text-sm text-gray-300 text-center">
+                    En iPhone se hace en dos toques desde Safari:
+                  </p>
+                  <ol className="space-y-2 text-sm text-gray-200">
+                    <li className="flex items-center gap-3">
+                      <span className="flex-shrink-0 w-7 h-7 rounded-full bg-violet-500/30 text-violet-200 font-semibold flex items-center justify-center text-xs">1</span>
+                      <span className="flex items-center gap-2">
+                        Tocá <Share size={16} className="inline text-violet-300" /> <span className="font-semibold">Compartir</span> abajo en la barra
+                      </span>
+                    </li>
+                    <li className="flex items-center gap-3">
+                      <span className="flex-shrink-0 w-7 h-7 rounded-full bg-violet-500/30 text-violet-200 font-semibold flex items-center justify-center text-xs">2</span>
+                      <span className="flex items-center gap-2">
+                        Elegí <Plus size={16} className="inline text-violet-300" /> <span className="font-semibold">Agregar a inicio</span>
+                      </span>
+                    </li>
+                  </ol>
+                </div>
+              )}
+
+              {/* Otros (Firefox, Safari macOS sin API, etc.): instrucción genérica */}
+              {!canPromptInstall && platform !== 'ios' && (
+                <div className="space-y-3 bg-neutral-800/60 border border-neutral-700 rounded-xl p-4">
+                  <p className="text-sm text-gray-300 text-center flex items-center justify-center gap-2">
+                    Tocá el menú <Menu size={16} className="inline text-violet-300" /> de tu navegador
+                    {platform === 'desktop' ? ' y elegí "Instalar AdorAPP".' : ' y elegí "Instalar app" o "Agregar a inicio".'}
+                  </p>
+                </div>
+              )}
+
+              <button
+                onClick={onClose}
+                disabled={installBusy}
+                className="w-full text-sm text-gray-500 hover:text-gray-300"
+              >
+                {canPromptInstall ? 'Más tarde' : 'Listo'}
+              </button>
+              <p className="text-xs text-gray-600 text-center">
+                Si lo dejás para más tarde no pasa nada — la app sigue funcionando desde el navegador.
               </p>
             </>
           )}
