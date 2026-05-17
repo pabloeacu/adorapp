@@ -2,7 +2,7 @@
 // Photo Cropper fix - Canvas API image processing
 import React, { useState, useRef, useEffect, useCallback, useMemo } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
-import { Bell, Search, ChevronRight, User, Mail, Shield, Camera, X, RotateCcw, ZoomOut, Check, Move, LogOut, Trash2, Phone, Cross, Users2, Calendar, Loader2, Lock, Eye, EyeOff, RefreshCw, Music, Heart, FileText, Send, Sunset } from 'lucide-react';
+import { Bell, Search, ChevronRight, User, Mail, Shield, Camera, X, RotateCcw, ZoomOut, Check, Move, LogOut, Trash2, Phone, Cross, Users2, Calendar, Loader2, Lock, Eye, EyeOff, RefreshCw, Music, Heart, FileText, Send, Sunset, Cake } from 'lucide-react';
 import { useAuthStore } from '../../stores/authStore';
 import { useAppStore } from '../../stores/appStore';
 import { supabase } from '../../lib/supabase';
@@ -190,6 +190,7 @@ export const Header = () => {
       member: 'heart',
       request: 'file',
       order: 'calendar',
+      birthday: 'cake',
     }[t] || 'cross');
 
     const loadNotifications = async () => {
@@ -1507,6 +1508,7 @@ export const Header = () => {
                         {notif.icon === 'sunset' && <Sunset size={18} className="text-indigo-400" />}
                         {notif.icon === 'calendar' && <Calendar size={18} className="text-emerald-400" />}
                         {notif.icon === 'file' && <FileText size={18} className="text-yellow-400" />}
+                        {notif.icon === 'cake' && <Cake size={18} className="text-pink-400" />}
                         {notif.icon === 'send' && <Send size={18} className="text-blue-400" />}
                       </div>
                       <div className="flex-1">

@@ -25,6 +25,7 @@ import {
   Music,
   Heart,
   Sunset,
+  Cake,
   Search,
   Lock,
   Eye,
@@ -137,6 +138,7 @@ export const MobileNav = () => {
       member: 'heart',
       request: 'file',
       order: 'calendar',
+      birthday: 'cake',
     }[t] || 'cross');
 
     const loadNotifications = async () => {
@@ -1556,6 +1558,7 @@ export const MobileNav = () => {
                             {notif.icon === 'cross' && <Cross size={18} className="text-amber-400" />}
                             {notif.icon === 'sunset' && <Sunset size={18} className="text-indigo-400" />}
                             {notif.icon === 'calendar' && <Calendar size={18} className="text-emerald-400" />}
+                            {notif.icon === 'cake' && <Cake size={18} className="text-pink-400" />}
                             {notif.icon === 'send' && <Send size={18} className="text-blue-400" />}
                           </div>
                           <div className="flex-1">
