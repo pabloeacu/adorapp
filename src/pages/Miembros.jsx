@@ -8,6 +8,7 @@ import {
 } from 'lucide-react';
 import { useAppStore, MEMBER_ROLES, INSTRUMENTS } from '../stores/appStore';
 import { useAuthStore } from '../stores/authStore';
+import { useCurrentRole } from '../hooks/useCurrentMember';
 import { Card } from '../components/ui/Card';
 import { Button } from '../components/ui/Button';
 import { Badge } from '../components/ui/Badge';
@@ -40,9 +41,13 @@ const roleConfig = {
 export const Miembros = () => {
   useDocumentTitle('Miembros');
   const { members, addMember, updateMember, deleteMember, toggleMemberActive } = useAppStore();
-  const { user, profile } = useAuthStore();
+  const { user } = useAuthStore();
   const [searchParams, setSearchParams] = useSearchParams();
-  const isPastor = profile?.role === 'pastor';
+  // Role gating: pastors see everything (and can act). Leaders see a stripped
+  // view — name, role badge, instruments. Plain members are bounced by the
+  // route guard in App.jsx and never get here.
+  const role = useCurrentRole();
+  const isPastor = role === 'pastor';
 
   const [searchTerm, setSearchTerm] = useState('');
   const [filterRole, setFilterRole] = useState('all');
@@ -403,7 +408,7 @@ export const Miembros = () => {
             <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-500" size={20} />
             <input
               type="text"
-              placeholder="Buscar por nombre, email o instrumento..."
+              placeholder={isPastor ? "Buscar por nombre, email o instrumento..." : "Buscar por nombre o instrumento..."}
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
               className="w-full pl-12 pr-4 py-3 bg-neutral-900 border border-neutral-800 rounded-xl focus:outline-none focus:ring-2 focus:ring-white/40 focus:border-white transition-colors"
@@ -599,38 +604,43 @@ export const Miembros = () => {
                 )}
               </div>
 
-              <div className="space-y-2 text-sm">
-                {member.email && (
-                  <div className="flex items-center gap-2 text-gray-400">
-                    <Mail size={14} />
-                    <span className="truncate">{member.email}</span>
-                  </div>
-                )}
-                {member.phone && (
-                  <div className="flex items-center gap-2 text-gray-400">
-                    <Phone size={14} />
-                    <span>{member.phone}</span>
-                  </div>
-                )}
-                {member.pastor_area && (
-                  <div className="flex items-center gap-2 text-gray-400">
-                    <Cross size={14} />
-                    <span>{member.pastor_area}</span>
-                  </div>
-                )}
-                {member.leader_of && (
-                  <div className="flex items-center gap-2 text-gray-400">
-                    <Users2 size={14} />
-                    <span>{member.leader_of}</span>
-                  </div>
-                )}
-                {member.birthdate && (
-                  <div className="flex items-center gap-2 text-gray-400">
-                    <Calendar size={14} />
-                    <span>{formatDateLocal(member.birthdate)}</span>
-                  </div>
-                )}
-              </div>
+              {/* Personal contact + private fields: pastors only. Leaders &
+                  members never see email/phone/pastor-area/leader-of/birthdate
+                  on the listing — they get just name, role and instruments. */}
+              {isPastor && (
+                <div className="space-y-2 text-sm">
+                  {member.email && (
+                    <div className="flex items-center gap-2 text-gray-400">
+                      <Mail size={14} />
+                      <span className="truncate">{member.email}</span>
+                    </div>
+                  )}
+                  {member.phone && (
+                    <div className="flex items-center gap-2 text-gray-400">
+                      <Phone size={14} />
+                      <span>{member.phone}</span>
+                    </div>
+                  )}
+                  {member.pastor_area && (
+                    <div className="flex items-center gap-2 text-gray-400">
+                      <Cross size={14} />
+                      <span>{member.pastor_area}</span>
+                    </div>
+                  )}
+                  {member.leader_of && (
+                    <div className="flex items-center gap-2 text-gray-400">
+                      <Users2 size={14} />
+                      <span>{member.leader_of}</span>
+                    </div>
+                  )}
+                  {member.birthdate && (
+                    <div className="flex items-center gap-2 text-gray-400">
+                      <Calendar size={14} />
+                      <span>{formatDateLocal(member.birthdate)}</span>
+                    </div>
+                  )}
+                </div>
+              )}
 
               <div className="flex flex-wrap gap-1.5 mt-3">
                 {member.instruments?.map((inst) => (
@@ -676,15 +686,22 @@ export const Miembros = () => {
               <thead>
                 <tr className="border-b border-neutral-800">
                   <th className="text-left px-4 py-3 text-xs text-gray-400 font-medium uppercase">Nombre</th>
-                  <th className="text-left px-4 py-3 text-xs text-gray-400 font-medium uppercase hidden lg:table-cell">Email</th>
-                  <th className="text-left px-4 py-3 text-xs text-gray-400 font-medium uppercase">Teléfono</th>
-                  <th className="text-left px-4 py-3 text-xs text-gray-400 font-medium uppercase">Pastor</th>
-                  <th className="text-left px-4 py-3 text-xs text-gray-400 font-medium uppercase">Líder</th>
+                  {/* Pastors-only columns: contact + status + private fields */}
+                  {isPastor && (
+                    <>
+                      <th className="text-left px-4 py-3 text-xs text-gray-400 font-medium uppercase hidden lg:table-cell">Email</th>
+                      <th className="text-left px-4 py-3 text-xs text-gray-400 font-medium uppercase">Teléfono</th>
+                      <th className="text-left px-4 py-3 text-xs text-gray-400 font-medium uppercase">Pastor</th>
+                      <th className="text-left px-4 py-3 text-xs text-gray-400 font-medium uppercase">Líder</th>
+                    </>
+                  )}
                   <th className="text-left px-4 py-3 text-xs text-gray-400 font-medium uppercase">Rol</th>
                   <th className="text-left px-4 py-3 text-xs text-gray-400 font-medium uppercase hidden xl:table-cell">Instrumentos</th>
-                  <th className="text-left px-4 py-3 text-xs text-gray-400 font-medium uppercase">Estado</th>
                   {isPastor && (
-                    <th className="text-right px-4 py-3 text-xs text-gray-400 font-medium uppercase">Acciones</th>
+                    <>
+                      <th className="text-left px-4 py-3 text-xs text-gray-400 font-medium uppercase">Estado</th>
+                      <th className="text-right px-4 py-3 text-xs text-gray-400 font-medium uppercase">Acciones</th>
+                    </>
                   )}
                 </tr>
               </thead>
@@ -702,10 +719,14 @@ export const Miembros = () => {
                         <span className="font-medium">{member.name}</span>
                       </div>
                     </td>
-                    <td className="px-4 py-3 text-sm text-gray-400">{member.email || '-'}</td>
-                    <td className="px-4 py-3 text-sm text-gray-400">{member.phone || '-'}</td>
-                    <td className="px-4 py-3 text-sm text-gray-400">{member.pastor_area || '-'}</td>
-                    <td className="px-4 py-3 text-sm text-gray-400">{member.leader_of || '-'}</td>
+                    {isPastor && (
+                      <>
+                        <td className="px-4 py-3 text-sm text-gray-400">{member.email || '-'}</td>
+                        <td className="px-4 py-3 text-sm text-gray-400">{member.phone || '-'}</td>
+                        <td className="px-4 py-3 text-sm text-gray-400">{member.pastor_area || '-'}</td>
+                        <td className="px-4 py-3 text-sm text-gray-400">{member.leader_of || '-'}</td>
+                      </>
+                    )}
                     <td className="px-4 py-3">
                       <span className={`text-xs font-medium ${roleConfig[member.role]?.color}`}>
                         {roleConfig[member.role]?.label}
@@ -725,17 +746,19 @@ export const Miembros = () => {
                         )}
                       </div>
                     </td>
-                    <td className="px-4 py-3">
-                      {member.active ? (
-                        <span className="flex items-center gap-1 text-xs text-green-400">
-                          <Check size={12} /> Activo
-                        </span>
-                      ) : (
-                        <span className="flex items-center gap-1 text-xs text-gray-400">
-                          <X size={12} /> Inactivo
-                        </span>
-                      )}
-                    </td>
+                    {isPastor && (
+                      <td className="px-4 py-3">
+                        {member.active ? (
+                          <span className="flex items-center gap-1 text-xs text-green-400">
+                            <Check size={12} /> Activo
+                          </span>
+                        ) : (
+                          <span className="flex items-center gap-1 text-xs text-gray-400">
+                            <X size={12} /> Inactivo
+                          </span>
+                        )}
+                      </td>
+                    )}
                     {isPastor && (
                       <td className="px-4 py-3">
                         <div className="flex items-center justify-end gap-1">

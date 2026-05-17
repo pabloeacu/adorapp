@@ -1,9 +1,10 @@
 import React, { useEffect, useState, useCallback, lazy, Suspense } from 'react';
-import { BrowserRouter, Routes, Route, useLocation } from 'react-router-dom';
+import { BrowserRouter, Routes, Route, useLocation, Navigate } from 'react-router-dom';
 import { Layout } from './components/layout/Layout';
 import { PageLoader } from './components/ui/PageLoader';
 import { useAuthStore } from './stores/authStore';
 import { useAppStore } from './stores/appStore';
+import { useCurrentRole } from './hooks/useCurrentMember';
 
 // Lazy-loaded route components. Each compiles into its own chunk, so a user
 // who only ever opens Login / Dashboard does not download the Repertorio
@@ -24,6 +25,16 @@ const Solicitudes = lazyPage(() => import('./pages/Solicitudes'), 'Solicitudes')
 const Comunicaciones = lazyPage(() => import('./pages/Comunicaciones'), 'Comunicaciones');
 
 const RouteFallback = () => <PageLoader />;
+
+// Guards a route so plain members get redirected. Pastors and leaders pass through.
+// Used for /miembros: members shouldn't even land on it via URL — bandas/orders
+// still show member names via their own components, that's where they discover
+// who's who.
+const MembersOnlyRoles = ({ children }) => {
+  const role = useCurrentRole();
+  if (role === 'member') return <Navigate to="/" replace />;
+  return children;
+};
 
 // Auto-sync strategy:
 //   - On route change: re-fetch, but throttled — if the realtime layer ran <15s
@@ -102,7 +113,7 @@ function App() {
               <Route path="ordenes" element={<Ordenes />} />
               <Route path="repertorio" element={<Repertorio />} />
               <Route path="bandas" element={<Bandas />} />
-              <Route path="miembros" element={<Miembros />} />
+              <Route path="miembros" element={<MembersOnlyRoles><Miembros /></MembersOnlyRoles>} />
               <Route path="solicitudes" element={<Solicitudes />} />
               <Route path="comunicaciones" element={<Comunicaciones />} />
             </Route>

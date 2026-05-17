@@ -11,18 +11,25 @@ import {
   Send
 } from 'lucide-react';
 import { useAuthStore } from '../../stores/authStore';
+import { useCurrentRole } from '../../hooks/useCurrentMember';
 
 export const Sidebar = () => {
-  const { logout, profile } = useAuthStore();
-  const isPastor = profile?.role === 'pastor';
+  const { logout } = useAuthStore();
+  // Source of truth is the members table row (per parity fix); falls back to
+  // authStore.profile.role during the brief window before appStore is ready.
+  const role = useCurrentRole();
+  const isPastor = role === 'pastor';
+  const canSeeMembers = role === 'pastor' || role === 'leader';
 
-  // Dynamic navigation items - Solicitudes & Comunicaciones only for pastors
+  // Dynamic navigation items:
+  // - Miembros: pastors + leaders (plain members don't see it at all).
+  // - Solicitudes / Comunicaciones: pastors only.
   const navItems = [
     { path: '/', icon: LayoutDashboard, label: 'Dashboard' },
     { path: '/ordenes', icon: CalendarDays, label: 'Órdenes' },
     { path: '/repertorio', icon: Music2, label: 'Repertorio' },
     { path: '/bandas', icon: Users, label: 'Bandas' },
-    { path: '/miembros', icon: UserCircle, label: 'Miembros' },
+    ...(canSeeMembers ? [{ path: '/miembros', icon: UserCircle, label: 'Miembros' }] : []),
     ...(isPastor ? [
       { path: '/solicitudes', icon: FileText, label: 'Solicitudes' },
       { path: '/comunicaciones', icon: Send, label: 'Comunicaciones' }
