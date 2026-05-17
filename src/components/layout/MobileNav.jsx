@@ -27,6 +27,7 @@ import {
   Sunset,
   Cake,
   Search,
+  Menu,
   Lock,
   Eye,
   EyeOff,
@@ -52,14 +53,21 @@ const formatDateLocal = (dateStr) => {
   });
 };
 
-// Full nav list. The component filters it by role at render time so plain
-// members don't see the "Miembros" tab (it would be empty UX for them).
-const ALL_NAV_ITEMS = [
+// The mobile bottom strip is split in two:
+//   - PRIMARY_NAV: 4 tabs visible to ALL roles (the bottom strip backbone).
+//   - SECONDARY_NAV: items shown behind the hamburger menu (5th tab),
+//     filtered by role. Plain members get no hamburger at all (nothing to
+//     show), so they keep a clean 4-tab strip.
+const PRIMARY_NAV = [
   { path: '/', icon: LayoutDashboard, label: 'Inicio' },
   { path: '/ordenes', icon: CalendarDays, label: 'Órdenes' },
   { path: '/repertorio', icon: Music2, label: 'Repertorio' },
   { path: '/bandas', icon: Users, label: 'Bandas' },
+];
+const SECONDARY_NAV = [
   { path: '/miembros', icon: UserCircle, label: 'Miembros', roles: ['pastor', 'leader'] },
+  { path: '/solicitudes', icon: FileText, label: 'Solicitudes', roles: ['pastor'] },
+  { path: '/comunicaciones', icon: Send, label: 'Comunicaciones', roles: ['pastor'] },
 ];
 
 // pageTitles lives in src/lib/pageTitles.js — single source of truth shared
@@ -332,7 +340,6 @@ export const MobileNav = () => {
   const currentUserMember = useCurrentMember();
   // CRITICAL: derive role from members table (single source of truth), same as
   // Header.jsx. authStore.profile may be stale after a role change in DB.
-  const isPastor = (currentUserMember?.role || profile?.role) === 'pastor';
   const displayName = currentUserMember?.name || profile?.name || 'Usuario';
   const displayRole = currentUserMember?.role || profile?.role || 'member';
   const displayPhoto =
@@ -345,17 +352,14 @@ export const MobileNav = () => {
   const displayLeaderOf = currentUserMember?.leader_of || profile?.leader_of;
   const displayBirthdate = currentUserMember?.birthdate || profile?.birthdate;
 
-  // Filter the base nav by role (plain members don't see "Miembros") and
-  // add Solicitudes / Comunicaciones for pastors only.
+  // Secondary items (behind the hamburger) filtered by role. Empty for
+  // plain members → no hamburger button shown at all.
   const role = currentUserMember?.role || profile?.role || 'member';
-  const allNavItems = useMemo(() => {
-    const items = ALL_NAV_ITEMS.filter((it) => !it.roles || it.roles.includes(role));
-    if (isPastor) {
-      items.push({ path: '/solicitudes', icon: FileText, label: 'Solicitudes' });
-      items.push({ path: '/comunicaciones', icon: Send, label: 'Comunicaciones' });
-    }
-    return items;
-  }, [isPastor, role]);
+  const secondaryNavItems = useMemo(
+    () => SECONDARY_NAV.filter((it) => !it.roles || it.roles.includes(role)),
+    [role]
+  );
+  const hasSecondary = secondaryNavItems.length > 0;
 
   const profileSheetRef = useRef(null);
   const fileInputRef = useRef(null);
@@ -1342,7 +1346,7 @@ export const MobileNav = () => {
             </div>
 
             <nav className="flex-1 px-4 space-y-2">
-              {allNavItems.map(({ path, icon: Icon, label }) => {
+              {secondaryNavItems.map(({ path, icon: Icon, label }) => {
                 const isActive = location.pathname === path;
                 return (
                   <NavLink
@@ -1611,13 +1615,15 @@ export const MobileNav = () => {
         </div>
       )}
 
-      {/* Bottom Tab Bar */}
+      {/* Bottom Tab Bar — 4 fixed primary tabs + (for pastors/leaders) a
+          hamburger that opens the fullscreen menu with the secondary items.
+          Plain members get only the 4 primary tabs (nothing extra to surface). */}
       <div
         className="lg:hidden fixed bottom-0 left-0 right-0 z-40 bg-black/95 backdrop-blur-lg border-t border-neutral-800"
         style={{ paddingBottom: 'env(safe-area-inset-bottom)' }}
       >
         <div className="flex items-center justify-around h-20 px-2">
-          {allNavItems.map(({ path, icon: Icon, label }) => {
+          {PRIMARY_NAV.map(({ path, icon: Icon, label }) => {
             const isActive = location.pathname === path;
             return (
               <NavLink
@@ -1637,6 +1643,25 @@ export const MobileNav = () => {
               </NavLink>
             );
           })}
+          {hasSecondary && (
+            <button
+              type="button"
+              onClick={() => setMenuOpen(true)}
+              aria-label="Abrir menú"
+              aria-haspopup="menu"
+              aria-expanded={menuOpen}
+              className={`flex flex-col items-center justify-center w-full h-full transition-all ${
+                menuOpen ? 'text-white' : 'text-gray-500'
+              }`}
+            >
+              <div className={`p-2 rounded-xl transition-all ${menuOpen ? 'bg-white/10' : ''}`}>
+                <Menu size={22} strokeWidth={menuOpen ? 2.5 : 2} />
+              </div>
+              <span className={`text-xs mt-1 font-medium ${menuOpen ? 'text-white' : ''}`}>
+                Más
+              </span>
+            </button>
+          )}
         </div>
       </div>
     </>
