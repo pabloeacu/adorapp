@@ -27,8 +27,8 @@ const PAGE_ITEMS_BASE = [
   { id: 'page-ordenes', kind: 'page', label: 'Órdenes', path: '/ordenes', icon: CalendarDays },
   { id: 'page-repertorio', kind: 'page', label: 'Repertorio', path: '/repertorio', icon: Music2 },
   { id: 'page-bandas', kind: 'page', label: 'Bandas', path: '/bandas', icon: Users },
-  { id: 'page-miembros', kind: 'page', label: 'Miembros', path: '/miembros', icon: UserCircle },
 ];
+const MIEMBROS_PAGE_ITEM = { id: 'page-miembros', kind: 'page', label: 'Miembros', path: '/miembros', icon: UserCircle };
 const PASTOR_PAGE_ITEMS = [
   { id: 'page-solicitudes', kind: 'page', label: 'Solicitudes', path: '/solicitudes', icon: FileText },
   { id: 'page-comunicaciones', kind: 'page', label: 'Comunicaciones', path: '/comunicaciones', icon: Send },
@@ -39,7 +39,9 @@ export function CommandPalette() {
   const navigate = useNavigate();
   const { members, songs, orders, bands } = useAppStore();
   const { user } = useAuthStore();
-  const isPastor = useCurrentRole() === 'pastor';
+  const role = useCurrentRole();
+  const isPastor = role === 'pastor';
+  const canSeeMembers = role === 'pastor' || role === 'leader';
 
   // Open on Cmd/Ctrl+K from anywhere (desktop), or on a custom event dispatched
   // by mobile UI (where there's no keyboard) so the palette is reachable from
@@ -63,7 +65,13 @@ export function CommandPalette() {
   }, [open]);
 
   // All hooks must run unconditionally (rules of hooks).
-  const pageItems = isPastor ? [...PAGE_ITEMS_BASE, ...PASTOR_PAGE_ITEMS] : PAGE_ITEMS_BASE;
+  // Page navigation: members don't see Miembros (gated in nav & via route guard).
+  // Pastors additionally see Solicitudes + Comunicaciones.
+  const pageItems = [
+    ...PAGE_ITEMS_BASE,
+    ...(canSeeMembers ? [MIEMBROS_PAGE_ITEM] : []),
+    ...(isPastor ? PASTOR_PAGE_ITEMS : []),
+  ];
 
   const recentOrders = useMemo(
     () =>
@@ -147,19 +155,22 @@ export function CommandPalette() {
                 </Command.Group>
               )}
 
-              {members.length > 0 && (
+              {/* Members results: only for roles that can land on /miembros.
+                  Plain members get bounced from that route, so hiding the
+                  search results too avoids a confusing dead-end. */}
+              {canSeeMembers && members.length > 0 && (
                 <Command.Group heading="Miembros" className="text-xs uppercase text-gray-500 px-2 pt-2 pb-1">
                   {members.filter((m) => m.active !== false).slice(0, 50).map((m) => (
                     <Command.Item
                       key={`member-${m.id}`}
-                      value={`miembro ${m.name} ${m.email || ''}`}
+                      value={`miembro ${m.name} ${isPastor ? (m.email || '') : ''}`}
                       onSelect={() => go(`/miembros?member=${m.id}`)}
                       className="flex items-center gap-3 px-3 py-2 rounded-lg cursor-pointer text-white aria-selected:bg-white/10"
                     >
                       <UserCircle size={16} className="text-blue-400 shrink-0" />
                       <div className="flex-1 min-w-0">
                         <div className="truncate">{m.name}</div>
-                        {m.email && <div className="text-xs text-gray-500 truncate">{m.email}</div>}
+                        {isPastor && m.email && <div className="text-xs text-gray-500 truncate">{m.email}</div>}
                       </div>
                       <span className="text-xs text-gray-500 capitalize">{m.role}</span>
                     </Command.Item>

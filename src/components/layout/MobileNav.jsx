@@ -51,12 +51,14 @@ const formatDateLocal = (dateStr) => {
   });
 };
 
-const navItems = [
+// Full nav list. The component filters it by role at render time so plain
+// members don't see the "Miembros" tab (it would be empty UX for them).
+const ALL_NAV_ITEMS = [
   { path: '/', icon: LayoutDashboard, label: 'Inicio' },
   { path: '/ordenes', icon: CalendarDays, label: 'Órdenes' },
   { path: '/repertorio', icon: Music2, label: 'Repertorio' },
   { path: '/bandas', icon: Users, label: 'Bandas' },
-  { path: '/miembros', icon: UserCircle, label: 'Miembros' },
+  { path: '/miembros', icon: UserCircle, label: 'Miembros', roles: ['pastor', 'leader'] },
 ];
 
 // pageTitles lives in src/lib/pageTitles.js — single source of truth shared
@@ -341,15 +343,17 @@ export const MobileNav = () => {
   const displayLeaderOf = currentUserMember?.leader_of || profile?.leader_of;
   const displayBirthdate = currentUserMember?.birthdate || profile?.birthdate;
 
-  // Add Solicitudes & Comunicaciones for pastors only
+  // Filter the base nav by role (plain members don't see "Miembros") and
+  // add Solicitudes / Comunicaciones for pastors only.
+  const role = currentUserMember?.role || profile?.role || 'member';
   const allNavItems = useMemo(() => {
-    const items = [...navItems];
+    const items = ALL_NAV_ITEMS.filter((it) => !it.roles || it.roles.includes(role));
     if (isPastor) {
       items.push({ path: '/solicitudes', icon: FileText, label: 'Solicitudes' });
       items.push({ path: '/comunicaciones', icon: Send, label: 'Comunicaciones' });
     }
     return items;
-  }, [isPastor]);
+  }, [isPastor, role]);
 
   const profileSheetRef = useRef(null);
   const fileInputRef = useRef(null);
