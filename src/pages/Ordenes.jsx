@@ -152,14 +152,16 @@ export const Ordenes = () => {
 
   const unusedSongs = selectedBandForUnused ? getUnusedByBand(selectedBandForUnused, 4) : [];
 
-  // Filtered songs for dropdown search
+  // Filtered songs for dropdown search.
+  // Defensive null-guards: any NULL on title/artist/key (legacy data) would
+  // crash the whole Ordenes page with "Cannot read properties of null".
   const filteredSongsForDropdown = useMemo(() => {
     if (!songSearchTerm.trim()) return songs.slice(0, 10);
     const search = songSearchTerm.toLowerCase();
     return songs.filter(song =>
-      song.title.toLowerCase().includes(search) ||
-      song.artist.toLowerCase().includes(search) ||
-      song.key.toLowerCase().includes(search)
+      (song.title || '').toLowerCase().includes(search) ||
+      (song.artist || '').toLowerCase().includes(search) ||
+      (song.key || '').toLowerCase().includes(search)
     ).slice(0, 15);
   }, [songs, songSearchTerm]);
 
@@ -185,17 +187,23 @@ export const Ordenes = () => {
     e.preventDefault();
     if (!formData.date || !formData.bandId) return;
 
-    // Save key history for all songs with directors
-    const orderId = crypto.randomUUID(); // Generate ID for history tracking
+    // CRITICAL FIX: addOrder must run FIRST so we have the real order.id to
+    // satisfy the song_key_history.order_id FK. Previously a fresh random UUID
+    // was passed in, which the FK silently rejected — leaving song_key_history
+    // empty forever and breaking smart-suggest of the key per director.
+    const newOrder = await addOrder(formData);
+    if (!newOrder?.id) {
+      console.error('addOrder did not return an id; skipping key history save');
+      handleCloseModal();
+      return;
+    }
 
-    // Save key history for each song with a director
     await Promise.all(
       formData.songs
         .filter(s => s.directorId)
-        .map(s => saveKeyHistory(s.directorId, s.songId, s.key, orderId))
+        .map(s => saveKeyHistory(s.directorId, s.songId, s.key, newOrder.id))
     );
 
-    addOrder(formData);
     handleCloseModal();
   };
 
