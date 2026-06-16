@@ -169,6 +169,22 @@ const convertOrderFromDB = (o) => ({
   updatedAt: o.updated_at,
 });
 
+// ⚠️ DATA-LOSS LANDMINE — convertXToDB shape and contract ⚠️
+// The convertXToDB helpers below regenerate a FULL DB row, filling defaults
+// (NULL, '', 'C', [], 'culto_general', etc.) for every field the input doesn't
+// supply. This is the right shape for an INSERT but is CATASTROPHIC for an
+// UPDATE: a partial input would silently wipe every other column on the row.
+//
+// Rule: NEVER call `supabase.from(...).update(convertXToDB(partial))`. Always
+// route through `updateMember/Band/Song/Order` in this store — they merge the
+// partial input with the current store snapshot BEFORE handing to the
+// converter, so the full row going to UPDATE has the real values intact.
+//
+// History: this comment exists because June 15 2026 the bug wiped the lyrics,
+// chords, artist, original key, categories, youtube_url, bpm and compass of
+// every song touched by every saved order. See PR #20 commit message and
+// memory/project_state_20260615.md for the full incident report.
+
 // Convert camelCase to snake_case for Supabase
 const convertMemberToDB = (m) => {
   const out = {
