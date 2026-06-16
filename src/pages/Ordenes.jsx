@@ -91,11 +91,6 @@ export const Ordenes = () => {
   const [keyHistoryLoading, setKeyHistoryLoading] = useState(false);
   const [keyHistoryTooltip, setKeyHistoryTooltip] = useState(null);
 
-  // Members who can be directors (only active members with "Voz" instrument)
-  const singers = useMemo(() => {
-    return members.filter(m => m.active && m.instruments?.includes('Voz'));
-  }, [members]);
-
   const [formData, setFormData] = useState({
     date: '',
     time: '20:00',
@@ -104,6 +99,22 @@ export const Ordenes = () => {
     songs: [],
     feedback: ''
   });
+
+  // Members eligible to direct the songs in THIS order: must be in the
+  // selected band, active, and have Voz as instrument. When no band is
+  // chosen yet the list is empty — the song-search input is also blocked
+  // (see the search input below) so this can't be reached needing directors.
+  const singers = useMemo(() => {
+    if (!formData.bandId) return [];
+    const band = bands.find(b => b.id === formData.bandId);
+    if (!band) return [];
+    const bandMemberIds = new Set(band.members || []);
+    return members.filter(m =>
+      m.active &&
+      bandMemberIds.has(m.id) &&
+      m.instruments?.includes('Voz')
+    );
+  }, [members, bands, formData.bandId]);
 
   // Confirmation modals
   const [confirmModal, setConfirmModal] = useState({
@@ -1101,10 +1112,21 @@ export const Ordenes = () => {
                 onChange={(e) => {
                   const bandId = e.target.value || null;
                   const band = getBandById(bandId);
+                  // When the band changes, drop any director assignments that
+                  // don't belong to the new band — those members aren't
+                  // singers of this band anymore. The key reverts to the
+                  // song's default; the user can pick a valid director next.
+                  const newBandMemberIds = new Set(band?.members || []);
+                  const songsAfterBandSwap = formData.songs.map((s) => (
+                    s.directorId && !newBandMemberIds.has(s.directorId)
+                      ? { ...s, directorId: null, _suggestedDirector: false }
+                      : s
+                  ));
                   setFormData({
                     ...formData,
                     bandId,
-                    meetingType: band?.meetingType || 'culto_general'
+                    meetingType: band?.meetingType || 'culto_general',
+                    songs: songsAfterBandSwap,
                   });
                   setSelectedBandForUnused(bandId);
                 }}
@@ -1315,20 +1337,48 @@ export const Ordenes = () => {
                 }}
               >
                 <div
-                  className="w-full bg-neutral-800 border border-neutral-700 rounded-xl px-4 py-3 flex items-center gap-2 cursor-pointer hover:border-neutral-600 transition-colors"
-                  onClick={() => setShowSongDropdown(!showSongDropdown)}
+                  className={`w-full bg-neutral-800 border border-neutral-700 rounded-xl px-4 py-3 flex items-center gap-2 transition-colors ${
+                    formData.bandId
+                      ? 'cursor-pointer hover:border-neutral-600'
+                      : 'cursor-not-allowed opacity-60'
+                  }`}
+                  onClick={() => {
+                    // Block adding songs until a band is chosen: the director
+                    // dropdown derives its options from the band, so without
+                    // a band the song row would offer an empty director list.
+                    if (!formData.bandId) {
+                      setErrorModal({
+                        isOpen: true,
+                        title: 'Elegí la banda primero',
+                        message: 'Para agregar canciones necesitamos saber qué banda va a tocar — así sólo te ofrecemos como directores a quienes integran esa banda.',
+                      });
+                      return;
+                    }
+                    setShowSongDropdown(!showSongDropdown);
+                  }}
                 >
                   <Search size={16} className="text-gray-500" />
                   <input
                     type="text"
-                    placeholder="Buscar canción por nombre, artista o tonalidad..."
+                    placeholder={formData.bandId ? 'Buscar canción por nombre, artista o tonalidad...' : 'Primero elegí la banda…'}
                     value={songSearchTerm}
+                    disabled={!formData.bandId}
                     onChange={(e) => {
                       setSongSearchTerm(e.target.value);
                       setShowSongDropdown(true);
                     }}
-                    onFocus={() => setShowSongDropdown(true)}
-                    className="flex-1 bg-transparent outline-none text-sm"
+                    onFocus={() => {
+                      if (!formData.bandId) {
+                        setErrorModal({
+                          isOpen: true,
+                          title: 'Elegí la banda primero',
+                          message: 'Para agregar canciones necesitamos saber qué banda va a tocar — así sólo te ofrecemos como directores a quienes integran esa banda.',
+                        });
+                        return;
+                      }
+                      setShowSongDropdown(true);
+                    }}
+                    className="flex-1 bg-transparent outline-none text-sm disabled:cursor-not-allowed"
                   />
                   <ChevronDown size={16} className="text-gray-500" />
                 </div>
