@@ -333,20 +333,21 @@ export const useAppStore = create((set, get) => ({
 
   updateMember: async (id, updates) => {
     try {
-      // CRITICAL: Preserve avatar_url if not explicitly provided in updates
-      // This prevents losing the avatar when only role/name/etc is changed
-      const existingMember = get().members.find(m => m.id === id);
-
-      // Only preserve if avatar is not being explicitly changed to a new value
-      // convertMemberToDB uses avatarUrl, so we must set that field
-      if (!updates.avatar_url && !updates.avatarUrl && existingMember?.avatar_url) {
-        updates.avatar_url = existingMember.avatar_url;
-        updates.avatarUrl = existingMember.avatar_url; // <-- This is the fix!
+      // CRITICAL DATA-LOSS FIX: convertMemberToDB regenerates the entire DB row
+      // with defaults for every missing field. If we passed `updates` alone,
+      // any field not in `updates` would be wiped (phone, birthdate, role…).
+      // We merge updates over the current store snapshot first so the converter
+      // emits the full, intact row. (Same pattern fixes updateBand/Song/Order.)
+      const current = get().members.find(m => m.id === id);
+      if (!current) {
+        console.error('updateMember: member not found in store, aborting', { id });
+        return null;
       }
+      const merged = { ...current, ...updates };
 
       const { data, error } = await supabase
         .from('members')
-        .update(convertMemberToDB(updates))
+        .update(convertMemberToDB(merged))
         .eq('id', id)
         .select()
         .single();
@@ -454,9 +455,18 @@ export const useAppStore = create((set, get) => ({
 
   updateBand: async (id, updates) => {
     try {
+      // Merge with current store snapshot before converting — see updateMember
+      // comment for why. Prevents data loss on partial updates.
+      const current = get().bands.find(b => b.id === id);
+      if (!current) {
+        console.error('updateBand: band not found in store, aborting', { id });
+        return null;
+      }
+      const merged = { ...current, ...updates };
+
       const { data, error } = await supabase
         .from('bands')
-        .update(convertBandToDB(updates))
+        .update(convertBandToDB(merged))
         .eq('id', id)
         .select()
         .single();
@@ -526,9 +536,22 @@ export const useAppStore = create((set, get) => ({
 
   updateSong: async (id, updates) => {
     try {
+      // CRITICAL DATA-LOSS FIX: this was the root cause of the structure=[]
+      // wipe-out reported by Paul. updateSong(id, { lastUsed }) called from
+      // addOrder used to send the converted row with EVERY other field
+      // defaulted to '', NULL, or 'C' — silently nuking lyrics, chords, tono,
+      // artista, categorías, youtube, etc. on every order save.
+      // Merge with current store snapshot before converting.
+      const current = get().songs.find(s => s.id === id);
+      if (!current) {
+        console.error('updateSong: song not found in store, aborting', { id });
+        return null;
+      }
+      const merged = { ...current, ...updates };
+
       const { data, error } = await supabase
         .from('songs')
-        .update(convertSongToDB(updates))
+        .update(convertSongToDB(merged))
         .eq('id', id)
         .select()
         .single();
@@ -605,9 +628,18 @@ export const useAppStore = create((set, get) => ({
 
   updateOrder: async (id, updates) => {
     try {
+      // Merge with current store snapshot before converting — see updateMember
+      // comment. Without this, saving feedback alone would wipe date/band/songs.
+      const current = get().orders.find(o => o.id === id);
+      if (!current) {
+        console.error('updateOrder: order not found in store, aborting', { id });
+        return null;
+      }
+      const merged = { ...current, ...updates };
+
       const { data, error } = await supabase
         .from('orders')
-        .update(convertOrderToDB(updates))
+        .update(convertOrderToDB(merged))
         .eq('id', id)
         .select()
         .single();
