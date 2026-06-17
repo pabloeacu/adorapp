@@ -386,7 +386,11 @@ export const MobileNav = () => {
     setEditBirthdate(displayBirthdate || '');
   };
 
-  const handleMouseDown = (e) => {
+  // Cropper drag: use Pointer Events so mouse, touch and pen all work with the
+  // same handlers. The previous mouse-only impl meant Leandro (and every
+  // other phone/tablet user) could zoom/rotate but not pan the image inside
+  // the crop circle.
+  const handlePointerDown = (e) => {
     setIsDragging(true);
     setDragStart({
       x: e.clientX - position.x,
@@ -394,7 +398,7 @@ export const MobileNav = () => {
     });
   };
 
-  const handleMouseMove = useCallback((e) => {
+  const handlePointerMove = useCallback((e) => {
     if (isDragging) {
       setPosition({
         x: e.clientX - dragStart.x,
@@ -403,20 +407,22 @@ export const MobileNav = () => {
     }
   }, [isDragging, dragStart]);
 
-  const handleMouseUp = useCallback(() => {
+  const handlePointerUp = useCallback(() => {
     setIsDragging(false);
   }, []);
 
   useEffect(() => {
     if (isDragging) {
-      document.addEventListener('mousemove', handleMouseMove);
-      document.addEventListener('mouseup', handleMouseUp);
+      document.addEventListener('pointermove', handlePointerMove);
+      document.addEventListener('pointerup', handlePointerUp);
+      document.addEventListener('pointercancel', handlePointerUp);
       return () => {
-        document.removeEventListener('mousemove', handleMouseMove);
-        document.removeEventListener('mouseup', handleMouseUp);
+        document.removeEventListener('pointermove', handlePointerMove);
+        document.removeEventListener('pointerup', handlePointerUp);
+        document.removeEventListener('pointercancel', handlePointerUp);
       };
     }
-  }, [isDragging, handleMouseMove, handleMouseUp]);
+  }, [isDragging, handlePointerMove, handlePointerUp]);
 
   const handleSaveProfile = async () => {
     if (!editName.trim()) {
@@ -1178,8 +1184,13 @@ export const MobileNav = () => {
               {/* Full Image Container - shows complete image WITHOUT clipping */}
               <div
                 className="relative w-full h-full cursor-move"
-                onMouseDown={handleMouseDown}
-                style={{ cursor: isDragging ? 'grabbing' : 'grab' }}
+                onPointerDown={handlePointerDown}
+                style={{
+                  cursor: isDragging ? 'grabbing' : 'grab',
+                  // Prevent the browser from hijacking the touch gesture for
+                  // scrolling/zooming the page — we want it for panning the photo.
+                  touchAction: 'none',
+                }}
               >
                 {previewUrl && (
                   <img
