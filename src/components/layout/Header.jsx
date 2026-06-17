@@ -616,7 +616,10 @@ export const Header = () => {
     }
   };
 
-  const handleMouseDown = (e) => {
+  // Cropper drag uses Pointer Events so mouse, touch and pen all share one
+  // handler set. Mouse-only events meant tablet/touch users could zoom and
+  // rotate but not pan the photo inside the crop circle.
+  const handlePointerDown = (e) => {
     e.preventDefault();
     setIsDragging(true);
     setDragStart({
@@ -625,7 +628,7 @@ export const Header = () => {
     });
   };
 
-  const handleMouseMove = useCallback((e) => {
+  const handlePointerMove = useCallback((e) => {
     if (isDragging) {
       setPosition({
         x: e.clientX - dragStart.x,
@@ -634,20 +637,22 @@ export const Header = () => {
     }
   }, [isDragging, dragStart]);
 
-  const handleMouseUp = useCallback(() => {
+  const handlePointerUp = useCallback(() => {
     setIsDragging(false);
   }, []);
 
   useEffect(() => {
     if (isDragging) {
-      document.addEventListener('mousemove', handleMouseMove);
-      document.addEventListener('mouseup', handleMouseUp);
+      document.addEventListener('pointermove', handlePointerMove);
+      document.addEventListener('pointerup', handlePointerUp);
+      document.addEventListener('pointercancel', handlePointerUp);
       return () => {
-        document.removeEventListener('mousemove', handleMouseMove);
-        document.removeEventListener('mouseup', handleMouseUp);
+        document.removeEventListener('pointermove', handlePointerMove);
+        document.removeEventListener('pointerup', handlePointerUp);
+        document.removeEventListener('pointercancel', handlePointerUp);
       };
     }
-  }, [isDragging, handleMouseMove, handleMouseUp]);
+  }, [isDragging, handlePointerMove, handlePointerUp]);
 
   // Process and save photo with crop/zoom/rotation applied - MATCHES PREVIEW EXACTLY
   const handleSavePhoto = async () => {
@@ -1202,8 +1207,11 @@ export const Header = () => {
             {/* Draggable Image Container - NO clipping, shows full image */}
             <div
               className="relative cursor-move"
-              onMouseDown={handleMouseDown}
-              style={{ cursor: isDragging ? 'grabbing' : 'grab' }}
+              onPointerDown={handlePointerDown}
+              style={{
+                cursor: isDragging ? 'grabbing' : 'grab',
+                touchAction: 'none',
+              }}
             >
               {previewUrl && (
                 <img
