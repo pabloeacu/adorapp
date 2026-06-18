@@ -68,8 +68,15 @@ export const Layout = () => {
 
         {/* Mobile Content - Full screen */}
         <div
-          className="lg:hidden flex-1 overflow-y-auto overflow-x-hidden pb-16"
-          style={{ paddingTop: 'calc(56px + env(safe-area-inset-top, 0px))' }}
+          className="lg:hidden flex-1 overflow-y-auto overflow-x-hidden"
+          style={{
+            paddingTop: 'calc(56px + env(safe-area-inset-top, 0px))',
+            // Clear the fixed bottom nav (h-20 = 80px) plus the gesture-bar
+            // safe area, so the last items scroll fully into view instead of
+            // sitting hidden behind the bar. pb-16 (64px) ignored the safe
+            // area and cut off the last row on phones with a gesture bar.
+            paddingBottom: 'calc(80px + env(safe-area-inset-bottom, 0px))',
+          }}
         >
           <main className="p-4">
             <Outlet />
