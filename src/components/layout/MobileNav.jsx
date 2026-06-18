@@ -1224,7 +1224,11 @@ export const MobileNav = () => {
             }
           }}
         >
-          <div className="flex items-center justify-between p-4 border-b border-neutral-800" onClick={(e) => e.stopPropagation()}>
+          <div
+            className="flex items-center gap-3 p-4 border-b border-neutral-800"
+            style={{ paddingTop: 'calc(1rem + env(safe-area-inset-top, 0px))' }}
+            onClick={(e) => e.stopPropagation()}
+          >
             <button
               onClick={() => {
                 setShowCropper(false);
@@ -1236,13 +1240,6 @@ export const MobileNav = () => {
               <X size={20} className="text-neutral-400" />
             </button>
             <h3 className="text-white font-semibold">Ajustar Foto</h3>
-            <button
-              onClick={handleSavePhoto}
-              className="px-4 py-2 bg-white text-black font-medium rounded-lg hover:bg-neutral-200 transition-colors flex items-center gap-2"
-            >
-              <Check size={18} />
-              Guardar
-            </button>
           </div>
 
           <div className="flex-1 overflow-y-auto flex flex-col items-center justify-center p-4" onClick={(e) => e.stopPropagation()}>
@@ -1385,6 +1382,23 @@ export const MobileNav = () => {
             <p className="text-neutral-500 text-xs text-center mt-4 px-4">
               Arrastrá la imagen para posicionarla dentro del círculo. Ajustá el zoom y rotación.
             </p>
+          </div>
+
+          {/* Save bar pinned at the bottom — always reachable and clear of the
+              home indicator. Guardar used to live in the top bar, where the
+              status bar / notch covered it and made it untappable. */}
+          <div
+            className="shrink-0 p-4 border-t border-neutral-800"
+            style={{ paddingBottom: 'calc(1rem + env(safe-area-inset-bottom, 0px))' }}
+            onClick={(e) => e.stopPropagation()}
+          >
+            <button
+              onClick={handleSavePhoto}
+              className="w-full py-3 bg-white text-black font-medium rounded-xl hover:bg-neutral-200 transition-colors flex items-center justify-center gap-2"
+            >
+              <Check size={18} />
+              Guardar cambios
+            </button>
           </div>
         </div>
       )}
