@@ -949,7 +949,7 @@ export const Ordenes = () => {
 
           return (
             <Card key={order.id} className="hover:border-neutral-700 transition-all">
-              <div className="flex items-start justify-between mb-4">
+              <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between mb-4">
                 <div className="flex items-center gap-4">
                   <div className={`w-14 h-14 rounded-xl flex items-center justify-center ${
                     order.status === 'completed' ? 'bg-green-500/20' :
@@ -983,7 +983,10 @@ export const Ordenes = () => {
                   </div>
                 </div>
 
-                <div className="flex items-center gap-2">
+                {/* flex-wrap so every action (incl. Imprimir = canciones con
+                    acordes) stays reachable on mobile; the row used to overflow
+                    the card off-screen to the right and hide Imprimir/Repetir. */}
+                <div className="flex flex-wrap items-center gap-2">
                   <Button variant="ghost" size="sm" icon={Eye} onClick={() => handleViewOrder(order)}>
                     Ver
                   </Button>
@@ -1436,9 +1439,18 @@ export const Ordenes = () => {
                 <h3 className="text-xl font-semibold">{formatDate(viewingOrder.date)}</h3>
                 <p className="text-gray-400">{viewingOrder.time}</p>
               </div>
-              <div className="flex items-center gap-2">
+              <div className="flex flex-wrap items-center gap-2">
                 <Button variant="secondary" size="sm" icon={FileDown} onClick={() => generateOrderPDF(viewingOrder)}>
                   Exportar PDF
+                </Button>
+                <Button
+                  variant="secondary"
+                  size="sm"
+                  icon={Printer}
+                  onClick={() => generateSongsPDF(viewingOrder)}
+                  title="Imprimir canciones con acordes (una canción por página)"
+                >
+                  Imprimir
                 </Button>
                 <Badge className={statusConfig[viewingOrder.status]?.bg}>
                   <span className={statusConfig[viewingOrder.status]?.color}>
