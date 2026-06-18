@@ -583,16 +583,12 @@ export const MobileNav = () => {
     }
 
     try {
-      // Get original file from input
-      const file = fileInputRef.current?.files?.[0];
-      if (!file) {
-        setShowCropper(false);
-        setPreviewUrl(null);
-        return;
-      }
-
-
-      // Load the image
+      // Load the image from previewUrl. We intentionally do NOT read the file
+      // from fileInputRef here: the <input> lives inside the photo modal, which
+      // is unmounted when the cropper opens (setShowPhotoModal(false)), so
+      // fileInputRef.current is null at save time — that made "Guardar" un
+      // no-op silencioso en móvil (no subía nada). previewUrl ya tiene todo lo
+      // necesario para renderizar el recorte.
       const img = new Image();
 
       await new Promise((resolve, reject) => {
