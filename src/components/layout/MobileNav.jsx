@@ -367,6 +367,9 @@ export const MobileNav = () => {
 
   const profileSheetRef = useRef(null);
   const fileInputRef = useRef(null);
+  // Ref to the preview <img> in the cropper so the save can read its real
+  // rendered (pre-transform) size and reproduce the crop exactly.
+  const cropImgRef = useRef(null);
 
   const handleLogout = async (e) => {
     e.stopPropagation();
@@ -604,27 +607,24 @@ export const MobileNav = () => {
       canvas.height = canvasSize;
       const ctx = canvas.getContext('2d');
 
-      // Mobile preview uses maxHeight: 280px, circle is 200px
-      const previewCircleSize = 200;
-      const previewMaxHeight = 280;
-      const imgAspect = img.width / img.height;
-
-      let imgDisplayW, imgDisplayH;
-      const containerAspect = 1; // square container
-      if (imgAspect > containerAspect) {
-        // Wide image: width = previewCircleSize, height proportionally
-        imgDisplayW = previewCircleSize;
-        imgDisplayH = previewCircleSize / imgAspect;
+      // Reproduce the on-screen preview EXACTLY. Instead of guessing the
+      // displayed image size from constants (the old bug: the saved crop didn't
+      // match what the user saw), we read the preview <img>'s real rendered
+      // size — offsetWidth/Height reflect the browser's object-fit:contain
+      // layout and are unaffected by the CSS transform.
+      const previewCircleSize = 200; // crop circle diameter in preview px
+      const imgEl = cropImgRef.current;
+      let baseW, baseH;
+      if (imgEl && imgEl.offsetWidth) {
+        baseW = imgEl.offsetWidth;
+        baseH = imgEl.offsetHeight;
       } else {
-        // Tall/square image: height = previewMaxHeight, width proportionally
-        imgDisplayH = previewMaxHeight;
-        imgDisplayW = previewMaxHeight * imgAspect;
+        // Fallback (should not happen while the cropper is open).
+        const aspect = img.width / img.height;
+        baseW = aspect >= 1 ? previewCircleSize : previewCircleSize * aspect;
+        baseH = aspect >= 1 ? previewCircleSize / aspect : previewCircleSize;
       }
-
-      // Scale from preview pixels to canvas pixels
-      const scaleToCanvas = canvasSize / previewCircleSize;
-      const canvasImgW = imgDisplayW * scaleToCanvas;
-      const canvasImgH = imgDisplayH * scaleToCanvas;
+      const k = canvasSize / previewCircleSize; // preview px -> canvas px
 
       // Clip to circle
       ctx.save();
@@ -632,19 +632,15 @@ export const MobileNav = () => {
       ctx.arc(canvasSize / 2, canvasSize / 2, canvasSize / 2, 0, Math.PI * 2);
       ctx.clip();
 
-      // Move to canvas center
+      // Same transform pipeline as the CSS preview (transform-origin: center,
+      // image centered): center -> scale(k) -> scale(zoom) -> rotate ->
+      // translate(px/zoom, py/zoom), then draw the image centered.
       ctx.translate(canvasSize / 2, canvasSize / 2);
-
-      // Apply same transforms as CSS preview
-      ctx.rotate((rotation * Math.PI) / 180);
+      ctx.scale(k, k);
       ctx.scale(zoom, zoom);
-      ctx.translate(
-        position.x * scaleToCanvas,
-        position.y * scaleToCanvas
-      );
-
-      // Draw image centered
-      ctx.drawImage(img, -canvasImgW / 2, -canvasImgH / 2, canvasImgW, canvasImgH);
+      ctx.rotate((rotation * Math.PI) / 180);
+      ctx.translate(position.x / zoom, position.y / zoom);
+      ctx.drawImage(img, -baseW / 2, -baseH / 2, baseW, baseH);
 
       ctx.restore();
 
@@ -1259,6 +1255,7 @@ export const MobileNav = () => {
               >
                 {previewUrl && (
                   <img
+                    ref={cropImgRef}
                     src={previewUrl}
                     alt="Preview"
                     className="absolute"
@@ -1266,13 +1263,15 @@ export const MobileNav = () => {
                       maxHeight: '280px',
                       maxWidth: '100%',
                       objectFit: 'contain',
-                      transform: `scale(${zoom}) rotate(${rotation}deg) translate(${position.x / zoom}px, ${position.y / zoom}px)`,
-                      transition: isDragging ? 'none' : 'transform 0.2s ease',
+                      // Clean centering: translate(-50%,-50%) centers the image on
+                      // its own size (% is relative to the element), then zoom /
+                      // rotate / pan about the center. The canvas save replicates
+                      // this exact pipeline so the crop matches the preview.
                       left: '50%',
                       top: '50%',
                       transformOrigin: 'center center',
-                      marginLeft: '-50%',
-                      marginTop: '-50%'
+                      transform: `translate(-50%, -50%) scale(${zoom}) rotate(${rotation}deg) translate(${position.x / zoom}px, ${position.y / zoom}px)`,
+                      transition: isDragging ? 'none' : 'transform 0.2s ease',
                     }}
                     draggable={false}
                   />
