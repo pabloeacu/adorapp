@@ -150,32 +150,6 @@ export const Header = () => {
     }
   }, [profile, displayPhoto]);
 
-  // Listen for events from MobileNav
-  useEffect(() => {
-    const handleOpenPhotoUpload = () => {
-      setShowProfile(true);
-    };
-
-    const handleOpenEditProfile = () => {
-      setEditName(currentUserMember?.name || profile?.name || user?.name || '');
-      setEditPhone(currentUserMember?.phone || profile?.phone || '');
-      setEditPastorArea(currentUserMember?.pastor_area || profile?.pastor_area || '');
-      setEditLeaderOf(currentUserMember?.leader_of || profile?.leader_of || '');
-      setEditBirthdate(currentUserMember?.birthdate || profile?.birthdate || '');
-      setIsEditing(true);
-      setShowProfile(true);
-    };
-
-    window.addEventListener('openPhotoUpload', handleOpenPhotoUpload);
-    window.addEventListener('openEditProfile', handleOpenEditProfile);
-
-    return () => {
-      window.removeEventListener('openPhotoUpload', handleOpenPhotoUpload);
-      window.removeEventListener('openEditProfile', handleOpenEditProfile);
-    };
-  }, [profile, user, currentUserMember]);
-
-
   // Load notifications from Supabase. Devotional + reflection are global rows
   // emitted by DB triggers (cron, songs/bands/members inserts, registrations
   // pending, etc.) and live in `notifications`. Communications use their own
@@ -860,6 +834,7 @@ export const Header = () => {
 
         <div className="flex items-center gap-4">
           <button
+            onClick={() => window.dispatchEvent(new CustomEvent('openCommandPalette'))}
             className="p-2 rounded-lg hover:bg-neutral-800 transition-colors relative"
             title="Buscar"
           >
@@ -1455,10 +1430,6 @@ export const Header = () => {
         size="md"
       >
         <div className="space-y-4">
-          {/* Debug info */}
-          <div className="text-xs text-gray-500 bg-neutral-800 p-2 rounded mb-4">
-            Total loaded: {notifications.length} | Unread: {unreadCount} | Read IDs: {readNotificationIds.length}
-          </div>
           {/* Filter to show only unread notifications */}
           {(() => {
             const unreadNotifications = notifications.filter(

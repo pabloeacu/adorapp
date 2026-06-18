@@ -1092,7 +1092,7 @@ export const Ordenes = () => {
         }
       >
         <div className="space-y-6">
-          <div className="grid grid-cols-3 gap-4">
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
             <Input
               label="Fecha"
               type="date"
@@ -1201,11 +1201,11 @@ export const Ordenes = () => {
                     const rowId = songRef._localId || `${songRef.songId}-${index}`;
                     return (
                       <SortableSongRow key={rowId} id={rowId}>
-                        <div className="flex items-center gap-3 p-3 bg-neutral-800 rounded-xl">
+                        <div className="flex flex-wrap items-center gap-3 p-3 bg-neutral-800 rounded-xl">
                     <span className="w-6 h-6 rounded-full bg-neutral-700 flex items-center justify-center text-xs shrink-0">
                       {index + 1}
                     </span>
-                    <div className="flex-1 min-w-0">
+                    <div className="flex-1 min-w-0 basis-32">
                       <p className="font-medium truncate">{song?.title}</p>
                       <p className="text-xs text-gray-400 truncate">{song?.artist}</p>
                     </div>
@@ -1434,7 +1434,7 @@ export const Ordenes = () => {
       >
         {viewingOrder && (
           <div className="space-y-6">
-            <div className="flex items-center justify-between">
+            <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
               <div>
                 <h3 className="text-xl font-semibold">{formatDate(viewingOrder.date)}</h3>
                 <p className="text-gray-400">{viewingOrder.time}</p>
@@ -1460,7 +1460,7 @@ export const Ordenes = () => {
               </div>
             </div>
 
-            <div className="grid grid-cols-2 gap-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <Card className="p-4">
                 <p className="text-xs text-gray-400 uppercase mb-1">Banda</p>
                 <p className="font-medium">{getBandById(viewingOrder.bandId)?.name}</p>
