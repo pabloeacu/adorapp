@@ -350,7 +350,7 @@ export const Miembros = () => {
           </p>
         </div>
         {/* View mode toggle - visible to all users */}
-        <div className="flex items-center gap-2">
+        <div className="flex flex-wrap items-center gap-2 justify-end">
           <div className="flex bg-neutral-900 rounded-lg p-1 border border-neutral-800">
             <button
               onClick={() => setViewMode('cards')}
@@ -578,7 +578,7 @@ export const Miembros = () => {
                 </div>
 
                 {isPastor && (
-                  <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                  <div className="flex items-center gap-1 opacity-100 lg:opacity-0 lg:group-hover:opacity-100 transition-opacity">
                     <button
                       onClick={() => handleResetPassword(member)}
                       className="p-2 rounded-lg hover:bg-neutral-800 transition-colors"
@@ -682,7 +682,7 @@ export const Miembros = () => {
         /* Table View */
         <Card className="overflow-hidden">
           <div className="overflow-x-auto">
-            <table className="w-full">
+            <table className="w-full min-w-[640px]">
               <thead>
                 <tr className="border-b border-neutral-800">
                   <th className="text-left px-4 py-3 text-xs text-gray-400 font-medium uppercase">Nombre</th>
@@ -691,8 +691,8 @@ export const Miembros = () => {
                     <>
                       <th className="text-left px-4 py-3 text-xs text-gray-400 font-medium uppercase hidden lg:table-cell">Email</th>
                       <th className="text-left px-4 py-3 text-xs text-gray-400 font-medium uppercase">Teléfono</th>
-                      <th className="text-left px-4 py-3 text-xs text-gray-400 font-medium uppercase">Pastor</th>
-                      <th className="text-left px-4 py-3 text-xs text-gray-400 font-medium uppercase">Líder</th>
+                      <th className="text-left px-4 py-3 text-xs text-gray-400 font-medium uppercase hidden md:table-cell">Pastor</th>
+                      <th className="text-left px-4 py-3 text-xs text-gray-400 font-medium uppercase hidden md:table-cell">Líder</th>
                     </>
                   )}
                   <th className="text-left px-4 py-3 text-xs text-gray-400 font-medium uppercase">Rol</th>
@@ -723,8 +723,8 @@ export const Miembros = () => {
                       <>
                         <td className="px-4 py-3 text-sm text-gray-400">{member.email || '-'}</td>
                         <td className="px-4 py-3 text-sm text-gray-400">{member.phone || '-'}</td>
-                        <td className="px-4 py-3 text-sm text-gray-400">{member.pastor_area || '-'}</td>
-                        <td className="px-4 py-3 text-sm text-gray-400">{member.leader_of || '-'}</td>
+                        <td className="px-4 py-3 text-sm text-gray-400 hidden md:table-cell">{member.pastor_area || '-'}</td>
+                        <td className="px-4 py-3 text-sm text-gray-400 hidden md:table-cell">{member.leader_of || '-'}</td>
                       </>
                     )}
                     <td className="px-4 py-3">
@@ -958,7 +958,7 @@ export const Miembros = () => {
             <label className="text-xs text-gray-400 font-medium uppercase tracking-wide block mb-3">
               Instrumentos (puede seleccionar varios)
             </label>
-            <div className="grid grid-cols-4 gap-2">
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
               {INSTRUMENTS.map(inst => (
                 <button
                   key={inst}

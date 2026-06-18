@@ -405,9 +405,9 @@ export const Solicitudes = () => {
                 <tr className="border-b border-neutral-800">
                   <th className="text-left px-4 py-3 text-xs text-gray-400 font-medium uppercase">Nombre</th>
                   <th className="text-left px-4 py-3 text-xs text-gray-400 font-medium uppercase hidden lg:table-cell">Email</th>
-                  <th className="text-left px-4 py-3 text-xs text-gray-400 font-medium uppercase">Teléfono</th>
-                  <th className="text-left px-4 py-3 text-xs text-gray-400 font-medium uppercase">Instrumentos</th>
-                  <th className="text-left px-4 py-3 text-xs text-gray-400 font-medium uppercase">Fecha</th>
+                  <th className="text-left px-4 py-3 text-xs text-gray-400 font-medium uppercase hidden md:table-cell">Teléfono</th>
+                  <th className="text-left px-4 py-3 text-xs text-gray-400 font-medium uppercase hidden lg:table-cell">Instrumentos</th>
+                  <th className="text-left px-4 py-3 text-xs text-gray-400 font-medium uppercase hidden md:table-cell">Fecha</th>
                   <th className="text-left px-4 py-3 text-xs text-gray-400 font-medium uppercase">Estado</th>
                   <th className="text-right px-4 py-3 text-xs text-gray-400 font-medium uppercase">Acciones</th>
                 </tr>
@@ -427,8 +427,8 @@ export const Solicitudes = () => {
                       </div>
                     </td>
                     <td className="px-4 py-3 text-sm text-gray-400 hidden lg:table-cell">{request.email || '-'}</td>
-                    <td className="px-4 py-3 text-sm text-gray-400">{request.phone || '-'}</td>
-                    <td className="px-4 py-3">
+                    <td className="px-4 py-3 text-sm text-gray-400 hidden md:table-cell">{request.phone || '-'}</td>
+                    <td className="px-4 py-3 hidden lg:table-cell">
                       <div className="flex gap-1">
                         {request.instruments?.slice(0, 2).map((inst) => (
                           <span key={inst} className="px-2 py-0.5 bg-neutral-800 rounded text-xs">
@@ -442,7 +442,7 @@ export const Solicitudes = () => {
                         )}
                       </div>
                     </td>
-                    <td className="px-4 py-3 text-sm text-gray-400">{formatDateLocal(request.created_at)}</td>
+                    <td className="px-4 py-3 text-sm text-gray-400 hidden md:table-cell">{formatDateLocal(request.created_at)}</td>
                     <td className="px-4 py-3">
                       <span className={`text-xs font-medium px-2 py-0.5 rounded-full ${statusConfig[request.status]?.bg} ${statusConfig[request.status]?.color}`}>
                         {statusConfig[request.status]?.label}

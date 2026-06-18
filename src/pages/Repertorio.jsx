@@ -487,7 +487,7 @@ export const Repertorio = () => {
           </p>
         </div>
         <div className="flex items-center gap-2">
-          <div className="flex items-center gap-2">
+          <div className="flex flex-wrap items-center gap-2 justify-end">
             <div className="flex bg-neutral-900 rounded-lg p-1 border border-neutral-800">
               <button
                 onClick={() => setViewMode('cards')}
@@ -648,23 +648,25 @@ export const Repertorio = () => {
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
           {filteredSongs.map((song) => (
             <Card key={song.id} hover className="group">
-              <div className="flex items-start justify-between mb-4">
-                <div className="flex items-center gap-3">
-                  <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-purple-500/20 to-pink-500/20 flex items-center justify-center">
+              <div className="flex items-start justify-between gap-2 mb-4 flex-wrap">
+                <div className="flex items-center gap-3 min-w-0">
+                  <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-purple-500/20 to-pink-500/20 flex items-center justify-center shrink-0">
                     <Music2 size={24} className="text-purple-400" />
                   </div>
-                  <div>
-                    <h3 className="font-semibold">{song.title}</h3>
-                    <p className="text-sm text-gray-400">{song.artist}</p>
+                  <div className="min-w-0">
+                    <h3 className="font-semibold truncate">{song.title}</h3>
+                    <p className="text-sm text-gray-400 truncate">{song.artist}</p>
                   </div>
                 </div>
-                <Badge variant="primary">Tono: {song.key}</Badge>
+                <div className="flex flex-wrap items-center gap-1 justify-end">
+                  <Badge variant="primary">Tono: {song.key}</Badge>
                   {song.compass && (
                     <Badge variant="secondary">Comp: {song.compass}</Badge>
                   )}
                   {song.bpm && (
                     <Badge variant="secondary">BPM: {song.bpm}</Badge>
                   )}
+                </div>
               </div>
 
               <div className="flex items-start gap-2 mb-3 flex-wrap">
@@ -694,7 +696,7 @@ export const Repertorio = () => {
                 </p>
               )}
 
-              <div className="flex items-center gap-2 pt-3 border-t border-neutral-800">
+              <div className="flex flex-wrap items-center gap-2 pt-3 border-t border-neutral-800">
                 <Button
                   variant="ghost"
                   size="sm"
@@ -743,7 +745,7 @@ export const Repertorio = () => {
         /* Table View */
         <Card className="overflow-hidden">
           <div className="overflow-x-auto">
-            <table className="w-full">
+            <table className="w-full min-w-[640px]">
               <thead>
                 <tr className="border-b border-neutral-800">
                   <th className="text-left px-4 py-3 text-xs text-gray-400 font-medium uppercase">Canción</th>
@@ -1068,7 +1070,7 @@ export const Repertorio = () => {
                       </button>
                     )}
                   </div>
-                  <div className="grid grid-cols-2 gap-3">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                     <div>
                       <label className="text-xs text-gray-500 block mb-1">Acordes</label>
                       <input
@@ -1122,7 +1124,7 @@ export const Repertorio = () => {
 
           return (
             <div className="space-y-6">
-              <div className="flex items-center justify-between">
+              <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
                 <div>
                   <p className="text-gray-400">{viewingSong.artist}</p>
                   <div className="flex flex-wrap items-center gap-2 mt-2">
@@ -1140,7 +1142,7 @@ export const Repertorio = () => {
                     ))}
                   </div>
                 </div>
-                <div className="flex items-center gap-2">
+                <div className="flex flex-wrap items-center gap-2">
                   <select
                     className="bg-neutral-800 border border-neutral-700 rounded-lg px-3 py-2"
                     value={viewingKey}

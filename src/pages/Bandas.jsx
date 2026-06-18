@@ -177,16 +177,16 @@ export const Bandas = () => {
           return (
             <Card key={band.id} className="overflow-hidden">
               <div
-                className="flex items-center justify-between p-4 cursor-pointer hover:bg-neutral-800/30 transition-colors"
+                className="flex flex-wrap items-center justify-between gap-3 p-4 cursor-pointer hover:bg-neutral-800/30 transition-colors"
                 onClick={() => setExpandedBand(isExpanded ? null : band.id)}
               >
-                <div className="flex items-center gap-4">
+                <div className="flex items-center gap-4 min-w-0">
                   <div className="w-14 h-14 rounded-xl bg-gradient-to-br from-purple-500 to-pink-500 flex items-center justify-center">
                     <Users size={24} className="text-white" />
                   </div>
                   <div>
                     <h3 className="text-lg font-semibold">{band.name}</h3>
-                    <div className="flex items-center gap-3 text-sm text-gray-400 mt-1">
+                    <div className="flex flex-wrap items-center gap-3 text-sm text-gray-400 mt-1">
                       <span className="flex items-center gap-1">
                         <Calendar size={14} />
                         {dayLabels[band.meetingDay]}s
@@ -202,7 +202,7 @@ export const Bandas = () => {
                   </div>
                 </div>
 
-                <div className="flex items-center gap-4">
+                <div className="flex items-center gap-4 shrink-0">
                   <div className="flex items-center gap-2">
                     {bandMembers.slice(0, 4).map((member) => (
                       <Avatar key={member.id} name={member.name} size="sm" />
@@ -328,7 +328,7 @@ export const Bandas = () => {
             onChange={(e) => setFormData({ ...formData, name: e.target.value })}
           />
 
-          <div className="grid grid-cols-3 gap-4">
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
             <div>
               <label className="text-xs text-gray-400 font-medium uppercase tracking-wide block mb-1.5">
                 Día de Reunión

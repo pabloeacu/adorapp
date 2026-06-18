@@ -31,6 +31,10 @@ import {
   Lock,
   Eye,
   EyeOff,
+  Mail,
+  Shield,
+  Trash2,
+  RefreshCw,
 } from 'lucide-react';
 import { useAuthStore } from '../../stores/authStore';
 import { supabase } from '../../lib/supabase';
@@ -544,6 +548,33 @@ export const MobileNav = () => {
     }
   };
 
+  // Quitar la foto de perfil: nulea avatar_url en members (lo que la saca de la
+  // vista) y, si la foto vivía en Storage, hace un best-effort de borrar el
+  // archivo. Espeja el "Eliminar foto" del Header desktop.
+  const handleDeletePhoto = async () => {
+    const memberIdToUpdate = currentUserMember?.id;
+    const currentUrl =
+      currentUserMember?.avatar_url || currentUserMember?.avatarUrl || profile?.avatar_url;
+    try {
+      const marker = '/object/public/avatars/';
+      const idx = currentUrl ? currentUrl.indexOf(marker) : -1;
+      if (idx !== -1) {
+        const key = currentUrl.slice(idx + marker.length);
+        await supabase.storage.from('avatars').remove([key]);
+      }
+      if (memberIdToUpdate) {
+        // Update directo de una sola columna (no pasa por convertXToDB) — patrón
+        // idéntico al de handleSavePhoto, sin riesgo de DATA-LOSS LANDMINE.
+        await supabase.from('members').update({ avatar_url: null }).eq('id', memberIdToUpdate);
+      }
+      await refreshProfile();
+    } catch (err) {
+      console.error('Delete photo error:', err);
+    } finally {
+      setShowPhotoModal(false);
+    }
+  };
+
   const handleSavePhoto = async () => {
     if (!previewUrl) {
       setShowCropper(false);
@@ -1016,6 +1047,24 @@ export const MobileNav = () => {
                         <p className="text-white text-sm">{displayBirthdate ? formatDateLocal(displayBirthdate) : 'No configurada'}</p>
                       </div>
                     </div>
+                    <div className="flex items-center gap-3">
+                      <div className="p-2 bg-neutral-700 rounded-lg">
+                        <Mail size={16} className="text-neutral-400" />
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <p className="text-xs text-neutral-500">Email</p>
+                        <p className="text-white text-sm truncate">{currentUserMember?.email || profile?.email || 'No configurado'}</p>
+                      </div>
+                    </div>
+                    <div className="flex items-center gap-3">
+                      <div className="p-2 bg-neutral-700 rounded-lg">
+                        <Shield size={16} className="text-neutral-400" />
+                      </div>
+                      <div className="flex-1">
+                        <p className="text-xs text-neutral-500">Rol en el sistema</p>
+                        <p className="text-white text-sm">{displayRole === 'pastor' ? 'Pastor' : displayRole === 'leader' ? 'Líder' : 'Miembro'}</p>
+                      </div>
+                    </div>
                   </div>
 
                   {/* Menu Options */}
@@ -1035,6 +1084,19 @@ export const MobileNav = () => {
                     >
                       <Settings size={20} className="text-neutral-400" />
                       <span className="flex-1 text-left text-white">Editar datos del perfil</span>
+                      <ChevronRight size={18} className="text-neutral-600" />
+                    </button>
+
+                    <button
+                      onClick={async () => {
+                        // refreshProfile() también dispara appStore.initialize(),
+                        // así que esto resincroniza perfil + datos de la app.
+                        await refreshProfile();
+                      }}
+                      className="w-full flex items-center gap-4 px-4 py-4 rounded-xl hover:bg-neutral-800 transition-colors"
+                    >
+                      <RefreshCw size={20} className="text-neutral-400" />
+                      <span className="flex-1 text-left text-white">Sincronizar</span>
                       <ChevronRight size={18} className="text-neutral-600" />
                     </button>
 
@@ -1133,6 +1195,16 @@ export const MobileNav = () => {
                 Seleccionar imagen
               </button>
 
+              {displayPhoto && (
+                <button
+                  onClick={handleDeletePhoto}
+                  className="w-full mt-3 py-3 border border-red-500/40 text-red-400 font-medium rounded-xl hover:bg-red-500/10 transition-colors flex items-center justify-center gap-2"
+                >
+                  <Trash2 size={18} />
+                  Eliminar foto
+                </button>
+              )}
+
               <p className="text-neutral-500 text-xs text-center mt-4">
                 Formatos: JPG, PNG, GIF. Máximo 5MB.
               </p>
@@ -1173,7 +1245,7 @@ export const MobileNav = () => {
             </button>
           </div>
 
-          <div className="flex-1 flex flex-col items-center justify-center p-4" onClick={(e) => e.stopPropagation()}>
+          <div className="flex-1 overflow-y-auto flex flex-col items-center justify-center p-4" onClick={(e) => e.stopPropagation()}>
             {/* Image Preview - Full image with circular guide overlay */}
             <div className="relative flex items-center justify-center" style={{ height: '300px', width: '100%', maxWidth: '400px' }}>
               {/* Dark Background */}
