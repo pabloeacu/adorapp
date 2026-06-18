@@ -80,3 +80,23 @@ Los `.animate-fade-in` / `.animate-slide-up` corren para todos. Usuarios con sen
 1. **Hook `usePhotoCropper`** (resuelve MP1 + duplicación). 2 horas. *Descrito en 03.*
 2. **Hook `useNotifications`** (resuelve duplicación de carga de campanita). 2 horas. *Descrito en 03.*
 3. **Componente `<PageTitleBar>`** + integración en `MobileNav.jsx` y `Header.jsx`. 30 minutos. Resuelve MP7 + reduce duplicación de `pageTitles`.
+
+---
+
+## Actualización 2026-06-18 — sesión "mobile" (7 PRs a prod)
+
+Auditoría de paridad re-ejecutada y corregida en gran parte. Detalle completo y commits en `CLAUDE.md` → "Estado al 2026-06-18". Resumen:
+
+**Resuelto en prod:**
+- Foto de perfil end-to-end en móvil: subía nada (RLS del bucket `avatars` sin políticas, PR #24), botón Guardar bajo el notch (PR #28), guardado no-op por `fileInputRef` desmontado (PR #29), y recorte que no coincidía con la preview — el viejo MP1/duplicación de cropper math (PR #30, vía medición de `offsetWidth/Height` + pipeline de transform replicado).
+- Contenido tapado por la bottom nav: `Layout.jsx` con `paddingBottom: calc(80px + env(safe-area-inset-bottom))` (PR #24).
+- Acciones del pastor en /miembros invisibles al tacto (`opacity-0 group-hover` → `lg:` prefix) (PR #26).
+- Botón "Imprimir" (PDF canciones c/acordes) inalcanzable: `flex-wrap` + header apilado (PR #25).
+- Modales no se cerraban en celular: `<Modal>` con history+portal, back gesture cierra (PR #27).
+- Clusters sin wrap, tablas sin `min-w`/columnas ocultas, grids no responsive, "Eliminar foto"/"Sincronizar"/email+rol faltantes en móvil, búsqueda desktop muerta, código muerto: todo en PR #26.
+
+**Confirmado OK (no era problema):** navegación por rol Sidebar==MobileNav idéntica; `<Modal>` ya capaba altura + scroll.
+
+**Pendiente (backlog):**
+- MP1 real: extraer cropper a hook `usePhotoCropper` (sigue duplicado Header+MobileNav). El cropper **desktop** todavía tiene la math frágil con constantes (sólo se arregló móvil).
+- `alert()` → modales en perfil móvil. `enterkeyhint` en inputs (MP9). `prefers-reduced-motion` (MP10). Migrar foto base64 de Paul a Storage.
