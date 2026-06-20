@@ -185,6 +185,11 @@ export const Ordenes = () => {
       songs: [],
       feedback: ''
     });
+    // Blanquear el buscador de canciones para no arrastrar lo tipeado en una
+    // apertura anterior (el search vive fuera de formData).
+    setSongSearchTerm('');
+    setShowSongDropdown(false);
+    setKeyHistoryTooltip(null);
     setIsModalOpen(true);
   };
 
@@ -192,6 +197,9 @@ export const Ordenes = () => {
     setIsModalOpen(false);
     setShowUnused(false);
     setSelectedBandForUnused(null);
+    setSongSearchTerm('');
+    setShowSongDropdown(false);
+    setKeyHistoryTooltip(null);
   };
 
   const handleSubmit = async (e) => {

@@ -192,6 +192,7 @@ export const Repertorio = () => {
   const handleCloseModal = () => {
     setIsModalOpen(false);
     setEditingSong(null);
+    setShowCategoryDropdown(false);
   };
 
   const handleSubmit = (e) => {
