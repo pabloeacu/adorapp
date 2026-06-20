@@ -165,6 +165,8 @@ const convertOrderFromDB = (o) => ({
   songs: o.songs || [],
   feedback: o.feedback,
   status: o.status,
+  rehearsalDate: o.rehearsal_date,
+  rehearsalTime: o.rehearsal_time,
   createdAt: o.created_at,
   updatedAt: o.updated_at,
 });
@@ -239,6 +241,11 @@ const convertOrderToDB = (o) => ({
   songs: o.songs || [],
   feedback: o.feedback || null,
   status: o.status || 'scheduled',
+  // Rehearsal scheduling (nullable). NOTE: rehearsal_reminder_sent is owned by
+  // the send_rehearsal_reminders cron — intentionally NOT written from the
+  // client, so an update can never clobber the dedup flag.
+  rehearsal_date: o.rehearsalDate || null,
+  rehearsal_time: o.rehearsalTime || null,
 });
 
 export const useAppStore = create((set, get) => ({

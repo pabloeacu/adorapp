@@ -1,4 +1,5 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import { useDocumentTitle } from '../hooks/useDocumentTitle';
 import {
   Plus, Calendar, Music, Clock, Copy,
@@ -97,7 +98,10 @@ export const Ordenes = () => {
     bandId: null,
     meetingType: 'culto_general',
     songs: [],
-    feedback: ''
+    feedback: '',
+    rehearsalEnabled: false,
+    rehearsalDate: '',
+    rehearsalTime: '18:00'
   });
 
   // Members eligible to direct the songs in THIS order: must be in the
@@ -140,6 +144,7 @@ export const Ordenes = () => {
 
   const [sortBy, setSortBy] = useState('date_desc');
   const [viewMode, setViewMode] = useState('list'); // 'list' | 'calendar'
+  const [searchParams, setSearchParams] = useSearchParams();
 
   const filteredOrders = useMemo(() => {
     const list = orders.filter(order => {
@@ -183,7 +188,10 @@ export const Ordenes = () => {
       bandId: null,
       meetingType: 'culto_general',
       songs: [],
-      feedback: ''
+      feedback: '',
+      rehearsalEnabled: false,
+      rehearsalDate: '',
+      rehearsalTime: '18:00'
     });
     // Blanquear el buscador de canciones para no arrastrar lo tipeado en una
     // apertura anterior (el search vive fuera de formData).
@@ -202,15 +210,38 @@ export const Ordenes = () => {
     setKeyHistoryTooltip(null);
   };
 
+  // Deep link from the dashboard "Hoy tenés ensayo" card: /ordenes?order=<id>
+  // opens that order's detail. Wait until orders are loaded to resolve it.
+  useEffect(() => {
+    const orderId = searchParams.get('order');
+    if (!orderId) return;
+    const target = orders.find(o => o.id === orderId);
+    if (!target) return;
+    // Syncing an external URL param into local modal state — legitimate effect.
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    setViewingOrder(target);
+    setIsDetailOpen(true);
+    searchParams.delete('order');
+    setSearchParams(searchParams, { replace: true });
+  }, [searchParams, orders, setSearchParams]);
+
   const handleSubmit = async (e) => {
     e.preventDefault();
     if (!formData.date || !formData.bandId) return;
+
+    // Rehearsal is optional. Only attach date+time when the switch is on and a
+    // date was picked; otherwise both stay null (no rehearsal for this order).
+    const rehearsalDate = formData.rehearsalEnabled && formData.rehearsalDate
+      ? formData.rehearsalDate
+      : null;
+    const rehearsalTime = rehearsalDate ? (formData.rehearsalTime || null) : null;
+    const orderPayload = { ...formData, rehearsalDate, rehearsalTime };
 
     // CRITICAL FIX: addOrder must run FIRST so we have the real order.id to
     // satisfy the song_key_history.order_id FK. Previously a fresh random UUID
     // was passed in, which the FK silently rejected — leaving song_key_history
     // empty forever and breaking smart-suggest of the key per director.
-    const newOrder = await addOrder(formData);
+    const newOrder = await addOrder(orderPayload);
     if (!newOrder?.id) {
       console.error('addOrder did not return an id; skipping key history save');
       handleCloseModal();
@@ -1148,6 +1179,50 @@ export const Ordenes = () => {
                 ))}
               </select>
             </div>
+          </div>
+
+          {/* Rehearsal scheduling (optional) */}
+          <div className="rounded-xl border border-neutral-800 p-4">
+            <div className="flex items-center justify-between gap-3">
+              <div className="min-w-0">
+                <p className="text-sm font-medium text-white">Programar ensayo</p>
+                <p className="text-xs text-gray-400 mt-0.5">
+                  Avisamos a la banda 2 h antes y lo mostramos en el calendario y en el inicio.
+                </p>
+              </div>
+              <button
+                type="button"
+                role="switch"
+                aria-checked={formData.rehearsalEnabled}
+                aria-label="Programar ensayo"
+                onClick={() => setFormData({ ...formData, rehearsalEnabled: !formData.rehearsalEnabled })}
+                className={`relative shrink-0 w-12 h-7 rounded-full transition-colors focus:outline-none focus:ring-2 focus:ring-white/40 ${
+                  formData.rehearsalEnabled ? 'bg-green-500' : 'bg-neutral-700'
+                }`}
+              >
+                <span
+                  className={`absolute top-1 left-1 w-5 h-5 rounded-full bg-white transition-transform ${
+                    formData.rehearsalEnabled ? 'translate-x-5' : ''
+                  }`}
+                />
+              </button>
+            </div>
+            {formData.rehearsalEnabled && (
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mt-4">
+                <Input
+                  label="Día del ensayo"
+                  type="date"
+                  value={formData.rehearsalDate}
+                  onChange={(e) => setFormData({ ...formData, rehearsalDate: e.target.value })}
+                />
+                <Input
+                  label="Hora del ensayo"
+                  type="time"
+                  value={formData.rehearsalTime}
+                  onChange={(e) => setFormData({ ...formData, rehearsalTime: e.target.value })}
+                />
+              </div>
+            )}
           </div>
 
           {/* Add Songs Section */}

@@ -1,4 +1,5 @@
 import React from 'react';
+import { Link } from 'react-router-dom';
 import { useDocumentTitle } from '../hooks/useDocumentTitle';
 import {
   Users,
@@ -8,6 +9,8 @@ import {
   TrendingUp,
   Zap,
   Calendar,
+  CalendarClock,
+  ChevronRight,
   Guitar,
   Mic2,
   Drum,
@@ -37,6 +40,22 @@ export const Dashboard = () => {
   const unusedSongs = getUnusedSongs(4);
   const recentSongs = songs.slice(0, 4);
 
+  // "Hoy tenés ensayo" card: shown only on the rehearsal day, between 08:00 and
+  // 23:00 ART. We read the current ART wall-clock via toLocaleString (ART is
+  // UTC-3, no DST) so date + hour are correct regardless of the device's TZ.
+  const artNow = new Date(
+    new Date().toLocaleString('en-US', { timeZone: 'America/Argentina/Buenos_Aires' })
+  );
+  const todayART = `${artNow.getFullYear()}-${String(artNow.getMonth() + 1).padStart(2, '0')}-${String(artNow.getDate()).padStart(2, '0')}`;
+  const artHour = artNow.getHours();
+  const todaysRehearsal = orders.find(
+    (o) => o.rehearsalDate && String(o.rehearsalDate).slice(0, 10) === todayART
+  );
+  const showRehearsalCard = !!todaysRehearsal && artHour >= 8 && artHour < 23;
+  const rehearsalBand = todaysRehearsal
+    ? bands.find((b) => b.id === todaysRehearsal.bandId)
+    : null;
+
   const stats = [
     { label: 'Miembros Activos', value: activeMembers, icon: Users, color: 'text-blue-400', bg: 'bg-blue-500/20' },
     { label: 'Bandas', value: bands.length, icon: UsersRound, color: 'text-purple-400', bg: 'bg-purple-500/20' },
@@ -46,6 +65,28 @@ export const Dashboard = () => {
 
   return (
     <div className="space-y-6 animate-fade-in">
+      {/* Hoy tenés ensayo — full-width highlight card, links to the order */}
+      {showRehearsalCard && todaysRehearsal && (
+        <Link
+          to={`/ordenes?order=${todaysRehearsal.id}`}
+          className="block rounded-2xl p-5 bg-gradient-to-r from-amber-400 to-yellow-500 text-black shadow-lg hover:brightness-105 transition-all"
+        >
+          <div className="flex items-center gap-4">
+            <div className="p-3 rounded-xl bg-black/10 shrink-0">
+              <CalendarClock size={28} className="text-black" />
+            </div>
+            <div className="flex-1 min-w-0">
+              <p className="text-lg font-bold">¡Hoy tenés ensayo!</p>
+              <p className="text-sm font-medium text-black/80 truncate">
+                {rehearsalBand?.name || 'Banda'}
+                {todaysRehearsal.rehearsalTime ? ` · ${todaysRehearsal.rehearsalTime}` : ''} — tocá para ver la orden
+              </p>
+            </div>
+            <ChevronRight size={24} className="text-black/70 shrink-0" />
+          </div>
+        </Link>
+      )}
+
       {/* Stats Grid */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
         {stats.map((stat) => (
