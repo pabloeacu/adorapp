@@ -50,6 +50,21 @@ export function OrderCalendar({ orders, getBandById, onSelectOrder }) {
     return map;
   }, [orders]);
 
+  // Rehearsal events: one extra pill on the rehearsal day for each order that
+  // has a rehearsal scheduled. Clicking opens the linked order, same as the
+  // order pill.
+  const rehearsalsByDay = useMemo(() => {
+    const map = new Map();
+    orders.forEach((o) => {
+      if (!o.rehearsalDate) return;
+      const k = dayKey(o.rehearsalDate);
+      if (!k) return;
+      if (!map.has(k)) map.set(k, []);
+      map.get(k).push(o);
+    });
+    return map;
+  }, [orders]);
+
   // Build the 6×7 grid: pad with prev-month tail and next-month head so each
   // cell has a real date. Hidden cells get a muted style.
   const cells = useMemo(() => {
@@ -160,6 +175,20 @@ export function OrderCalendar({ orders, getBandById, onSelectOrder }) {
                   +{dayOrders.length - 3} más
                 </div>
               )}
+              {(rehearsalsByDay.get(k) || []).map((o) => {
+                const band = getBandById(o.bandId);
+                return (
+                  <button
+                    key={`reh-${o.id}`}
+                    type="button"
+                    onClick={() => onSelectOrder?.(o)}
+                    title={`Ensayo · ${band?.name || 'Banda'}${o.rehearsalTime ? ' · ' + o.rehearsalTime : ''}`}
+                    className="text-left text-[10px] px-1.5 py-0.5 rounded border truncate bg-amber-500/30 text-amber-100 border-amber-500/40 hover:brightness-125 focus:outline-none focus:ring-2 focus:ring-white/40"
+                  >
+                    {o.rehearsalTime ? `${o.rehearsalTime.slice(0, 5)} ` : ''}Ensayo · {band?.name || 'Banda'}
+                  </button>
+                );
+              })}
             </div>
           );
         })}
