@@ -102,14 +102,16 @@ export const Modal = ({
         </div>
 
         {/* Content */}
-        <div className="flex-1 overflow-y-auto p-4 pb-32">
+        <div className="flex-1 overflow-y-auto p-4">
           {children}
         </div>
 
-        {/* Footer */}
+        {/* Footer — an in-flow flex child (shrink-0), NOT absolute, so the
+            content area (flex-1) is sized between header and footer and scrolls
+            on its own. Absolute positioning used to overlap the last fields. */}
         {footer && (
           <div
-            className="absolute bottom-0 left-0 right-0 p-4 border-t border-neutral-800 bg-neutral-900 rounded-b-2xl"
+            className="shrink-0 p-4 border-t border-neutral-800 bg-neutral-900 rounded-b-2xl"
             style={{ paddingBottom: 'calc(1rem + env(safe-area-inset-bottom, 0px))' }}
           >
             {footer}
