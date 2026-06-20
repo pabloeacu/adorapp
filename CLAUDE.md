@@ -57,6 +57,7 @@ PWA en Vite/React 18 + Supabase + Vercel para ~8 usuarios reales del **ministeri
 - `daily-reflection-notification` 17:00 ART
 - `reflection-monitor` cada 6 h (escribe a `error_log` si falta reflexión >25 h)
 - `daily-birthday-notification` 09:00 ART (push a pastores con cumpleaños del día; jobid 7)
+- `rehearsal-reminders` cada 15 min (push a la banda 2 h antes de un ensayo programado en una orden; ver "Estado al 2026-06-20")
 
 ## Comandos útiles
 
@@ -123,3 +124,25 @@ Sesión "mobile" grande, **7 PRs a producción** (rama `claude/mobile-photo-uplo
 - Extraer el cropper a un hook/componente compartido (hoy duplicado Header+MobileNav ~40%).
 - Convertir los `alert()` del perfil móvil a modales (UX; en desktop ya son modales).
 - Migrar la foto base64 de Paul a Storage.
+
+## Estado al 2026-06-20
+
+Dos cosas: (a) fix de modales de formulario (PR #32, ya arriba) y (b) **feature nueva "Programar ensayo"** (PR #34, commit `2053b19`).
+
+**Programar ensayo (por orden):** en "Nueva Orden" un switch **"Programar ensayo"** habilita día + hora. Si se programa:
+- **Push 2 h antes** a todos los integrantes de la banda el día del ensayo.
+- **Evento en el calendario** ("Ensayo · banda", ámbar) ligado a la orden.
+- **Card en el inicio** ("¡Hoy tenés ensayo!", amarillo, full-width) visible el día del ensayo 08:00–23:00 ART, con link directo `/ordenes?order=<id>`.
+
+**Implementación:**
+- DB (`supabase/migrations/20260620_rehearsal_reminders.sql`): columnas aditivas nullable en `orders` (`rehearsal_date date`, `rehearsal_time text` 'HH:MM', `rehearsal_reminder_sent bool` dedup). Función `send_rehearsal_reminders()` (SECURITY DEFINER, `search_path` fijo, **REVOKE** del RPC como las otras de cron) + cron `rehearsal-reminders` `*/15 * * * *`. En la ventana `[ensayo-2h, ensayo)` ART, una sola vez (dedup flag), inserta 1 notificación `'reminder'` por integrante activo con cuenta → dispara el push existente (trigger `notify_push_on_notification_insert`).
+- `appStore.js`: `rehearsalDate/Time` en `convertOrderFromDB/ToDB`. **`rehearsal_reminder_sent` NO se escribe desde el cliente** (lo maneja sólo el cron).
+- `Ordenes.jsx`: switch + campos; reset en open; submit adjunta ensayo sólo si está activo; lee `?order=` y abre el detalle.
+- `OrderCalendar.jsx`: bucket `rehearsalsByDay` + pill ámbar. `Dashboard.jsx`: card con cálculo de hora ART vía `toLocaleString`.
+
+**QA hecho (en prod, sin push real):** la función se probó dentro de `BEGIN; SET LOCAL session_replication_role=replica; … ROLLBACK;` (triggers off + rollback = doble blindaje, cero push). Verificado: inserta 1 notif por miembro (3 en Banda Test), marca dedup, 2º llamado no duplica, ventana 2h OK, sin residuos, y alta de orden normal sigue andando. Advisors de seguridad: 0 alertas nuevas (la función no aparece en `function_search_path_mutable` ni en `authenticated_security_definer_function_executable`).
+
+**Landmines nuevos:**
+9. **`orders.rehearsal_reminder_sent`**: lo escribe SÓLO el cron. Nunca incluirlo en `convertOrderToDB` (si no, una edición de orden lo pisaría y re-enviaría el push).
+10. **Probar funciones que insertan en `notifications`**: el INSERT en `orders`/`bands`/`notifications` dispara triggers que mandan push global/real. Para QA, SIEMPRE `BEGIN; SET LOCAL session_replication_role = replica; … ROLLBACK;` — desactiva triggers (no encola push) y revierte. Nunca correr `send_rehearsal_reminders()` "en vivo" contra una banda con miembros reales fuera de ese envoltorio.
+11. **Fecha+hora del ensayo como `date` + `text`** (no `timestamptz`): evita el off-by-one de TZ en el calendario/dashboard (un `timestamptz` 22:00 ART cae en el día UTC siguiente). El cron combina ambos en ART.
