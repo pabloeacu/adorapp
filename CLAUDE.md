@@ -58,6 +58,7 @@ PWA en Vite/React 18 + Supabase + Vercel para ~8 usuarios reales del **ministeri
 - `reflection-monitor` cada 6 h (escribe a `error_log` si falta reflexión >25 h)
 - `daily-birthday-notification` 09:00 ART (push a pastores con cumpleaños del día; jobid 7)
 - `rehearsal-reminders` cada 15 min (push a la banda 2 h antes de un ensayo programado en una orden; ver "Estado al 2026-06-20")
+- `auto-complete-orders` `0 6 * * *` (03:00 ART): pasa a `completed` las órdenes `scheduled` con `date < hoy ART` (no toca canceladas; UPDATE no dispara push). Ver "Estado al 2026-06-21".
 
 ## Comandos útiles
 
@@ -146,3 +147,15 @@ Dos cosas: (a) fix de modales de formulario (PR #32, ya arriba) y (b) **feature 
 9. **`orders.rehearsal_reminder_sent`**: lo escribe SÓLO el cron. Nunca incluirlo en `convertOrderToDB` (si no, una edición de orden lo pisaría y re-enviaría el push).
 10. **Probar funciones que insertan en `notifications`**: el INSERT en `orders`/`bands`/`notifications` dispara triggers que mandan push global/real. Para QA, SIEMPRE `BEGIN; SET LOCAL session_replication_role = replica; … ROLLBACK;` — desactiva triggers (no encola push) y revierte. Nunca correr `send_rehearsal_reminders()` "en vivo" contra una banda con miembros reales fuera de ese envoltorio.
 11. **Fecha+hora del ensayo como `date` + `text`** (no `timestamptz`): evita el off-by-one de TZ en el calendario/dashboard (un `timestamptz` 22:00 ART cae en el día UTC siguiente). El cron combina ambos en ART.
+
+## Estado al 2026-06-21
+
+**Órdenes — 3 mejoras (PR #36, commit `bad2e06`):**
+- **Editar orden:** se reutiliza el modal de "Nueva Orden". `handleOpenModal(order)` precarga `formData` + setea `editingOrder`; `handleSubmit` rutea a `updateOrder` (merge-safe) en vez de `addOrder`. Botón "Editar" en tarjeta y detalle (pastor/líder). `saveKeyHistory` es upsert (`onConflict member_id,song_id`) → editar no duplica historial.
+- **Control de estado manual** en el detalle (pastor/líder): Marcar completada / Cancelar / Reabrir, vía `updateOrder({status})` + patch del snapshot `viewingOrder`.
+- **Auto-completar pasadas (DB):** `auto_complete_past_orders()` + cron `auto-complete-orders` `0 6 * * *`. UPDATE `scheduled → completed` donde `date < hoy ART`. No toca canceladas; UPDATE NO dispara push (el trigger de orden es sólo INSERT). Blindada del RPC (REVOKE). Migración `20260621_auto_complete_past_orders.sql`. Corrida una vez al aplicar (la orden del 16-jun pasó a completada → el contador "Servicios completados" del Dashboard ya tiene sentido).
+- **Filtro por defecto de Órdenes:** `all → scheduled` (`Ordenes.jsx`), como Solicitudes con `pending`. Evita la lista infinita de pasadas.
+
+**Landmines nuevos:**
+12. **`handleOpenModal(order = null)`** en Ordenes: los botones "Nueva Orden" DEBEN llamar `() => handleOpenModal()` — si pasan el handler directo, React les manda el evento como `order` y abren en modo edición con basura. (Mismo patrón si se reusa el modal para editar en otras pantallas.)
+13. **Editar orden NO re-arma el recordatorio de ensayo:** `convertOrderToDB` no escribe `rehearsal_reminder_sent` (landmine #9), así que si reprogramás el ensayo de una orden cuyo flag ya está `true`, el cron no vuelve a avisar. Caso borde conocido (los ensayos se setean casi siempre al crear). Si hiciera falta, resetear el flag server-side, no desde el cliente.
