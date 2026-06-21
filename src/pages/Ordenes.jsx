@@ -5,7 +5,8 @@ import {
   Plus, Calendar, Music, Clock, Copy,
   MessageSquare, Eye, Trash2, Search, Check, X,
   User, Zap, AlertCircle, ChevronDown, FileDown, History, Award,
-  FileText, Printer, Copy as CopyIcon
+  FileText, Printer, Copy as CopyIcon,
+  Edit, CheckCircle, XCircle, RotateCcw
 } from 'lucide-react';
 // jspdf is loaded on demand inside generateOrderPDF / generateSongsPDF
 // (~140 KB; no need at first paint).
@@ -78,9 +79,10 @@ export const Ordenes = () => {
   const isLeader = userRole === 'leader';
 
   const [isModalOpen, setIsModalOpen] = useState(false);
+  const [editingOrder, setEditingOrder] = useState(null);
   const [isDetailOpen, setIsDetailOpen] = useState(false);
   const [viewingOrder, setViewingOrder] = useState(null);
-  const [filterStatus, setFilterStatus] = useState('all');
+  const [filterStatus, setFilterStatus] = useState('scheduled');
   const [filterBand, setFilterBand] = useState('all');
   const [showUnused, setShowUnused] = useState(false);
   const [selectedBandForUnused, setSelectedBandForUnused] = useState(null);
@@ -181,18 +183,35 @@ export const Ordenes = () => {
     ).slice(0, 15);
   }, [songs, songSearchTerm]);
 
-  const handleOpenModal = () => {
-    setFormData({
-      date: '',
-      time: '20:00',
-      bandId: null,
-      meetingType: 'culto_general',
-      songs: [],
-      feedback: '',
-      rehearsalEnabled: false,
-      rehearsalDate: '',
-      rehearsalTime: '18:00'
-    });
+  const handleOpenModal = (order = null) => {
+    if (order) {
+      // Editar: precargar los datos de la orden existente.
+      setEditingOrder(order);
+      setFormData({
+        date: order.date || '',
+        time: order.time || '20:00',
+        bandId: order.bandId || null,
+        meetingType: order.meetingType || 'culto_general',
+        songs: order.songs ? order.songs.map(s => ({ ...s })) : [],
+        feedback: order.feedback || '',
+        rehearsalEnabled: !!order.rehearsalDate,
+        rehearsalDate: order.rehearsalDate || '',
+        rehearsalTime: order.rehearsalTime || '18:00'
+      });
+    } else {
+      setEditingOrder(null);
+      setFormData({
+        date: '',
+        time: '20:00',
+        bandId: null,
+        meetingType: 'culto_general',
+        songs: [],
+        feedback: '',
+        rehearsalEnabled: false,
+        rehearsalDate: '',
+        rehearsalTime: '18:00'
+      });
+    }
     // Blanquear el buscador de canciones para no arrastrar lo tipeado en una
     // apertura anterior (el search vive fuera de formData).
     setSongSearchTerm('');
@@ -203,11 +222,19 @@ export const Ordenes = () => {
 
   const handleCloseModal = () => {
     setIsModalOpen(false);
+    setEditingOrder(null);
     setShowUnused(false);
     setSelectedBandForUnused(null);
     setSongSearchTerm('');
     setShowSongDropdown(false);
     setKeyHistoryTooltip(null);
+  };
+
+  // Pastor/leader can change an order's status from the detail view. Routes
+  // through updateOrder (merge-safe) and patches the open detail snapshot.
+  const handleChangeStatus = async (order, status) => {
+    await updateOrder(order.id, { status });
+    setViewingOrder(prev => (prev && prev.id === order.id ? { ...prev, status } : prev));
   };
 
   // Deep link from the dashboard "Hoy tenés ensayo" card: /ordenes?order=<id>
@@ -237,21 +264,31 @@ export const Ordenes = () => {
     const rehearsalTime = rehearsalDate ? (formData.rehearsalTime || null) : null;
     const orderPayload = { ...formData, rehearsalDate, rehearsalTime };
 
-    // CRITICAL FIX: addOrder must run FIRST so we have the real order.id to
-    // satisfy the song_key_history.order_id FK. Previously a fresh random UUID
-    // was passed in, which the FK silently rejected — leaving song_key_history
-    // empty forever and breaking smart-suggest of the key per director.
-    const newOrder = await addOrder(orderPayload);
-    if (!newOrder?.id) {
-      console.error('addOrder did not return an id; skipping key history save');
-      handleCloseModal();
-      return;
+    let orderId;
+    if (editingOrder) {
+      // Editar: updateOrder mergea el partial con el snapshot del store antes
+      // del converter (sin DATA-LOSS). rehearsal_reminder_sent NO se toca (lo
+      // maneja el cron).
+      await updateOrder(editingOrder.id, orderPayload);
+      orderId = editingOrder.id;
+    } else {
+      // Crear: addOrder corre PRIMERO para tener el order.id real y satisfacer
+      // el FK song_key_history.order_id (ver incidente histórico).
+      const newOrder = await addOrder(orderPayload);
+      if (!newOrder?.id) {
+        console.error('addOrder did not return an id; skipping key history save');
+        handleCloseModal();
+        return;
+      }
+      orderId = newOrder.id;
     }
 
+    // saveKeyHistory es upsert (onConflict member_id,song_id) → idempotente,
+    // así que editar no duplica historial.
     await Promise.all(
       formData.songs
         .filter(s => s.directorId)
-        .map(s => saveKeyHistory(s.directorId, s.songId, s.key, newOrder.id))
+        .map(s => saveKeyHistory(s.directorId, s.songId, s.key, orderId))
     );
 
     handleCloseModal();
@@ -927,7 +964,7 @@ export const Ordenes = () => {
             </button>
           </div>
           {(isPastor || isLeader) && (
-            <Button icon={Plus} onClick={handleOpenModal}>
+            <Button icon={Plus} onClick={() => handleOpenModal()}>
               Nueva Orden
             </Button>
           )}
@@ -1048,6 +1085,11 @@ export const Ordenes = () => {
                     Imprimir
                   </Button>
                   {(isPastor || isLeader) && (
+                    <Button variant="ghost" size="sm" icon={Edit} onClick={() => handleOpenModal(order)}>
+                      Editar
+                    </Button>
+                  )}
+                  {(isPastor || isLeader) && (
                     <Button variant="ghost" size="sm" icon={Copy} onClick={() => handleCloneOrder(order)}>
                       Repetir
                     </Button>
@@ -1108,7 +1150,7 @@ export const Ordenes = () => {
           <Calendar size={48} className="mx-auto text-gray-600 mb-4" />
           <p className="text-gray-400">No hay órdenes {filterStatus !== 'all' ? 'con este filtro' : ''}</p>
           {(isPastor || isLeader) && (
-            <Button variant="secondary" icon={Plus} onClick={handleOpenModal} className="mt-4">
+            <Button variant="secondary" icon={Plus} onClick={() => handleOpenModal()} className="mt-4">
               Crear primera orden
             </Button>
           )}
@@ -1119,13 +1161,13 @@ export const Ordenes = () => {
       <Modal
         isOpen={isModalOpen}
         onClose={handleCloseModal}
-        title="Nueva Orden de Servicio"
+        title={editingOrder ? 'Editar Orden de Servicio' : 'Nueva Orden de Servicio'}
         size="xl"
         footer={
           <>
             <Button variant="secondary" onClick={handleCloseModal}>Cancelar</Button>
             <Button onClick={handleSubmit} disabled={!formData.date || !formData.bandId}>
-              Crear Orden
+              {editingOrder ? 'Guardar cambios' : 'Crear Orden'}
             </Button>
           </>
         }
@@ -1535,6 +1577,16 @@ export const Ordenes = () => {
                 >
                   Imprimir
                 </Button>
+                {(isPastor || isLeader) && (
+                  <Button
+                    variant="secondary"
+                    size="sm"
+                    icon={Edit}
+                    onClick={() => { setIsDetailOpen(false); handleOpenModal(viewingOrder); }}
+                  >
+                    Editar
+                  </Button>
+                )}
                 <Badge className={statusConfig[viewingOrder.status]?.bg}>
                   <span className={statusConfig[viewingOrder.status]?.color}>
                     {statusConfig[viewingOrder.status]?.label}
@@ -1542,6 +1594,27 @@ export const Ordenes = () => {
                 </Badge>
               </div>
             </div>
+
+            {(isPastor || isLeader) && (
+              <div className="flex flex-wrap items-center gap-2">
+                <span className="text-xs text-gray-400 uppercase tracking-wide">Estado:</span>
+                {viewingOrder.status !== 'completed' && (
+                  <Button variant="ghost" size="sm" icon={CheckCircle} onClick={() => handleChangeStatus(viewingOrder, 'completed')}>
+                    Marcar completada
+                  </Button>
+                )}
+                {viewingOrder.status !== 'cancelled' && (
+                  <Button variant="ghost" size="sm" icon={XCircle} onClick={() => handleChangeStatus(viewingOrder, 'cancelled')}>
+                    Cancelar
+                  </Button>
+                )}
+                {viewingOrder.status !== 'scheduled' && (
+                  <Button variant="ghost" size="sm" icon={RotateCcw} onClick={() => handleChangeStatus(viewingOrder, 'scheduled')}>
+                    Reabrir
+                  </Button>
+                )}
+              </div>
+            )}
 
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <Card className="p-4">
