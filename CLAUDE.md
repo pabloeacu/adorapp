@@ -159,3 +159,15 @@ Dos cosas: (a) fix de modales de formulario (PR #32, ya arriba) y (b) **feature 
 **Landmines nuevos:**
 12. **`handleOpenModal(order = null)`** en Ordenes: los botones "Nueva Orden" DEBEN llamar `() => handleOpenModal()` — si pasan el handler directo, React les manda el evento como `order` y abren en modo edición con basura. (Mismo patrón si se reusa el modal para editar en otras pantallas.)
 13. **Editar orden NO re-arma el recordatorio de ensayo:** `convertOrderToDB` no escribe `rehearsal_reminder_sent` (landmine #9), así que si reprogramás el ensayo de una orden cuyo flag ya está `true`, el cron no vuelve a avisar. Caso borde conocido (los ensayos se setean casi siempre al crear). Si hiciera falta, resetear el flag server-side, no desde el cliente.
+
+## Estado al 2026-07-01
+
+**Exportar PDF fallaba al transportar el tono (PR #38, commit `db1e818`).** Reportado por Daniel (Córdoba): exportar anda en tono original, "no funciona" al transportar.
+
+- **Causa real (NO era un crash):** reproduje `generateSongPDF` en Node con jsPDF + datos reales → genera OK en todos los tonos. El "no descarga" era el **manejo async**: el botón "Descargar PDF" tenía `try/catch` **síncrono** alrededor de una función **async**, dentro de un `setTimeout` que cerraba el modal antes → cualquier rejection tras el primer `await` se tragaba en silencio. Fix: handler `async` + `await generateSongPDF()` con catch real + cerrar el modal DESPUÉS de disparar la descarga (se quitó el setTimeout).
+- **Bug de correctitud (motor de transposición):** el regex de acorde exigía raíz MAYÚSCULA `[A-G]`, así que un `c9` en minúscula (typo, presente en "A Ti Me Rindo") NO se transportaba y salía mal en cualquier tono. Fix en `appStore.js`: `[A-Ga-g]` + `toUpperCase` en raíz y bajo. Motor compartido → beneficia viewer, PDF Repertorio y PDF Órdenes.
+- **Preventivo:** los 4 botones de PDF de Órdenes se llamaban fire-and-forget → se envuelven en `runPdfExport()` que surfacea el error. Test nuevo `src/stores/transpose.test.js` (7 casos) fija el motor de transposición.
+
+**Landmines nuevos:**
+14. **PDF export es `async`:** nunca envolver `generateSongPDF/generateSongsPDF/generateOrderPDF` en un `try/catch` síncrono ni dispararlas en `setTimeout` — el rejection se traga y el usuario ve "no pasa nada". Usar `await` con catch, o `runPdfExport()` (Ordenes). Generar ANTES de cerrar el modal.
+15. **Acordes en minúscula:** el motor de transposición ahora acepta raíz `[A-Ga-g]` y la pasa a mayúscula. Si tocás el regex de `transposeChordToken`, mantené el case-insensitive o los typos tipo `c9` dejan de transportar. Cubierto por `transpose.test.js`.
