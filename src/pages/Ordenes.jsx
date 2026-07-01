@@ -348,6 +348,19 @@ export const Ordenes = () => {
   };
 
   // Export order summary (without chords)
+  // Surface PDF-generation failures instead of letting the async rejection die
+  // silently (same class of bug fixed in the Repertorio export).
+  const runPdfExport = (promise) => {
+    Promise.resolve(promise).catch((err) => {
+      console.error('Error generating PDF:', err);
+      setErrorModal({
+        isOpen: true,
+        title: 'Error',
+        message: 'No se pudo generar el PDF. Intentá de nuevo.'
+      });
+    });
+  };
+
   const generateOrderPDF = async (order) => {
     const { jsPDF } = await import('jspdf');
     const band = getBandById(order.bandId);
@@ -1070,7 +1083,7 @@ export const Ordenes = () => {
                     variant="ghost"
                     size="sm"
                     icon={FileText}
-                    onClick={() => generateOrderPDF(order)}
+                    onClick={() => runPdfExport(generateOrderPDF(order))}
                     title="Exportar orden de servicio (resumen sin acordes)"
                   >
                     Exportar
@@ -1079,7 +1092,7 @@ export const Ordenes = () => {
                     variant="ghost"
                     size="sm"
                     icon={Printer}
-                    onClick={() => generateSongsPDF(order)}
+                    onClick={() => runPdfExport(generateSongsPDF(order))}
                     title="Imprimir canciones con acordes (una canción por página)"
                   >
                     Imprimir
@@ -1565,14 +1578,14 @@ export const Ordenes = () => {
                 <p className="text-gray-400">{viewingOrder.time}</p>
               </div>
               <div className="flex flex-wrap items-center gap-2">
-                <Button variant="secondary" size="sm" icon={FileDown} onClick={() => generateOrderPDF(viewingOrder)}>
+                <Button variant="secondary" size="sm" icon={FileDown} onClick={() => runPdfExport(generateOrderPDF(viewingOrder))}>
                   Exportar PDF
                 </Button>
                 <Button
                   variant="secondary"
                   size="sm"
                   icon={Printer}
-                  onClick={() => generateSongsPDF(viewingOrder)}
+                  onClick={() => runPdfExport(generateSongsPDF(viewingOrder))}
                   title="Imprimir canciones con acordes (una canción por página)"
                 >
                   Imprimir
