@@ -328,7 +328,7 @@ export const Repertorio = () => {
     const originalKey = song.originalKey || song.key;
     const transposedStructure = key !== originalKey
       ? transposeSongStructure(song.structure || [], originalKey, key)
-      : song.structure;
+      : (song.structure || []);
 
     // Use white background for better printing
     const doc = new jsPDF({
@@ -1220,23 +1220,28 @@ export const Repertorio = () => {
         footer={
           <>
             <Button variant="secondary" onClick={() => setExportModalSong(null)}>Cancelar</Button>
-            <Button icon={FileDown} onClick={() => {
-              if (exportModalSong) {
-                const song = exportModalSong;
-                const key = exportSongKey;
-                setExportModalSong(null); // Close modal first
-                setTimeout(() => {
-                  try {
-                    generateSongPDF(song, key);
-                  } catch (err) {
-                    console.error('Error generating PDF:', err);
-                    setErrorModal({
-                      isOpen: true,
-                      title: 'Error',
-                      message: 'No se pudo generar el PDF. Intenta de nuevo.'
-                    });
-                  }
-                }, 100); // Small delay to let modal close first
+            <Button icon={FileDown} onClick={async () => {
+              if (!exportModalSong) return;
+              const song = exportModalSong;
+              const key = exportSongKey;
+              try {
+                // Generar + disparar la descarga PRIMERO (con await, así los
+                // errores SÍ se capturan), y recién después cerrar el modal.
+                // Antes: se cerraba el modal y se llamaba generateSongPDF dentro
+                // de un setTimeout con try/catch SÍNCRONO alrededor de una
+                // función ASYNC → cualquier error tras el primer await se tragaba
+                // en silencio (una exportación transportada que fallaba no
+                // mostraba nada).
+                await generateSongPDF(song, key);
+                setExportModalSong(null);
+              } catch (err) {
+                console.error('Error generating PDF:', err);
+                setExportModalSong(null);
+                setErrorModal({
+                  isOpen: true,
+                  title: 'Error',
+                  message: 'No se pudo generar el PDF. Intentá de nuevo.'
+                });
               }
             }}>
               Descargar PDF

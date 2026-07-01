@@ -41,11 +41,12 @@ const transposeChordToken = (token, semitones) => {
   }
 
   // Parse main chord: root + accidental + suffix
-  // Pattern: [A-G] + optional [#b] + optional suffix
-  const match = mainPart.match(/^([A-G])([#b]?)(.*)$/);
+  // Pattern: [A-G] (case-insensitive; lowercase roots like 'c9' are typos but
+  // must still transpose) + optional [#b] + optional suffix
+  const match = mainPart.match(/^([A-Ga-g])([#b]?)(.*)$/);
   if (!match) return token;
 
-  const rootNote = match[1];
+  const rootNote = match[1].toUpperCase();
   const accidental = match[2];
   const suffix = match[3];
 
@@ -62,9 +63,9 @@ const transposeChordToken = (token, semitones) => {
   // Handle bass note if present
   let newBassNote = null;
   if (bassPart) {
-    const bassMatch = bassPart.match(/^([A-G])([#b]?)(.*)$/);
+    const bassMatch = bassPart.match(/^([A-Ga-g])([#b]?)(.*)$/);
     if (bassMatch) {
-      const bassRoot = bassMatch[1];
+      const bassRoot = bassMatch[1].toUpperCase();
       const bassAcc = bassMatch[2];
       const bassRootWithAcc = bassAcc ? `${bassRoot}${bassAcc}` : bassRoot;
       const bassIndex = getSemitoneIndex(bassRootWithAcc);
