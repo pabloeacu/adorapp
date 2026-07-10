@@ -296,6 +296,9 @@ const RegisterModal = ({ isOpen, onClose, onSuccess }) => {
         console.error('Registration error:', insertError);
         if (insertError.code === '23505') {
           setError('Ya existe una solicitud o cuenta con ese email. Contactá a los pastores.');
+        } else if (insertError.code === 'PT429') {
+          // El trigger de rate limit (server-side) devuelve HTTP 429 con este código.
+          setError('Estás enviando solicitudes muy seguido. Esperá un minuto e intentá de nuevo.');
         } else {
           setError('No se pudo enviar la solicitud. Intentá de nuevo.');
         }
