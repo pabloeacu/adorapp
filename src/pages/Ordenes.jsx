@@ -331,14 +331,25 @@ export const Ordenes = () => {
       cancelText: 'Mejor no',
       icon: AlertCircle,
       onConfirm: async () => {
+        // Esperar el resultado real: deleteOrder es async y devuelve true/false.
+        // Antes se llamaba fire-and-forget y SIEMPRE se mostraba "eliminada",
+        // aunque el borrado fallara (p. ej. FK) → el usuario veía "no pasa nada".
         setConfirmModal(prev => ({ ...prev, loading: true }));
-        deleteOrder(order.id);
+        const ok = await deleteOrder(order.id);
         setConfirmModal(prev => ({ ...prev, loading: false, isOpen: false }));
-        setSuccessModal({
-          isOpen: true,
-          title: 'Orden eliminada',
-          message: 'La orden fue eliminada correctamente.'
-        });
+        if (ok) {
+          setSuccessModal({
+            isOpen: true,
+            title: 'Orden eliminada',
+            message: 'La orden fue eliminada correctamente.'
+          });
+        } else {
+          setErrorModal({
+            isOpen: true,
+            title: 'No se pudo eliminar',
+            message: 'Hubo un problema al eliminar la orden. Intentá de nuevo.'
+          });
+        }
       }
     });
   };
@@ -1107,7 +1118,7 @@ export const Ordenes = () => {
                       Repetir
                     </Button>
                   )}
-                  {isPastor && (
+                  {(isPastor || isLeader) && (
                     <Button variant="ghost" size="sm" icon={Trash2} onClick={() => handleDeleteOrder(order)}>
                       Eliminar
                     </Button>
