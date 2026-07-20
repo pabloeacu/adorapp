@@ -2,6 +2,35 @@ import React, { useEffect, useRef } from 'react';
 import { createPortal } from 'react-dom';
 import { X } from 'lucide-react';
 
+// ---- Shared browser-history coordination for ALL <Modal> instances ----
+// Each open modal pushes a dummy history entry so the mobile back gesture /
+// Android back button CLOSES the top-most modal instead of navigating away.
+//
+// The listener is registered ONCE at module level (not one per modal). This is
+// what makes modal→modal transitions correct: when a closing modal pops its own
+// dummy entry with history.back(), that fires a popstate. A per-modal listener
+// on a just-opened modal would mistake it for a user "back" and close itself —
+// that was the "Perfil → Cambiar Contraseña no abre" bug (the second modal shut
+// instantly). Here we count programmatic backs and absorb their popstate instead
+// of treating them as a user back.
+const openModalStack = [];        // { close }; top of stack = most recently opened
+let programmaticBackPending = 0;  // # of history.back() we triggered ourselves
+let popstateListenerBound = false;
+
+function ensureModalPopstateListener() {
+  if (popstateListenerBound) return;
+  popstateListenerBound = true;
+  window.addEventListener('popstate', () => {
+    if (programmaticBackPending > 0) {
+      // Our own cleanup popped a dummy entry — not a user back. Absorb it.
+      programmaticBackPending--;
+      return;
+    }
+    const top = openModalStack[openModalStack.length - 1];
+    if (top) top.close();          // real user back → close the top-most modal
+  });
+}
+
 export const Modal = ({
   isOpen,
   onClose,
@@ -31,26 +60,29 @@ export const Modal = ({
   }, [isOpen]);
 
   // Integrate with browser history so the mobile back gesture / Android back
-  // button CLOSES the modal instead of navigating to the previous route.
-  // On open we push a dummy history entry; a back press pops it and fires
-  // popstate, which we turn into onClose(). If the modal is closed another way
-  // (the X, Escape, programmatically), the dummy entry is still on the stack,
-  // so the cleanup pops it to keep history clean.
+  // button CLOSES this modal instead of navigating to the previous route.
+  // On open we push a dummy entry and register ourselves on the shared stack;
+  // the single module-level popstate listener closes the top modal on a real
+  // back. If the modal is closed another way (X, Escape, programmatically, or
+  // because another modal opened over this flow), the cleanup pops our dummy
+  // entry — and that programmatic back() is absorbed, not treated as a user
+  // back, so it never closes a sibling modal.
   useEffect(() => {
     if (!isOpen) return;
 
+    ensureModalPopstateListener();
+    const entry = { close: () => onCloseRef.current?.() };
+    openModalStack.push(entry);
     window.history.pushState({ adorappModal: true }, '');
 
-    const onPopState = () => {
-      onCloseRef.current?.();
-    };
-    window.addEventListener('popstate', onPopState);
-
     return () => {
-      window.removeEventListener('popstate', onPopState);
+      const i = openModalStack.indexOf(entry);
+      if (i !== -1) openModalStack.splice(i, 1);
       if (window.history.state && window.history.state.adorappModal) {
-        // Closed via X/Escape/programmatically — our dummy entry is still
-        // there; pop it (same URL, so the router doesn't navigate).
+        // Our dummy entry is still on top (closed via X/Escape/programmatically);
+        // pop it. The resulting popstate is absorbed by programmaticBackPending
+        // so it never closes another modal. Same URL → the router won't navigate.
+        programmaticBackPending++;
         window.history.back();
       }
     };
