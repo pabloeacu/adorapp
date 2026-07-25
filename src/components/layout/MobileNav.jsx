@@ -828,7 +828,12 @@ export const MobileNav = () => {
             className="absolute bottom-0 left-0 right-0 bg-neutral-900 rounded-t-3xl animate-slide-up max-h-[90vh] overflow-y-auto"
             style={{
               paddingBottom: 'calc(env(safe-area-inset-bottom) + 20px)',
-              touchAction: 'none'
+              // touch-action:none bloqueaba el scroll TÁCTIL del sheet en algunos
+              // navegadores/celulares (contenido cortado, sin poder llegar a
+              // "Activar notificaciones"). El sheet no tiene gesto de arrastre
+              // propio, así que se deja el scroll táctil por defecto.
+              // overscroll-behavior:contain evita que el scroll "sangre" al fondo.
+              overscrollBehavior: 'contain'
             }}
             onClick={(e) => e.stopPropagation()}
           >
