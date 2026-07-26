@@ -15,6 +15,44 @@ import { Modal } from '../components/ui/Modal';
 import { Input } from '../components/ui/Input';
 import { ConfirmModal, SuccessModal, ErrorModal } from '../components/ui/ConfirmModal';
 import { foldText, toCSV, downloadCSV } from '../lib/csv';
+import {
+  DndContext,
+  closestCenter,
+  KeyboardSensor,
+  PointerSensor,
+  useSensor,
+  useSensors,
+} from '@dnd-kit/core';
+import {
+  arrayMove,
+  SortableContext,
+  sortableKeyboardCoordinates,
+  verticalListSortingStrategy,
+  useSortable,
+} from '@dnd-kit/sortable';
+import { CSS } from '@dnd-kit/utilities';
+
+// Wraps each song-structure section so it can be dragged to reorder. The
+// GripVertical handle (passed the drag listeners) is the only drag surface, so
+// editing the selects/inputs never starts a drag. Same pattern as the song-row
+// DnD in Ordenes.jsx.
+function SortableSection({ id, children }) {
+  const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id });
+  const style = {
+    transform: CSS.Transform.toString(transform),
+    transition,
+    opacity: isDragging ? 0.6 : 1,
+  };
+  return (
+    <div
+      ref={setNodeRef}
+      style={style}
+      className="structure-section bg-neutral-800 rounded-xl p-4 transition-all duration-300 hover:ring-2 hover:ring-purple-500/30"
+    >
+      {children({ attributes, listeners })}
+    </div>
+  );
+}
 
 const sectionTypes = [
   { id: 'intro', label: 'Intro' },
@@ -66,6 +104,30 @@ export const Repertorio = () => {
   const [newSectionIndex, setNewSectionIndex] = useState(null);
   const structureContainerRef = useRef(null);
 
+  // Stable per-section id for drag-and-drop reordering. Assigned when the editor
+  // opens / a section is added; stripped before saving (never persisted).
+  const localIdRef = useRef(0);
+  const nextLocalId = () => `sec-${localIdRef.current++}`;
+
+  // DnD sensors: Pointer (6px threshold so a click on the grip doesn't
+  // accidentally drag) + Keyboard for accessibility. Mirrors Ordenes.jsx.
+  const sectionSensors = useSensors(
+    useSensor(PointerSensor, { activationConstraint: { distance: 6 } }),
+    useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates })
+  );
+
+  const handleSectionDragEnd = (event) => {
+    const { active, over } = event;
+    if (!over || active.id === over.id) return;
+    setFormData((prev) => {
+      const ids = prev.structure.map((s) => s._localId);
+      const oldIndex = ids.indexOf(active.id);
+      const newIndex = ids.indexOf(over.id);
+      if (oldIndex < 0 || newIndex < 0) return prev;
+      return { ...prev, structure: arrayMove(prev.structure, oldIndex, newIndex) };
+    });
+  };
+
   const [formData, setFormData] = useState({
     title: '',
     artist: '',
@@ -74,7 +136,7 @@ export const Repertorio = () => {
     youtubeUrl: '',
     compass: '', // Compás (ej: 4/4, 3/4)
     bpm: '', // BPM (número hasta 3 dígitos)
-    structure: [{ type: 'verse', label: 'Verso 1', content: '', chords: '' }]
+    structure: [{ type: 'verse', label: 'Verso 1', content: '', chords: '', _localId: 'sec-init-0' }]
   });
 
   // Confirmation modals
@@ -171,7 +233,8 @@ export const Repertorio = () => {
         youtubeUrl: song.youtubeUrl || '',
         compass: song.compass || '',
         bpm: song.bpm || '',
-        structure: song.structure || [{ type: 'verse', label: 'Verso 1', content: '', chords: '' }]
+        structure: (song.structure || [{ type: 'verse', label: 'Verso 1', content: '', chords: '' }])
+          .map(s => ({ ...s, _localId: nextLocalId() }))
       });
     } else {
       setEditingSong(null);
@@ -183,7 +246,7 @@ export const Repertorio = () => {
         youtubeUrl: '',
         compass: '',
         bpm: '',
-        structure: [{ type: 'intro', label: 'Intro', content: '', chords: '' }]
+        structure: [{ type: 'intro', label: 'Intro', content: '', chords: '', _localId: nextLocalId() }]
       });
     }
     setIsModalOpen(true);
@@ -201,6 +264,8 @@ export const Repertorio = () => {
 
     const songData = {
       ...formData,
+      // Strip the drag-and-drop-only _localId; it must never be persisted.
+      structure: formData.structure.map(({ _localId, ...rest }) => rest),
       originalKey: formData.key,
       lastUsed: editingSong?.lastUsed || null
     };
@@ -274,7 +339,7 @@ export const Repertorio = () => {
       const newLabel = getDefaultSectionLabel('verse', prev.structure);
       return {
         ...prev,
-        structure: [...prev.structure, { type: 'verse', label: newLabel, content: '', chords: '' }]
+        structure: [...prev.structure, { type: 'verse', label: newLabel, content: '', chords: '', _localId: nextLocalId() }]
       };
     });
     // Scroll to the new section after render
@@ -1041,11 +1106,30 @@ export const Repertorio = () => {
                 Agregar Sección
               </Button>
             </div>
-            <div className="space-y-3 max-h-80 sm:max-h-96 overflow-y-auto" ref={structureContainerRef}>
-              {formData.structure.map((section, index) => (
-                <div key={index} className="structure-section bg-neutral-800 rounded-xl p-4 transition-all duration-300 hover:ring-2 hover:ring-purple-500/30">
+            <DndContext
+              sensors={sectionSensors}
+              collisionDetection={closestCenter}
+              onDragEnd={handleSectionDragEnd}
+            >
+              <SortableContext
+                items={formData.structure.map((s) => s._localId)}
+                strategy={verticalListSortingStrategy}
+              >
+                <div className="space-y-3 max-h-80 sm:max-h-96 overflow-y-auto" ref={structureContainerRef}>
+                  {formData.structure.map((section, index) => (
+                    <SortableSection key={section._localId} id={section._localId}>
+                      {({ attributes, listeners }) => (
+                        <>
                   <div className="flex items-center gap-3 mb-3">
-                    <GripVertical size={16} className="text-gray-500" />
+                    <button
+                      type="button"
+                      aria-label="Mover sección"
+                      {...attributes}
+                      {...listeners}
+                      className="cursor-grab active:cursor-grabbing text-gray-500 hover:text-gray-300 touch-none focus:outline-none focus:ring-2 focus:ring-white/40 rounded shrink-0"
+                    >
+                      <GripVertical size={16} />
+                    </button>
                     <select
                       className="flex-1 bg-neutral-900 border border-neutral-700 rounded-lg px-3 py-2"
                       value={section.type}
@@ -1092,9 +1176,13 @@ export const Repertorio = () => {
                       />
                     </div>
                   </div>
+                        </>
+                      )}
+                    </SortableSection>
+                  ))}
                 </div>
-              ))}
-            </div>
+              </SortableContext>
+            </DndContext>
             {/* Botón para agregar sección debajo de la última */}
             <div className="mt-2">
               <button
