@@ -1439,9 +1439,14 @@ export const Ordenes = () => {
                           )}
                         </button>
                       )}
-                      {/* Tooltip for key history */}
+                      {/* Tooltip for key history.
+                          Anchored to the right (right-0) and wrapping (no
+                          whitespace-nowrap) so the long "primera vez" message no
+                          longer overflows off-screen on mobile — the key column
+                          sits at the right edge, so the tooltip grows leftward,
+                          inward, and wraps to a few lines within max-w. */}
                       {keyHistoryTooltip && songRef.directorId && (
-                        <div className="absolute bottom-full mb-2 left-1/2 -translate-x-1/2 px-3 py-2 bg-neutral-700 text-xs rounded-lg shadow-lg whitespace-nowrap z-50 max-w-xs">
+                        <div className="absolute bottom-full mb-2 right-0 px-3 py-2 bg-neutral-700 text-xs rounded-lg shadow-lg z-50 max-w-[13rem] w-max">
                           {keyHistoryTooltip.found === true ? (
                             // Found history tooltip
                             <>
@@ -1457,7 +1462,7 @@ export const Ordenes = () => {
                               {keyHistoryTooltip.message}
                             </p>
                           ) : null}
-                          <div className="absolute top-full left-1/2 -translate-x-1/2 border-4 border-transparent border-t-neutral-700"></div>
+                          <div className="absolute top-full right-3 border-4 border-transparent border-t-neutral-700"></div>
                         </div>
                       )}
                     </div>
