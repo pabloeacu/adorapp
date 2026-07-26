@@ -211,3 +211,9 @@ Dos fixes reportados por líderes reales, ambos a producción en la rama `claude
 
 **Landmines nuevos:**
 21. **Bottom-sheets móviles scrolleables (`overflow-y-auto`) NO deben llevar `touch-action: none`** — bloquea el scroll táctil en algunos navegadores/celulares. `touch-action:none` es SÓLO para superficies con gesto de arrastre propio (el recortador de foto en `MobileNav.jsx` y `Header.jsx`, que sí lo necesitan para pan de la imagen). Para un sheet que scrollea, dejar el default + `overscroll-behavior:contain`. Testear el scroll táctil en Chromium real con `hasTouch` + gesto por CDP (jsdom no sirve).
+
+## Estado al 2026-07-26
+
+**Tooltip de tonalidad del director se desbordaba del marco en móvil (PR #45, commit `15e014c`).** Reportado con captura (estético): en Nueva/Editar Orden, el tooltip "Esta es la primera vez que el director la va a cantar…" se salía de la pantalla a la derecha en el celular.
+- **Causa:** el tooltip (`Ordenes.jsx`, key-history) tenía `whitespace-nowrap` (una sola línea) y estaba centrado (`left-1/2 -translate-x-1/2`) sobre el botón de tonalidad, que vive pegado al borde derecho de la fila → el texto largo desbordaba fuera del viewport.
+- **Fix:** anclar a la derecha (`right-0`) + permitir wrap (quitar `whitespace-nowrap`) con `max-w-[13rem] w-max`; el caret pasa a `right-3`. Sólo visual. Verificado en Chromium 390px: antes llegaba a x=445 (fuera de 390), con el fix queda en [131,339] en 3 renglones. Auditado: no hay otros tooltips con este patrón (los de Repertorio son dropdowns `left-0 right-0`).
