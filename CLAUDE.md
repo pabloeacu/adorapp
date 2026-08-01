@@ -2,6 +2,20 @@
 
 Este archivo se carga automáticamente al iniciar cualquier sesión de Claude Code en este repo. Es el contrato mínimo para no perder contexto entre sesiones.
 
+## ⭐ REGLA DE ORO — método obligatorio para CADA pedido (innegociable)
+
+Aplica a **toda** solicitud de Paul, **sin importar cuán chica o trivial parezca**. No es opcional ni por caso: es el estándar permanente del proyecto. Vale para esta sesión y para cualquier sesión futura.
+
+1. **Alcance total, nunca aislado.** Lo que Paul reporta es el *síntoma*, no el límite del trabajo. Pensá transversalmente: investigá TODO lo que pueda estar relacionado (misma causa raíz, mismo patrón, mismo componente, mismos datos, mismas capas). Resolvé el problema **y toda su familia**, aunque no esté denunciado.
+2. **Todas las hipótesis, incluso las remotas y descabelladas.** Enumerá causas posibles antes de decidir. No descartes una por improbable sin evidencia. La causa real suele no ser la obvia.
+3. **No des por sentado que algo funciona: probalo EN VIVO.** Nada se declara resuelto ni "ya andaba" sin verificación empírica. Reproducí el bug (control negativo) y validá el fix en un navegador real (Chromium/Playwright, gestos táctiles por CDP si aplica), contra prod cuando corresponda, y en la base de datos real (QA transaccional con `ROLLBACK`). jsdom no alcanza para timing/scroll/DnD/history.
+4. **Auditoría doble y triple, a fondo.** Después de arreglar, barré el resto del código buscando el mismo patrón en otros lugares (grep del anti-patrón), y verificá que no rompiste nada de lo que ya funcionaba. Garantía **100%** de no-regresión.
+5. **Optimización en el camino.** Cazá cada detalle y falla que cruces aunque no sea el pedido — corregí o registralo. Dejá el código mejor de como lo encontraste.
+6. **Cero intervención de Paul.** Desplegá los agentes/subagentes que hagan falta, usá el navegador, los MCP (Supabase, Vercel, GitHub, Chrome), instalá herramientas (ffmpeg, playwright-core) — lo que sea necesario para obtener el resultado **vos**. Paul no ejecuta pasos manuales ni valida por vos.
+7. **Sin excusas, sin reserva de esfuerzo ni talento.** Certeza completa de la resolución con alcance total antes de cerrar. Si algo no se puede garantizar, decilo explícito y por qué — pero primero agotá todo.
+
+> Guía práctica ya probada en este repo: reproducir en Chromium con `playwright-core` + el Chromium de `/opt/pw-browsers` (ver `scratchpad/run_*.mjs`); QA de DB con `BEGIN … ROLLBACK` impersonando roles; PR por parte con CI verde + smoke prod; y auditar el anti-patrón con `grep -rn` en todo `src/`.
+
 ## Qué es esto
 
 PWA en Vite/React 18 + Supabase + Vercel para ~8 usuarios reales del **ministerio de adoración de Adoración CAF**. Los líderes arman **órdenes** (la lista de canciones de cada reunión/culto). Pastores son Paul y Ana.
