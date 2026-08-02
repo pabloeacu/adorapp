@@ -1249,29 +1249,29 @@ export const Ordenes = () => {
 
           {/* Rehearsal scheduling (optional) */}
           <div className="rounded-xl border border-neutral-800 p-4">
-            <div className="flex items-center justify-between gap-3">
-              <div className="min-w-0">
+            <div className="flex items-center justify-between gap-4">
+              <div className="flex-1 min-w-0">
                 <p className="text-sm font-medium text-white">Programar ensayo</p>
                 <p className="text-xs text-gray-400 mt-0.5">
                   Avisamos a la banda 2 h antes y lo mostramos en el calendario y en el inicio.
                 </p>
               </div>
-              <button
-                type="button"
-                role="switch"
-                aria-checked={formData.rehearsalEnabled}
-                aria-label="Programar ensayo"
-                onClick={() => setFormData({ ...formData, rehearsalEnabled: !formData.rehearsalEnabled })}
-                className={`relative shrink-0 w-12 h-7 rounded-full transition-colors focus:outline-none focus:ring-2 focus:ring-white/40 ${
-                  formData.rehearsalEnabled ? 'bg-green-500' : 'bg-neutral-700'
-                }`}
-              >
-                <span
-                  className={`absolute top-1 left-1 w-5 h-5 rounded-full bg-white transition-transform ${
-                    formData.rehearsalEnabled ? 'translate-x-5' : ''
-                  }`}
+              {/* Switch: <label> + checkbox oculto (sr-only peer) + spans track/knob.
+                  Antes era un <button>, que en iOS Safari tomaba forma nativa
+                  (-webkit-appearance: push-button) y se veía ovalado/comprimido.
+                  Un <span> con tamaños fijos en px es inmune a eso; shrink-0 +
+                  el texto en flex-1 min-w-0 evitan que el track se comprima. */}
+              <label className="relative shrink-0 inline-flex items-center cursor-pointer">
+                <input
+                  type="checkbox"
+                  className="sr-only peer"
+                  aria-label="Programar ensayo"
+                  checked={formData.rehearsalEnabled}
+                  onChange={() => setFormData({ ...formData, rehearsalEnabled: !formData.rehearsalEnabled })}
                 />
-              </button>
+                <span className="block w-[52px] h-8 rounded-full bg-neutral-700 transition-colors peer-checked:bg-green-500 peer-focus-visible:ring-2 peer-focus-visible:ring-white/40" />
+                <span className="pointer-events-none absolute top-[2px] left-[2px] h-7 w-7 rounded-full bg-white shadow transition-transform peer-checked:translate-x-5" />
+              </label>
             </div>
             {formData.rehearsalEnabled && (
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mt-4">
