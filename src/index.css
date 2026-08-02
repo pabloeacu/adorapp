@@ -124,6 +124,18 @@ input, textarea, select {
   appearance: none;
 }
 
+/* Altura mínima consistente para campos de texto/fecha/hora y selects.
+   iOS Safari colapsa la altura de un input[type=date]/[time] VACÍO (no hay
+   contenido que sostenga la línea), así que la Fecha vacía se veía mucho más
+   chica que Hora/Banda. El min-height les da un piso parejo (y mejora el
+   target táctil). Se EXCLUYEN checkbox/radio/range/file/color, que tienen su
+   propia geometría y quedarían deformados. Los textarea (multilínea, h-16/h-24)
+   no lo necesitan y quedan fuera. */
+input:not([type="checkbox"]):not([type="radio"]):not([type="range"]):not([type="file"]):not([type="color"]),
+select {
+  min-height: 50px;
+}
+
 input:focus, textarea:focus, select:focus {
   outline: none;
   border-color: var(--ador-accent);
@@ -143,6 +155,13 @@ button {
   border: none;
   background: transparent;
   font-family: inherit;
+  /* iOS Safari aplica -webkit-appearance: push-button a los <button> por
+     defecto, imponiendo forma/relleno nativos que DEFORMABAN los toggles
+     custom (el switch pill de "Programar ensayo" se veía ovalado). Todos los
+     botones ya tienen su estilo propio, así que resetear el appearance es
+     seguro y arregla cualquier toggle/pill en iOS. */
+  -webkit-appearance: none;
+  appearance: none;
 }
 
 button:disabled {
