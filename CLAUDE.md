@@ -38,7 +38,7 @@ PWA en Vite/React 18 + Supabase + Vercel para ~8 usuarios reales del **ministeri
 
 ## Vocabulario eclesial (importa)
 
-- "**orden**" (no "culto") = lista de canciones de la reunión.
+- "**orden**" (no "culto") = lista de canciones de la reunión. **Es MASCULINO** ("*el* orden de las canciones", "*un nuevo* orden", "*primer* orden", "orden elimina*do*/duplica*do*/programa*do*"), NO femenino ("~~la orden~~" = mandato/pedido). Toda concordancia en el texto visible (artículos, adjetivos, participios, pronombres "lo/los") va en masculino. Los `label` de estado y los filtros ya están así (Programado/Completado/Cancelado). Corregido en PR #52 (commit `61eb133`); si agregás copy nuevo sobre órdenes, mantené el masculino.
 - "**ministerio de adoración**" (no "iglesia entera") cuando hablás del alcance de comunicación.
 - "**estándares de seguridad**" (no "seguridad de tipo empresa").
 - "hecha **a medida** del ministerio" (no "única en Hispanoamérica").
