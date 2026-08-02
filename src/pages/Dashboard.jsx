@@ -18,6 +18,7 @@ import {
   User
 } from 'lucide-react';
 import { useAppStore } from '../stores/appStore';
+import { useCurrentRole } from '../hooks/useCurrentMember';
 import { Card } from '../components/ui/Card';
 import { Badge } from '../components/ui/Badge';
 import { Avatar } from '../components/ui/Avatar';
@@ -34,6 +35,7 @@ const getInstrumentIcon = (instrument) => {
 export const Dashboard = () => {
   useDocumentTitle('Inicio');
   const { members, bands, songs, orders, getUnusedSongs } = useAppStore();
+  const role = useCurrentRole();
 
   const activeMembers = members.filter(m => m.active).length;
   const upcomingOrders = orders.filter(o => o.status === 'scheduled');
@@ -56,11 +58,18 @@ export const Dashboard = () => {
     ? bands.find((b) => b.id === todaysRehearsal.bandId)
     : null;
 
+  // Each stat card doubles as a shortcut to its section — but only for roles
+  // that can actually reach that section (mirrors the nav + route guards:
+  // /miembros is pastor/leader only, the rest are open to all roles). When the
+  // role lacks access the card renders as a plain, non-clickable info tile.
+  // The Órdenes card counts only 'scheduled' orders (upcomingOrders): counting
+  // every order ever created would balloon into the hundreds over time and stop
+  // meaning "lo que viene".
   const stats = [
-    { label: 'Miembros Activos', value: activeMembers, icon: Users, color: 'text-blue-400', bg: 'bg-blue-500/20' },
-    { label: 'Bandas', value: bands.length, icon: UsersRound, color: 'text-purple-400', bg: 'bg-purple-500/20' },
-    { label: 'Canciones', value: songs.length, icon: Music2, color: 'text-green-400', bg: 'bg-green-500/20' },
-    { label: 'Órdenes', value: orders.length, icon: CalendarDays, color: 'text-orange-400', bg: 'bg-orange-500/20' },
+    { label: 'Miembros Activos', value: activeMembers, icon: Users, color: 'text-blue-400', bg: 'bg-blue-500/20', to: '/miembros', roles: ['pastor', 'leader'] },
+    { label: 'Bandas', value: bands.length, icon: UsersRound, color: 'text-purple-400', bg: 'bg-purple-500/20', to: '/bandas' },
+    { label: 'Canciones', value: songs.length, icon: Music2, color: 'text-green-400', bg: 'bg-green-500/20', to: '/repertorio' },
+    { label: 'Órdenes', value: upcomingOrders.length, icon: CalendarDays, color: 'text-orange-400', bg: 'bg-orange-500/20', to: '/ordenes' },
   ];
 
   return (
@@ -87,10 +96,11 @@ export const Dashboard = () => {
         </Link>
       )}
 
-      {/* Stats Grid */}
+      {/* Stats Grid — each card links to its section when the role can access it */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-        {stats.map((stat) => (
-          <Card key={stat.label} className="hover:border-neutral-700 transition-all">
+        {stats.map((stat) => {
+          const canAccess = !stat.roles || stat.roles.includes(role);
+          const inner = (
             <div className="flex items-start justify-between">
               <div>
                 <p className="text-sm text-gray-400">{stat.label}</p>
@@ -100,8 +110,19 @@ export const Dashboard = () => {
                 <stat.icon size={24} className={stat.color} />
               </div>
             </div>
-          </Card>
-        ))}
+          );
+          return canAccess ? (
+            <Link key={stat.label} to={stat.to} className="block">
+              <Card className="hover:border-neutral-700 hover:bg-neutral-800/40 transition-all cursor-pointer h-full">
+                {inner}
+              </Card>
+            </Link>
+          ) : (
+            <Card key={stat.label} className="transition-all h-full">
+              {inner}
+            </Card>
+          );
+        })}
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
