@@ -41,7 +41,7 @@ const TOUR_STOPS = [
   {
     selector: null,
     title: 'Imprimir órdenes',
-    body: 'Cuando entrás a una orden, vas a ver los íconos de impresión arriba a la derecha.',
+    body: 'Cuando entrás a un orden, vas a ver los íconos de impresión arriba a la derecha.',
   },
 ];
 

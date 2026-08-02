@@ -303,7 +303,7 @@ export const Ordenes = () => {
     setConfirmModal({
       isOpen: true,
       title: 'Duplicar Orden',
-      message: `¿Querés duplicar la orden del ${formatDate(order.date)}? Se creará una copia que podés editar después.`,
+      message: `¿Querés duplicar el orden del ${formatDate(order.date)}? Se creará una copia que podés editar después.`,
       type: 'success',
       confirmText: 'Sí, duplicar',
       cancelText: 'Mejor no',
@@ -314,8 +314,8 @@ export const Ordenes = () => {
         setConfirmModal(prev => ({ ...prev, loading: false, isOpen: false }));
         setSuccessModal({
           isOpen: true,
-          title: 'Orden duplicada',
-          message: 'La nueva orden fue creada. Podés editarla cuando quieras.'
+          title: 'Orden duplicado',
+          message: 'El nuevo orden fue creado. Podés editarlo cuando quieras.'
         });
       }
     });
@@ -325,7 +325,7 @@ export const Ordenes = () => {
     setConfirmModal({
       isOpen: true,
       title: 'Eliminar Orden',
-      message: `¿Querés eliminar la orden del ${formatDate(order.date)}? Esta acción no se puede deshacer.`,
+      message: `¿Querés eliminar el orden del ${formatDate(order.date)}? Esta acción no se puede deshacer.`,
       type: 'danger',
       confirmText: 'Sí, eliminar',
       cancelText: 'Mejor no',
@@ -340,14 +340,14 @@ export const Ordenes = () => {
         if (ok) {
           setSuccessModal({
             isOpen: true,
-            title: 'Orden eliminada',
-            message: 'La orden fue eliminada correctamente.'
+            title: 'Orden eliminado',
+            message: 'El orden fue eliminado correctamente.'
           });
         } else {
           setErrorModal({
             isOpen: true,
             title: 'No se pudo eliminar',
-            message: 'Hubo un problema al eliminar la orden. Intentá de nuevo.'
+            message: 'Hubo un problema al eliminar el orden. Intentá de nuevo.'
           });
         }
       }
@@ -959,7 +959,7 @@ export const Ordenes = () => {
         <div>
           <h2 className="text-2xl font-bold">Órdenes de Servicio</h2>
           <p className="text-sm text-gray-400 mt-1">
-            {orders.length} órdenes · {orders.filter(o => o.status === 'scheduled').length} programadas
+            {orders.length} órdenes · {orders.filter(o => o.status === 'scheduled').length} programados
           </p>
         </div>
         <div className="flex items-center gap-2">
@@ -989,7 +989,7 @@ export const Ordenes = () => {
           </div>
           {(isPastor || isLeader) && (
             <Button icon={Plus} onClick={() => handleOpenModal()}>
-              Nueva Orden
+              Nuevo Orden
             </Button>
           )}
         </div>
@@ -1175,7 +1175,7 @@ export const Ordenes = () => {
           <p className="text-gray-400">No hay órdenes {filterStatus !== 'all' ? 'con este filtro' : ''}</p>
           {(isPastor || isLeader) && (
             <Button variant="secondary" icon={Plus} onClick={() => handleOpenModal()} className="mt-4">
-              Crear primera orden
+              Crear primer orden
             </Button>
           )}
         </div>
@@ -1185,7 +1185,7 @@ export const Ordenes = () => {
       <Modal
         isOpen={isModalOpen}
         onClose={handleCloseModal}
-        title={editingOrder ? 'Editar Orden de Servicio' : 'Nueva Orden de Servicio'}
+        title={editingOrder ? 'Editar Orden de Servicio' : 'Nuevo Orden de Servicio'}
         size="xl"
         footer={
           <>
@@ -1629,7 +1629,7 @@ export const Ordenes = () => {
                 <span className="text-xs text-gray-400 uppercase tracking-wide">Estado:</span>
                 {viewingOrder.status !== 'completed' && (
                   <Button variant="ghost" size="sm" icon={CheckCircle} onClick={() => handleChangeStatus(viewingOrder, 'completed')}>
-                    Marcar completada
+                    Marcar completado
                   </Button>
                 )}
                 {viewingOrder.status !== 'cancelled' && (

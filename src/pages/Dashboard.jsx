@@ -88,7 +88,7 @@ export const Dashboard = () => {
               <p className="text-lg font-bold">¡Hoy tenés ensayo!</p>
               <p className="text-sm font-medium text-black/80 truncate">
                 {rehearsalBand?.name || 'Banda'}
-                {todaysRehearsal.rehearsalTime ? ` · ${todaysRehearsal.rehearsalTime}` : ''} — tocá para ver la orden
+                {todaysRehearsal.rehearsalTime ? ` · ${todaysRehearsal.rehearsalTime}` : ''} — tocá para ver el orden
               </p>
             </div>
             <ChevronRight size={24} className="text-black/70 shrink-0" />
@@ -157,7 +157,7 @@ export const Dashboard = () => {
         <Card>
           <div className="flex items-center justify-between mb-4">
             <h3 className="font-semibold">Próximos Servicios</h3>
-            <Badge variant="warning" size="sm">{upcomingOrders.length} programadas</Badge>
+            <Badge variant="warning" size="sm">{upcomingOrders.length} programados</Badge>
           </div>
           <div className="space-y-3">
             {upcomingOrders.slice(0, 3).map((order) => {
