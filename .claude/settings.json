@@ -1,0 +1,19 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(npm run lint)",
+      "Bash(npm test)",
+      "mcp__github__actions_list",
+      "mcp__github__actions_get",
+      "mcp__github__pull_request_read",
+      "mcp__github__get_commit",
+      "mcp__github__get_check_run",
+      "mcp__c5073f58-b8d2-4022-96dc-3f92519a5580__get_advisors",
+      "mcp__c5073f58-b8d2-4022-96dc-3f92519a5580__list_migrations",
+      "mcp__c5073f58-b8d2-4022-96dc-3f92519a5580__list_tables",
+      "mcp__a9edc114-c404-451a-a34c-f9fa2fa17e41__list_deployments",
+      "mcp__a9edc114-c404-451a-a34c-f9fa2fa17e41__list_teams",
+      "mcp__a9edc114-c404-451a-a34c-f9fa2fa17e41__web_fetch_vercel_url"
+    ]
+  }
+}
