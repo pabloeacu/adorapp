@@ -23,6 +23,7 @@ const Bandas = lazyPage(() => import('./pages/Bandas'), 'Bandas');
 const Miembros = lazyPage(() => import('./pages/Miembros'), 'Miembros');
 const Solicitudes = lazyPage(() => import('./pages/Solicitudes'), 'Solicitudes');
 const Comunicaciones = lazyPage(() => import('./pages/Comunicaciones'), 'Comunicaciones');
+const Practica = lazyPage(() => import('./pages/Practica'), 'Practica');
 
 const RouteFallback = () => <PageLoader />;
 
@@ -111,6 +112,7 @@ function App() {
             <Route path="/" element={<Layout />}>
               <Route index element={<Dashboard />} />
               <Route path="ordenes" element={<Ordenes />} />
+              <Route path="practica/:orderId" element={<Practica />} />
               <Route path="repertorio" element={<Repertorio />} />
               <Route path="bandas" element={<Bandas />} />
               <Route path="miembros" element={<MembersOnlyRoles><Miembros /></MembersOnlyRoles>} />

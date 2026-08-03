@@ -249,6 +249,38 @@ const convertOrderToDB = (o) => ({
   rehearsal_time: o.rehearsalTime || null,
 });
 
+// Ensayómetro: personal practice log per (user, order, song).
+const convertPracticeLogFromDB = (p) => ({
+  id: p.id,
+  orderId: p.order_id,
+  songId: p.song_id,
+  timesPracticed: p.times_practiced,
+  knowsLyrics: p.knows_lyrics,
+  knowsStructure: p.knows_structure,
+  knowsArrangements: p.knows_arrangements,
+  difficulty: p.difficulty,
+  lastPracticedAt: p.last_practiced_at,
+  updatedAt: p.updated_at,
+});
+
+// ⚠️ DATA-LOSS LANDMINE (same contract as the converters above): this builds a
+// FULL row with defaults, so it must only receive COMPLETE log objects. The
+// only writer is upsertPracticeLog below, whose callers (Practica.jsx) always
+// hold the complete per-song log in state — never hand it a partial.
+// user_id is NOT written from the client: the DB default (auth.uid()) fills it
+// and RLS pins every row to its owner.
+const convertPracticeLogToDB = (p) => ({
+  order_id: p.orderId,
+  song_id: p.songId,
+  times_practiced: p.timesPracticed || 0,
+  knows_lyrics: p.knowsLyrics ?? false,
+  knows_structure: p.knowsStructure ?? false,
+  knows_arrangements: p.knowsArrangements ?? false,
+  difficulty: p.difficulty || null,
+  last_practiced_at: p.lastPracticedAt || null,
+  updated_at: new Date().toISOString(),
+});
+
 export const useAppStore = create((set, get) => ({
   members: [],
   bands: [],
@@ -716,6 +748,43 @@ export const useAppStore = create((set, get) => ({
       return get().addOrder(newOrder);
     }
     return null;
+  },
+
+  // --- Ensayómetro (personal practice logs) -------------------------------
+  // Deliberately OUTSIDE initialize()/realtime/localStorage: this is personal,
+  // per-order data that only the Practica page needs. RLS already scopes every
+  // query to the logged-in user, so no client-side filtering is required.
+
+  fetchPracticeLogs: async (orderId) => {
+    try {
+      const { data, error } = await supabase
+        .from('practice_logs')
+        .select('*')
+        .eq('order_id', orderId);
+      if (error) throw error;
+      return (data || []).map(convertPracticeLogFromDB);
+    } catch (err) {
+      console.error('Error fetching practice logs:', err);
+      return [];
+    }
+  },
+
+  // Takes a COMPLETE log object (see DATA-LOSS LANDMINE on the converter).
+  // Upsert on (user_id, order_id, song_id): user_id comes from the DB default
+  // auth.uid(), so the same call transparently creates or updates the row.
+  upsertPracticeLog: async (log) => {
+    try {
+      const { data, error } = await supabase
+        .from('practice_logs')
+        .upsert(convertPracticeLogToDB(log), { onConflict: 'user_id,order_id,song_id' })
+        .select()
+        .single();
+      if (error) throw error;
+      return convertPracticeLogFromDB(data);
+    } catch (err) {
+      console.error('Error saving practice log:', err);
+      return null;
+    }
   },
 
   // Helper functions
