@@ -246,3 +246,31 @@ button:disabled {
   opacity: .3;
   transition: 0s;
 }
+
+/* Ensayómetro F3 — festejo 100% (confeti) y pulso del metrónomo.
+   El drift horizontal de cada papelito llega por la custom property
+   --confetti-drift (px, seteada inline por pieza en Practica.jsx). */
+@keyframes confetti-fall {
+  0% {
+    transform: translate3d(0, -12vh, 0) rotate(0deg);
+    opacity: 1;
+  }
+  100% {
+    transform: translate3d(calc(var(--confetti-drift, 0) * 1px), 112vh, 0) rotate(720deg);
+    opacity: 0.65;
+  }
+}
+
+.animate-confetti-fall {
+  animation: confetti-fall 2.8s linear forwards;
+}
+
+/* Punto que late al ritmo del BPM (animation-duration = 60/bpm, inline). */
+@keyframes metronome-beat {
+  0%, 100% { transform: scale(0.6); opacity: 0.5; }
+  15% { transform: scale(1.25); opacity: 1; }
+}
+
+.animate-metronome-beat {
+  animation: metronome-beat 0.5s ease-out infinite;
+}

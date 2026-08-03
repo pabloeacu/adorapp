@@ -14,6 +14,7 @@ import {
   CheckCircle2,
   UploadCloud,
   AlarmClock,
+  Timer,
 } from 'lucide-react';
 import { useAppStore, transposeSongStructure } from '../stores/appStore';
 import { useDocumentTitle } from '../hooks/useDocumentTitle';
@@ -103,6 +104,67 @@ const ProgressRing = ({ percent }) => {
   );
 };
 
+// Metrónomo (F3): Web Audio API, sin dependencias. Un solo metrónomo activo a
+// la vez. El AudioContext se crea recién en el primer tap (política de
+// autoplay de los navegadores móviles: el audio DEBE nacer de un gesto).
+// Scheduler con lookahead corto: los beeps se agendan por adelantado en el
+// reloj del AudioContext (preciso), no en el de setInterval (impreciso).
+const beatsPerBarOf = (compass) => {
+  const n = parseInt(String(compass || '').split('/')[0], 10);
+  return Number.isFinite(n) && n > 0 && n <= 12 ? n : 4;
+};
+
+const useMetronome = () => {
+  const ctxRef = useRef(null);
+  const timerRef = useRef(null);
+  const nextBeatRef = useRef(0);
+  const beatCountRef = useRef(0);
+  const [active, setActive] = useState(null); // { songId, bpm }
+
+  const stop = useCallback(() => {
+    if (timerRef.current) clearInterval(timerRef.current);
+    timerRef.current = null;
+    setActive(null);
+  }, []);
+
+  const start = useCallback((songId, bpm, beatsPerBar) => {
+    stop();
+    if (!bpm || bpm <= 0) return;
+    const Ctx = window.AudioContext || window.webkitAudioContext;
+    if (!Ctx) return;
+    const ctx = ctxRef.current || (ctxRef.current = new Ctx());
+    if (ctx.state === 'suspended') ctx.resume();
+    const interval = 60 / bpm;
+    nextBeatRef.current = ctx.currentTime + 0.1;
+    beatCountRef.current = 0;
+    timerRef.current = setInterval(() => {
+      while (nextBeatRef.current < ctx.currentTime + 0.15) {
+        const accent = beatCountRef.current % beatsPerBar === 0;
+        const osc = ctx.createOscillator();
+        const gain = ctx.createGain();
+        osc.frequency.value = accent ? 1568 : 1047; // sol6 acentuado, do6 el resto
+        gain.gain.setValueAtTime(accent ? 0.5 : 0.28, nextBeatRef.current);
+        gain.gain.exponentialRampToValueAtTime(0.001, nextBeatRef.current + 0.08);
+        osc.connect(gain);
+        gain.connect(ctx.destination);
+        osc.start(nextBeatRef.current);
+        osc.stop(nextBeatRef.current + 0.09);
+        beatCountRef.current += 1;
+        nextBeatRef.current += interval;
+      }
+    }, 30);
+    setActive({ songId, bpm });
+  }, [stop]);
+
+  // Al desmontar la pantalla: silencio garantizado.
+  useEffect(() => () => {
+    if (timerRef.current) clearInterval(timerRef.current);
+    if (ctxRef.current) ctxRef.current.close().catch(() => {});
+  }, []);
+
+  return { active, start, stop };
+};
+
 const encouragement = (percent) => {
   if (percent === 0) return '🎸 ¡A darle! Cada pasada suma.';
   if (percent < 50) return '🔥 Buen ritmo, seguí sumando pasadas.';
@@ -140,6 +202,27 @@ export const Practica = () => {
     const saved = await setPracticeAlarm(next);
     if (saved === null) setAlarmEnabled(!next); // falló → revertir
   };
+
+  // Metrónomo (F3): uno solo activo a la vez, muere al salir de la pantalla.
+  const metronome = useMetronome();
+
+  // Festejo 100% (F3): SOLO cuando el usuario CRUZA a 100% en vivo (prev < 100
+  // → 100). Entrar a una pantalla que ya está al 100% no festeja de nuevo.
+  const [celebrating, setCelebrating] = useState(false);
+  const prevPercentRef = useRef(null);
+  const confetti = useMemo(() => {
+    if (!celebrating) return [];
+    const colors = ['#818cf8', '#a78bfa', '#60a5fa', '#f472b6', '#fbbf24', '#34d399'];
+    return Array.from({ length: 44 }, (_, i) => ({
+      left: `${(i * 37) % 100}%`,
+      color: colors[i % colors.length],
+      delay: `${(i % 11) * 0.12}s`,
+      duration: `${2.4 + ((i * 13) % 10) / 6}s`,
+      drift: `${((i * 29) % 120) - 60}px`,
+      size: 6 + ((i * 7) % 6),
+    }));
+  }, [celebrating]);
+
 
   // Timers de autoguardado con debounce por canción. El upsert manda SIEMPRE
   // el objeto completo (contrato del converter — ver DATA-LOSS LANDMINE).
@@ -230,6 +313,19 @@ export const Practica = () => {
     [uniqueSongIds, logs]
   );
 
+  // Festejo 100%: dispara solo en la transición en vivo (ver refs arriba).
+  useEffect(() => {
+    if (!logsLoaded) return undefined;
+    const prev = prevPercentRef.current;
+    prevPercentRef.current = percent;
+    if (prev !== null && prev < 100 && percent === 100) {
+      setCelebrating(true);
+      const t = setTimeout(() => setCelebrating(false), 4200);
+      return () => clearTimeout(t);
+    }
+    return undefined;
+  }, [percent, logsLoaded]);
+
   // Orden inexistente: si el store todavía carga, esperar; si ya cargó y no
   // está (borrado, id inválido), volver a Órdenes.
   if (!order) {
@@ -245,6 +341,33 @@ export const Practica = () => {
 
   return (
     <div className="space-y-6 animate-fade-in max-w-3xl mx-auto">
+      {/* Festejo 100% (F3): confeti + mensaje, sólo en la transición en vivo */}
+      {celebrating && (
+        <div className="fixed inset-0 z-50 pointer-events-none overflow-hidden" data-testid="celebration" aria-hidden="true">
+          {confetti.map((p, i) => (
+            <span
+              key={i}
+              className="absolute top-0 rounded-sm animate-confetti-fall"
+              style={{
+                left: p.left,
+                width: p.size,
+                height: p.size * 1.6,
+                backgroundColor: p.color,
+                animationDelay: p.delay,
+                animationDuration: p.duration,
+                '--confetti-drift': p.drift,
+              }}
+            />
+          ))}
+          <div className="absolute inset-0 flex items-center justify-center">
+            <div className="animate-fade-in rounded-2xl px-6 py-5 bg-gradient-to-br from-indigo-600/90 to-purple-600/90 border border-white/20 shadow-2xl text-center">
+              <p className="text-4xl mb-2">🏆</p>
+              <p className="text-lg font-bold text-white">¡Orden dominado!</p>
+              <p className="text-sm text-white/80">Llegás al ensamble con todo.</p>
+            </div>
+          </div>
+        </div>
+      )}
       {/* Volver + contexto del orden */}
       <div className="flex items-center gap-3">
         <Link
@@ -421,6 +544,35 @@ export const Practica = () => {
                     ))}
                   </div>
                   <div className="flex items-center gap-2">
+                    {song.bpm && (() => {
+                      const isTicking = metronome.active?.songId === songRef.songId;
+                      return (
+                        <button
+                          type="button"
+                          onClick={() =>
+                            isTicking
+                              ? metronome.stop()
+                              : metronome.start(songRef.songId, Number(song.bpm), beatsPerBarOf(song.compass))
+                          }
+                          aria-label={`Metrónomo a ${song.bpm} BPM`}
+                          aria-pressed={isTicking}
+                          className={`flex items-center gap-1.5 px-2.5 py-2 rounded-lg text-sm transition-all ${
+                            isTicking
+                              ? 'bg-indigo-500/30 text-indigo-300 border border-indigo-500/60'
+                              : 'bg-neutral-800/60 text-gray-400 border border-neutral-700 hover:border-neutral-600'
+                          }`}
+                        >
+                          <Timer size={16} />
+                          {isTicking && (
+                            <span
+                              className="inline-block w-2 h-2 rounded-full bg-indigo-300 animate-metronome-beat"
+                              style={{ animationDuration: `${60 / Number(song.bpm)}s` }}
+                            />
+                          )}
+                          <span className="text-xs">{song.bpm}</span>
+                        </button>
+                      );
+                    })()}
                     <Button
                       variant="secondary"
                       size="sm"
