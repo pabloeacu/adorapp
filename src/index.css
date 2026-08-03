@@ -162,6 +162,13 @@ button {
      seguro y arregla cualquier toggle/pill en iOS. */
   -webkit-appearance: none;
   appearance: none;
+  /* iOS mantiene el double-tap-to-zoom vivo (ignora user-scalable=no desde
+     iOS 10), y un tap sobre un control puede quedar retenido/comido como
+     "posible inicio de doble tap". manipulation permite scroll/pinch pero
+     elimina el doble-tap sobre botones → cada tap dispara el click al toque.
+     Los drag handles usan la clase .touch-none, que por especificidad
+     (clase > elemento) sigue ganando sobre esta regla. */
+  touch-action: manipulation;
 }
 
 button:disabled {
