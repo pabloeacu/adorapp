@@ -787,6 +787,45 @@ export const useAppStore = create((set, get) => ({
     }
   },
 
+  // --- Alarma de ensayo (Ensayómetro F2) ----------------------------------
+  // Preferencia personal (opt-in): push diario 18:00 ART mientras haya
+  // canciones por practicar. Una fila por usuario en practice_alarms
+  // (user_id via DEFAULT auth.uid(); RLS owner-only). El push lo manda el
+  // cron send_practice_reminders(), no el cliente.
+
+  fetchPracticeAlarm: async () => {
+    try {
+      const { data, error } = await supabase
+        .from('practice_alarms')
+        .select('enabled')
+        .maybeSingle();
+      if (error) throw error;
+      // Sin fila = nunca la activó → alarma apagada.
+      return data ? data.enabled : false;
+    } catch (err) {
+      console.error('Error fetching practice alarm:', err);
+      return false;
+    }
+  },
+
+  setPracticeAlarm: async (enabled) => {
+    try {
+      const { data, error } = await supabase
+        .from('practice_alarms')
+        .upsert(
+          { enabled, updated_at: new Date().toISOString() },
+          { onConflict: 'user_id' }
+        )
+        .select('enabled')
+        .single();
+      if (error) throw error;
+      return data.enabled;
+    } catch (err) {
+      console.error('Error saving practice alarm:', err);
+      return null;
+    }
+  },
+
   // Helper functions
   getMemberById: (id) => get().members.find(m => m.id === id),
   getBandById: (id) => get().bands.find(b => b.id === id),

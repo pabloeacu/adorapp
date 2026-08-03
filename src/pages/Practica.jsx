@@ -13,6 +13,7 @@ import {
   CalendarDays,
   CheckCircle2,
   UploadCloud,
+  AlarmClock,
 } from 'lucide-react';
 import { useAppStore, transposeSongStructure } from '../stores/appStore';
 import { useDocumentTitle } from '../hooks/useDocumentTitle';
@@ -112,7 +113,7 @@ const encouragement = (percent) => {
 export const Practica = () => {
   useDocumentTitle('Mi Ensayo');
   const { orderId } = useParams();
-  const { orders, loading, getSongById, getBandById, getMemberById, fetchPracticeLogs, upsertPracticeLog } = useAppStore();
+  const { orders, loading, getSongById, getBandById, getMemberById, fetchPracticeLogs, upsertPracticeLog, fetchPracticeAlarm, setPracticeAlarm } = useAppStore();
 
   const order = orders.find(o => o.id === orderId);
   const band = order ? getBandById(order.bandId) : null;
@@ -122,6 +123,23 @@ export const Practica = () => {
   const [logsLoaded, setLogsLoaded] = useState(false);
   const [saveState, setSaveState] = useState('idle'); // idle | saving | saved
   const [viewerSong, setViewerSong] = useState(null); // { song, orderKey }
+  // Alarma de ensayo (F2): preferencia GLOBAL del usuario (no por orden).
+  // null = todavía cargando (el toggle se deshabilita mientras tanto).
+  const [alarmEnabled, setAlarmEnabled] = useState(null);
+
+  useEffect(() => {
+    let alive = true;
+    fetchPracticeAlarm().then((enabled) => { if (alive) setAlarmEnabled(enabled); });
+    return () => { alive = false; };
+  }, [fetchPracticeAlarm]);
+
+  const toggleAlarm = async () => {
+    if (alarmEnabled === null) return;
+    const next = !alarmEnabled;
+    setAlarmEnabled(next); // optimista
+    const saved = await setPracticeAlarm(next);
+    if (saved === null) setAlarmEnabled(!next); // falló → revertir
+  };
 
   // Timers de autoguardado con debounce por canción. El upsert manda SIEMPRE
   // el objeto completo (contrato del converter — ver DATA-LOSS LANDMINE).
@@ -271,6 +289,34 @@ export const Practica = () => {
             </div>
           </div>
         </div>
+      </div>
+
+      {/* Alarma de ensayo (F2): opt-in personal. El push diario 18:00 ART lo
+          manda el cron send_practice_reminders() SOLO si hay canciones por
+          practicar en algún orden programado (anti-spam server-side). */}
+      <div className="rounded-xl border border-neutral-800 p-4 flex items-center justify-between gap-4">
+        <div className="flex-1 min-w-0">
+          <p className="text-sm font-medium text-white flex items-center gap-2">
+            <AlarmClock size={16} className="text-amber-400 shrink-0" /> Alarma de ensayo
+          </p>
+          <p className="text-xs text-gray-400 mt-0.5">
+            Te recordamos todos los días a las 18:00 mientras tengas canciones por practicar. Sin pendientes, no te molestamos.
+          </p>
+        </div>
+        {/* Switch inmune a iOS: label + checkbox sr-only peer + spans track/knob
+            (mismo patrón que "Programar ensamble" en Ordenes — landmine 23). */}
+        <label className={`relative shrink-0 inline-flex items-center ${alarmEnabled === null ? 'opacity-50' : 'cursor-pointer'}`}>
+          <input
+            type="checkbox"
+            className="sr-only peer"
+            aria-label="Alarma de ensayo"
+            checked={!!alarmEnabled}
+            disabled={alarmEnabled === null}
+            onChange={toggleAlarm}
+          />
+          <span className="block w-[52px] h-8 rounded-full bg-neutral-700 transition-colors peer-checked:bg-green-500 peer-focus-visible:ring-2 peer-focus-visible:ring-white/40" />
+          <span className="pointer-events-none absolute top-[2px] left-[2px] h-7 w-7 rounded-full bg-white shadow transition-transform peer-checked:translate-x-5" />
+        </label>
       </div>
 
       {/* Tarjetas de práctica por canción */}
