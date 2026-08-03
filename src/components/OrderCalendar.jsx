@@ -182,10 +182,10 @@ export function OrderCalendar({ orders, getBandById, onSelectOrder }) {
                     key={`reh-${o.id}`}
                     type="button"
                     onClick={() => onSelectOrder?.(o)}
-                    title={`Ensayo · ${band?.name || 'Banda'}${o.rehearsalTime ? ' · ' + o.rehearsalTime : ''}`}
+                    title={`Ensamble · ${band?.name || 'Banda'}${o.rehearsalTime ? ' · ' + o.rehearsalTime : ''}`}
                     className="text-left text-[10px] px-1.5 py-0.5 rounded border truncate bg-amber-500/30 text-amber-100 border-amber-500/40 hover:brightness-125 focus:outline-none focus:ring-2 focus:ring-white/40"
                   >
-                    {o.rehearsalTime ? `${o.rehearsalTime.slice(0, 5)} ` : ''}Ensayo · {band?.name || 'Banda'}
+                    {o.rehearsalTime ? `${o.rehearsalTime.slice(0, 5)} ` : ''}Ensamble · {band?.name || 'Banda'}
                   </button>
                 );
               })}

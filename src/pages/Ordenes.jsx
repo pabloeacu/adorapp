@@ -1,12 +1,12 @@
 import React, { useState, useMemo, useEffect } from 'react';
-import { useSearchParams } from 'react-router-dom';
+import { useSearchParams, Link } from 'react-router-dom';
 import { useDocumentTitle } from '../hooks/useDocumentTitle';
 import {
   Plus, Calendar, Music, Clock, Copy,
   MessageSquare, Eye, Trash2, Search, Check, X,
   User, Zap, AlertCircle, ChevronDown, FileDown, History, Award,
   FileText, Printer, Copy as CopyIcon,
-  Edit, CheckCircle, XCircle, RotateCcw
+  Edit, CheckCircle, XCircle, RotateCcw, Target, ChevronRight
 } from 'lucide-react';
 // jspdf is loaded on demand inside generateOrderPDF / generateSongsPDF
 // (~140 KB; no need at first paint).
@@ -1251,9 +1251,9 @@ export const Ordenes = () => {
           <div className="rounded-xl border border-neutral-800 p-4">
             <div className="flex items-center justify-between gap-4">
               <div className="flex-1 min-w-0">
-                <p className="text-sm font-medium text-white">Programar ensayo</p>
+                <p className="text-sm font-medium text-white">Programar ensamble</p>
                 <p className="text-xs text-gray-400 mt-0.5">
-                  Avisamos a la banda 2 h antes y lo mostramos en el calendario y en el inicio.
+                  El encuentro de toda la banda. Avisamos 2 h antes y lo mostramos en el calendario y en el inicio.
                 </p>
               </div>
               {/* Switch: <label> + checkbox oculto (sr-only peer) + spans track/knob.
@@ -1265,7 +1265,7 @@ export const Ordenes = () => {
                 <input
                   type="checkbox"
                   className="sr-only peer"
-                  aria-label="Programar ensayo"
+                  aria-label="Programar ensamble"
                   checked={formData.rehearsalEnabled}
                   onChange={() => setFormData({ ...formData, rehearsalEnabled: !formData.rehearsalEnabled })}
                 />
@@ -1276,13 +1276,13 @@ export const Ordenes = () => {
             {formData.rehearsalEnabled && (
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mt-4">
                 <Input
-                  label="Día del ensayo"
+                  label="Día del ensamble"
                   type="date"
                   value={formData.rehearsalDate}
                   onChange={(e) => setFormData({ ...formData, rehearsalDate: e.target.value })}
                 />
                 <Input
-                  label="Hora del ensayo"
+                  label="Hora del ensamble"
                   type="time"
                   value={formData.rehearsalTime}
                   onChange={(e) => setFormData({ ...formData, rehearsalTime: e.target.value })}
@@ -1623,6 +1623,27 @@ export const Ordenes = () => {
                 </Badge>
               </div>
             </div>
+
+            {/* Ensayómetro: acceso al ensayo personal (glosario: el "ensamble"
+                es el encuentro de la banda; el "ensayo" es la práctica personal
+                previa). Solo tiene sentido para órdenes aún programados. */}
+            {viewingOrder.status === 'scheduled' && (
+              <Link
+                to={`/practica/${viewingOrder.id}`}
+                className="flex items-center gap-3 rounded-xl p-4 bg-gradient-to-r from-indigo-600/80 to-purple-600/80 text-white hover:brightness-110 transition-all"
+              >
+                <div className="p-2 rounded-lg bg-white/15 shrink-0">
+                  <Target size={22} />
+                </div>
+                <div className="flex-1 min-w-0">
+                  <p className="font-semibold">Practicar este orden</p>
+                  <p className="text-sm text-white/80 truncate">
+                    Tu ensayo personal: pasadas, letra, estructura y arreglos de cada canción
+                  </p>
+                </div>
+                <ChevronRight size={20} className="shrink-0 text-white/70" />
+              </Link>
+            )}
 
             {(isPastor || isLeader) && (
               <div className="flex flex-wrap items-center gap-2">

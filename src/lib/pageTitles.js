@@ -12,4 +12,8 @@ export const pageTitles = {
   '/comunicaciones': 'Comunicaciones',
 };
 
-export const titleForPath = (pathname) => pageTitles[pathname] || 'AdorAPP';
+export const titleForPath = (pathname) => {
+  // Dynamic route: /practica/:orderId → the Ensayómetro (personal practice).
+  if (pathname.startsWith('/practica')) return 'Mi Ensayo';
+  return pageTitles[pathname] || 'AdorAPP';
+};

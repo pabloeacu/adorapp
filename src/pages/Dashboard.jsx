@@ -85,7 +85,7 @@ export const Dashboard = () => {
               <CalendarClock size={28} className="text-black" />
             </div>
             <div className="flex-1 min-w-0">
-              <p className="text-lg font-bold">¡Hoy tenés ensayo!</p>
+              <p className="text-lg font-bold">¡Hoy tenés ensamble!</p>
               <p className="text-sm font-medium text-black/80 truncate">
                 {rehearsalBand?.name || 'Banda'}
                 {todaysRehearsal.rehearsalTime ? ` · ${todaysRehearsal.rehearsalTime}` : ''} — tocá para ver el orden

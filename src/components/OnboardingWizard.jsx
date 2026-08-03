@@ -194,7 +194,7 @@ export function OnboardingWizard({ member, onClose }) {
                 <Phone size={20} /> Datos de contacto
               </h2>
               <p className="text-sm text-gray-400">
-                Solo los pastores y líderes ven esto. Te van a usar para coordinar ensayos.
+                Solo los pastores y líderes ven esto. Te van a usar para coordinar ensambles.
               </p>
 
               <label className="block">
