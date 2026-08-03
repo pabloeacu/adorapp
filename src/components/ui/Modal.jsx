@@ -107,18 +107,31 @@ export const Modal = ({
       role="dialog"
       aria-modal="true"
       aria-labelledby="modal-title"
+      // En iPhone (PWA standalone, status bar black-translucent) el contenido
+      // fluye DEBAJO del status bar. Con contenido alto el modal queda pegado
+      // al borde superior y el botón "Cerrar" cae rozando la zona del status
+      // bar / gesto del sistema: iOS se come el primer tap (reporte de Paul,
+      // misma clase de bug que el "Guardar" del recortador bajo el notch).
+      // El safe-area-inset-top corre todo el card por debajo de esa zona.
+      // En pantallas sin notch env() = 0 → idéntico a antes.
+      style={{ paddingTop: 'calc(1rem + env(safe-area-inset-top, 0px))' }}
     >
       {/* Modal Container.
           - max-h uses 100dvh (dynamic viewport) so iOS soft-keyboard does
             not push the footer below the visible area.
           - explicit padding-bottom from env(safe-area-inset-bottom) so the
             footer never overlaps the home indicator on notched phones. */}
-      <div className={`
+      <div
+        className={`
         relative bg-neutral-900 border border-neutral-800 rounded-2xl
         w-full ${sizes[size]} max-h-[calc(100dvh-160px)]
         flex flex-col
         animate-scale-in shadow-2xl
-      `}>
+      `}
+        // El max-height también descuenta el inset superior: con el card
+        // corrido hacia abajo, sin esto podría no entrar en el alto visible.
+        style={{ maxHeight: 'calc(100dvh - 160px - env(safe-area-inset-top, 0px))' }}
+      >
         {/* Header — shrink-0 so it stays pinned at the top of the card; the
             close button is always visible regardless of content scroll. */}
         <div className="flex items-center justify-between gap-3 p-4 border-b border-neutral-800 shrink-0 bg-neutral-900 rounded-t-2xl">
