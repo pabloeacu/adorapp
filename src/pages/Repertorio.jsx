@@ -288,14 +288,24 @@ export const Repertorio = () => {
       cancelText: 'Mejor no',
       icon: AlertTriangle,
       onConfirm: async () => {
+        // Esperar el resultado real (patrón PR #42): fire-and-forget mostraba
+        // "eliminada" aunque la base rechazara el DELETE (p. ej. FK).
         setConfirmModal(prev => ({ ...prev, loading: true }));
-        deleteSong(song.id);
+        const ok = await deleteSong(song.id);
         setConfirmModal(prev => ({ ...prev, loading: false, isOpen: false }));
-        setSuccessModal({
-          isOpen: true,
-          title: 'Canción eliminada',
-          message: `"${song.title}" fue eliminada del repertorio.`
-        });
+        if (ok) {
+          setSuccessModal({
+            isOpen: true,
+            title: 'Canción eliminada',
+            message: `"${song.title}" fue eliminada del repertorio.`
+          });
+        } else {
+          setErrorModal({
+            isOpen: true,
+            title: 'No se pudo eliminar',
+            message: `Hubo un problema al eliminar "${song.title}". Intentá de nuevo.`
+          });
+        }
       }
     });
   };

@@ -126,14 +126,24 @@ export const Bandas = () => {
       cancelText: 'Mejor no',
       icon: AlertTriangle,
       onConfirm: async () => {
+        // Esperar el resultado real (patrón PR #42): fire-and-forget mostraba
+        // "eliminada" aunque la base rechazara el DELETE (p. ej. FK).
         setConfirmModal(prev => ({ ...prev, loading: true }));
-        deleteBand(band.id);
+        const ok = await deleteBand(band.id);
         setConfirmModal(prev => ({ ...prev, loading: false, isOpen: false }));
-        setSuccessModal({
-          isOpen: true,
-          title: 'Banda eliminada',
-          message: `"${band.name}" fue eliminada correctamente.`
-        });
+        if (ok) {
+          setSuccessModal({
+            isOpen: true,
+            title: 'Banda eliminada',
+            message: `"${band.name}" fue eliminada correctamente.`
+          });
+        } else {
+          setErrorModal({
+            isOpen: true,
+            title: 'No se pudo eliminar',
+            message: `Hubo un problema al eliminar "${band.name}". Intentá de nuevo.`
+          });
+        }
       }
     });
   };
