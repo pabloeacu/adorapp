@@ -41,6 +41,7 @@ import { supabase } from '../../lib/supabase';
 import { useCurrentMember } from '../../hooks/useCurrentMember';
 import { PushToggle } from '../PushToggle';
 import { titleForPath } from '../../lib/pageTitles';
+import { sortNotificationsByDateDesc } from '../../lib/notifications';
 
 // Formato es-AR sin timezone shift — mismo helper que Header.jsx para mantener
 // paridad visual de fechas (cumpleaños, etc.) entre layouts.
@@ -177,6 +178,7 @@ export const MobileNav = () => {
             title: n.title,
             message: n.message,
             icon: iconForType(n.type),
+            createdAt: n.created_at,
             time: new Date(n.created_at).toLocaleTimeString('es-AR', { hour: '2-digit', minute: '2-digit' }),
           });
         });
@@ -203,12 +205,15 @@ export const MobileNav = () => {
               fullMessage: cn.full_message,
               message: cn.subject,
               icon: 'send',
+              createdAt: cn.created_at,
               time: new Date(cn.created_at).toLocaleTimeString('es-AR', { hour: '2-digit', minute: '2-digit' }),
             });
           });
         }
 
-        setNotifications(notifs);
+        // TODAS las fuentes mezcladas por fecha real (lo más nuevo arriba);
+        // sin esto las comunicaciones quedaban al fondo por el push tardío.
+        setNotifications(sortNotificationsByDateDesc(notifs));
         const unread = notifs.filter((n) => !readNotificationIds.includes(n.id)).length;
         setUnreadCount(unread);
       } catch (err) {
@@ -1632,15 +1637,24 @@ export const MobileNav = () => {
                       <div
                         key={notif.id}
                         onClick={() => {
-                          markAsRead(notif.id);
+                          // Tocar el aviso NO lo descarta (un roce accidental lo
+                          // borraba). Solo la ✕ de cada card o "Marcar todas".
                           if (notif.type === 'request') {
                             setShowNotifications(false);
                             window.location.href = '/solicitudes';
                           }
                         }}
-                        className="p-4 bg-neutral-800/50 rounded-2xl border border-neutral-700 hover:border-blue-500/50 transition-colors cursor-pointer"
+                        className="relative p-4 bg-neutral-800/50 rounded-2xl border border-neutral-700 hover:border-blue-500/50 transition-colors cursor-pointer"
                       >
-                        <div className="flex items-start gap-3">
+                        <button
+                          type="button"
+                          aria-label="Descartar notificación"
+                          onClick={(e) => { e.stopPropagation(); markAsRead(notif.id); }}
+                          className="absolute top-2 right-2 p-2 rounded-full text-gray-500 hover:text-white hover:bg-neutral-700 transition-colors"
+                        >
+                          <X size={16} />
+                        </button>
+                        <div className="flex items-start gap-3 pr-8">
                           <div className={`p-2 rounded-xl ${
                             notif.type === 'song' ? 'bg-purple-500/20' :
                             notif.type === 'band' ? 'bg-blue-500/20' :

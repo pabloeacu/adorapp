@@ -14,15 +14,7 @@ import { Modal } from '../components/ui/Modal';
 import { Input } from '../components/ui/Input';
 import { ConfirmModal, SuccessModal, ErrorModal } from '../components/ui/ConfirmModal';
 
-const dayLabels = {
-  domingo: 'Domingo',
-  lunes: 'Lunes',
-  martes: 'Martes',
-  miercoles: 'Miércoles',
-  jueves: 'Jueves',
- viernes: 'Viernes',
-  sabado: 'Sábado'
-};
+import { dayLabels, dayPluralLabels, compareBandsByCalendar } from '../lib/days';
 
 export const Bandas = () => {
   useDocumentTitle('Bandas');
@@ -65,7 +57,9 @@ export const Bandas = () => {
     message: ''
   });
 
-  const activeBands = bands.filter(b => b.active);
+  // Tarjetas en orden calendario (martes → jueves → sábado → domingo con las
+  // bandas actuales), no en el orden de carga de la DB.
+  const activeBands = bands.filter(b => b.active).sort(compareBandsByCalendar);
 
   const getBandSongCount = (bandId) => {
     return orders.filter(o => o.bandId === bandId).length;
@@ -199,7 +193,7 @@ export const Bandas = () => {
                     <div className="flex flex-wrap items-center gap-3 text-sm text-gray-400 mt-1">
                       <span className="flex items-center gap-1">
                         <Calendar size={14} />
-                        {dayLabels[band.meetingDay]}s
+                        {dayPluralLabels[band.meetingDay] || dayLabels[band.meetingDay]}
                       </span>
                       <span className="flex items-center gap-1">
                         <Clock size={14} />

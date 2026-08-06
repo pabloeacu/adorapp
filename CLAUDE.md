@@ -324,3 +324,15 @@ Dos fixes reportados por líderes reales, ambos a producción en la rama `claude
 
 **Landmine nuevo:**
 32. **Todo handler de borrado DEBE `await` + ramificar** (`deleteBand/Song/Order` devuelven true/false): fire-and-forget + modal de éxito = mentira al usuario cuando la base rechaza (23503 u otro). Las FKs de la app quedaron: `orders.band_id` SET NULL, `song_key_history.{song_id,member_id}` CASCADE, `song_key_history.order_id` SET NULL, `pending_registrations.{approved_by,rejected_by}` SET NULL, `practice_logs.*` CASCADE. Si agregás una FK nueva hacia `bands/songs/members/orders`, decidí la regla de DELETE explícitamente (nunca NO ACTION por defecto) y probá el borrado transaccionalmente impersonando un usuario ACTIVO (ver trampa arriba).
+
+## Estado al 2026-08-06
+
+**Cuatro reportes de Paul con capturas, en dos chunks (PR #60).**
+
+**Chunk A — Bandas:** (a) "Martess"/"Juevess": el card pluralizaba `${label}s` a ciegas; los días terminados en s son invariantes en español. Nuevo `src/lib/days.js` con `dayPluralLabels` (solo sábado/domingo pluralizan) — auditado, era el único lugar con esa concatenación. (b) Las tarjetas de Bandas ahora se ordenan por calendario (semana desde lunes → martes, jueves, sábado, domingo con las bandas reales), desempate por horario y nombre (`compareBandsByCalendar`). 8 tests unitarios con el dataset de las capturas.
+
+**Chunk B — Panel de push (MobileNav móvil + Header desktop, los DOS):** (a) las comunicaciones se pusheaban AL FINAL del array ya ordenado → siempre al fondo aunque fueran lo más nuevo. Ahora cada ítem lleva `createdAt` y todo se mezcla por fecha real (`sortNotificationsByDateDesc` en `src/lib/notifications.js`, con test); los eventos realtime recargan por el mismo loader → camino único. (b) tocar un aviso lo marcaba leído y lo hacía desaparecer (roce accidental = borrado): ahora el tap NO descarta (solo navega en solicitudes), cada card tiene su **✕** (`stopPropagation` → `markAsRead`) y el "Marcar todas como leídas" sigue arriba.
+
+**Landmines nuevos:**
+33. **Días de la semana:** NUNCA pluralizar concatenando "s" (`${label}s` → "Martess"). Usar `dayPluralLabels`/`dayLabels` de `src/lib/days.js`. El orden de tarjetas/listas por día usa `compareBandsByCalendar` (lunes primero, domingo último); si agregás una vista nueva ordenada por día, reutilizá esos helpers (tests en `days.test.js`).
+34. **Panel de notificaciones:** (a) todo lo que entre al panel DEBE llevar `createdAt` y pasar por `sortNotificationsByDateDesc` — no hay orden implícito por origen; las comunicaciones NO van después. (b) El tap sobre un aviso NO debe marcar leído/descartar (decisión de producto anti-roce): el descarte es SOLO vía la ✕ de cada card o "Marcar todas". El cambio vive duplicado en `MobileNav.jsx` Y `Header.jsx` (los paneles siguen sin unificar): cualquier cambio va en los dos.
