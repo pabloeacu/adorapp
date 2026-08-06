@@ -1069,7 +1069,7 @@ export const Ordenes = () => {
                           {statusConfig[order.status]?.label}
                         </span>
                       </Badge>
-                      <Badge variant="primary">{band?.name}</Badge>
+                      <Badge variant="primary">{band?.name || 'Banda eliminada'}</Badge>
                     </div>
                     <h3 className="text-lg font-semibold">{formatDate(order.date)}</h3>
                     <div className="flex items-center gap-3 text-sm text-gray-400 mt-1">
@@ -1669,7 +1669,7 @@ export const Ordenes = () => {
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <Card className="p-4">
                 <p className="text-xs text-gray-400 uppercase mb-1">Banda</p>
-                <p className="font-medium">{getBandById(viewingOrder.bandId)?.name}</p>
+                <p className="font-medium">{getBandById(viewingOrder.bandId)?.name || 'Banda eliminada'}</p>
               </Card>
               <Card className="p-4">
                 <p className="text-xs text-gray-400 uppercase mb-1">Tipo de Reunión</p>
