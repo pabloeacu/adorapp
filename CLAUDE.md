@@ -2,6 +2,8 @@
 
 Este archivo se carga automáticamente al iniciar cualquier sesión de Claude Code en este repo. Es el contrato mínimo para no perder contexto entre sesiones.
 
+> 📐 **Mapa completo del proyecto:** `ARCHITECTURE.md` (raíz) documenta **cada página, store, componente, librería, migración y cron** con sus funciones y flujo de datos, más la foto autoritativa de la base (tablas/RLS/crons/FKs/funciones). Leé PRIMERO este `CLAUDE.md` (el contrato: Regla de Oro + reglas + los 34 landmines), y usá `ARCHITECTURE.md` como el mapa exhaustivo del código.
+
 ## ⭐ REGLA DE ORO — método obligatorio para CADA pedido (innegociable)
 
 Aplica a **toda** solicitud de Paul, **sin importar cuán chica o trivial parezca**. No es opcional ni por caso: es el estándar permanente del proyecto. Vale para esta sesión y para cualquier sesión futura.
