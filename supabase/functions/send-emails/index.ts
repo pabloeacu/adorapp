@@ -66,8 +66,10 @@ function renderVars(tpl: string, vars: Record<string, unknown>, escape: boolean)
 }
 
 // --- Layout del email (handoff §6.2): table-based, inline, sobrio -----------
+const LOGO_URL = "https://adorapp.net.ar/adorapp-logo.png";
+
 function buildHtml(t: EmailTemplate, vars: Record<string, unknown>): string {
-  const accent = /^#[0-9a-fA-F]{6}$/.test(t.color_acento || "") ? t.color_acento : "#6366f1";
+  const accent = /^#[0-9a-fA-F]{6}$/.test(t.color_acento || "") ? t.color_acento : "#b7791f";
   const kicker = renderVars(t.kicker || "", vars, true);
   const titulo = renderVars(t.titulo || "", vars, true);
   const cuerpo = renderVars(t.cuerpo_html || "", vars, false); // cuerpo_html ya es HTML curado por el pastor
@@ -75,11 +77,19 @@ function buildHtml(t: EmailTemplate, vars: Record<string, unknown>): string {
   const ctaUrlRaw = renderVars(t.cta_url || "", vars, false);  // RAW; se escapa una vez abajo
   const firma = renderVars(t.firma || "", vars, true);
 
+  // Encabezado oscuro con el logo de AdorAPP (el PNG trae fondo negro → banda dark).
+  // Gated en mostrar_logo; imagen chica (no banner) para no castigar entregabilidad.
+  const logoBlock = t.mostrar_logo !== false
+    ? `<tr><td style="background:#0b0b12;padding:22px 0;text-align:center;">
+         <img src="${LOGO_URL}" width="180" alt="AdorAPP" style="width:180px;max-width:62%;height:auto;display:inline-block;border:0;">
+       </td></tr>`
+    : "";
+
   const ctaBlock = ctaText && ctaUrlRaw
-    ? `<tr><td style="padding:8px 0 4px;">
+    ? `<tr><td style="padding:10px 0 4px;">
          <table role="presentation" cellpadding="0" cellspacing="0"><tr>
            <td style="border-radius:8px;background-color:${accent};">
-             <a href="${escapeAttr(ctaUrlRaw)}" style="display:inline-block;padding:12px 22px;font-size:15px;font-weight:600;color:#ffffff;text-decoration:none;border-radius:8px;">${ctaText}</a>
+             <a href="${escapeAttr(ctaUrlRaw)}" style="display:inline-block;padding:12px 24px;font-size:15px;font-weight:600;color:#ffffff;text-decoration:none;border-radius:8px;">${ctaText}</a>
            </td></tr></table></td></tr>`
     : "";
 
@@ -88,25 +98,26 @@ function buildHtml(t: EmailTemplate, vars: Record<string, unknown>): string {
     : "";
 
   const firmaBlock = firma
-    ? `<tr><td style="padding:22px 0 0;font-size:13px;color:#6b7280;">${firma}</td></tr>`
+    ? `<tr><td style="padding:24px 0 0;font-size:13px;color:#6b7280;">${firma}</td></tr>`
     : "";
 
   return `<!doctype html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"></head>
 <body style="margin:0;padding:0;background:#f4f4f5;">
 <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:#f4f4f5;">
 <tr><td align="center" style="padding:28px 12px;">
-<table role="presentation" width="600" cellpadding="0" cellspacing="0" style="max-width:600px;width:100%;background:#ffffff;border-radius:12px;border:1px solid #e5e7eb;">
-<tr><td style="padding:32px 34px;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif;color:#111827;">
+<table role="presentation" width="600" cellpadding="0" cellspacing="0" style="max-width:600px;width:100%;background:#ffffff;border-radius:12px;border:1px solid #e5e7eb;overflow:hidden;">
+${logoBlock}
+<tr><td style="padding:30px 34px 32px;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif;color:#111827;">
 <table role="presentation" width="100%" cellpadding="0" cellspacing="0">
 ${kickerBlock}
-${titulo ? `<tr><td style="padding:0 0 14px;font-size:22px;font-weight:700;color:#111827;">${titulo}</td></tr>` : ""}
-<tr><td style="font-size:15px;line-height:1.6;color:#374151;">${cuerpo}</td></tr>
+${titulo ? `<tr><td style="padding:0 0 14px;font-size:22px;font-weight:700;color:#111827;line-height:1.3;">${titulo}</td></tr>` : ""}
+<tr><td style="font-size:15px;line-height:1.65;color:#374151;">${cuerpo}</td></tr>
 ${ctaBlock}
 ${firmaBlock}
 </table>
 </td></tr>
-<tr><td style="padding:16px 34px;border-top:1px solid #f3f4f6;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;font-size:12px;color:#9ca3af;">
-AdorAPP — Adoración CAF · adorapp.net.ar
+<tr><td style="padding:16px 34px;border-top:1px solid #f3f4f6;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;font-size:12px;color:#9ca3af;text-align:center;">
+AdorAPP · Ministerio de Adoración — Adoración CAF<br>adorapp.net.ar
 </td></tr>
 </table>
 </td></tr>
@@ -215,6 +226,7 @@ interface EmailTemplate {
   kicker: string | null; titulo: string | null; cuerpo_html: string | null;
   cta_text: string | null; cta_url: string | null; color_acento: string | null;
   firma: string | null; body_html: string | null; body_text: string | null;
+  mostrar_logo: boolean | null;
 }
 interface QueueJob {
   id: string; template_slug: string; to_email: string; to_nombre: string | null;
