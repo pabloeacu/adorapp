@@ -8,24 +8,33 @@
 //   * Envía por Gmail API (users.messages.send) con OAuth2 refresh_token.
 //
 // Seguridad:
-//   * verify_jwt:false (el cron no trae JWT de usuario) → validamos CRON_SECRET
-//     DENTRO del handler (landmine verify_jwt, handoff §5.1).
-//   * Secretos SOLO en Deno.env (nunca en el cliente ni en la DB ni en el repo).
+//   * verify_jwt:false (el cron no trae JWT de usuario) → validamos el secreto
+//     interno (email_internal_secret) DENTRO del handler (landmine verify_jwt, §5.1).
+//   * Credenciales de Gmail + remitente + secreto interno viven en private.app_secrets
+//     y se leen por get_email_config() (mismo patrón que el push). Nunca en el repo
+//     ni en el cliente.
 //   * Corre con service_role (bypassa RLS para leer/escribir la cola).
 
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 import { createClient } from "jsr:@supabase/supabase-js@2";
 
 // --- Config / secretos -----------------------------------------------------
+// Solo SUPABASE_URL y SERVICE_ROLE_KEY vienen de Deno.env (los inyecta Supabase).
+// El resto (credenciales de Gmail, remitente, secreto interno del cron) vive en
+// private.app_secrets y se lee por RPC get_email_config() — mismo patrón que el
+// push con get_push_config. No usamos Deno.env para esos secretos porque no se
+// pueden setear vía MCP; así queda todo centralizado, versionable y consistente.
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
 const SERVICE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
-const CRON_SECRET = Deno.env.get("CRON_SECRET") ?? "";
-const G_CLIENT_ID = Deno.env.get("GOOGLE_OAUTH_CLIENT_ID") ?? "";
-const G_CLIENT_SECRET = Deno.env.get("GOOGLE_OAUTH_CLIENT_SECRET") ?? "";
-const G_REFRESH_TOKEN = Deno.env.get("GOOGLE_OAUTH_REFRESH_TOKEN") ?? "";
-const EMAIL_FROM = Deno.env.get("EMAIL_FROM") ?? "adorappcaf@gmail.com";
-const EMAIL_FROM_NAME = Deno.env.get("EMAIL_FROM_NAME") ?? "AdorAPP · Adoración CAF";
-const EMAIL_REPLY_TO = Deno.env.get("EMAIL_REPLY_TO") ?? EMAIL_FROM;
+
+interface EmailConfig {
+  gmail_client_id: string;
+  gmail_client_secret: string;
+  gmail_refresh_token: string;
+  email_from: string;
+  email_from_name: string;
+  email_internal_secret: string;
+}
 
 // Throttle (handoff §5): por-destinatario 5 min fijo; global bajo para que los
 // transaccionales lleguen en segundos; carril rápido para prioridad <= 1.
@@ -174,14 +183,14 @@ function buildMime(opts: {
 }
 
 // --- OAuth + Gmail API (handoff §6.4) --------------------------------------
-async function getAccessToken(): Promise<string> {
+async function getAccessToken(clientId: string, clientSecret: string, refreshToken: string): Promise<string> {
   const r = await fetch("https://oauth2.googleapis.com/token", {
     method: "POST",
     headers: { "Content-Type": "application/x-www-form-urlencoded" },
     body: new URLSearchParams({
-      client_id: G_CLIENT_ID,
-      client_secret: G_CLIENT_SECRET,
-      refresh_token: G_REFRESH_TOKEN,
+      client_id: clientId,
+      client_secret: clientSecret,
+      refresh_token: refreshToken,
       grant_type: "refresh_token",
     }).toString(),
   });
@@ -218,10 +227,17 @@ function json(body: unknown, status = 200): Response {
 
 // --- Handler ----------------------------------------------------------------
 Deno.serve(async (req: Request) => {
+  // Config (credenciales Gmail + remitente + secreto interno) desde la RPC.
+  const { data: cfg, error: cfgErr } = await admin.rpc("get_email_config");
+  if (cfgErr || !cfg) return json({ error: "config unavailable", detail: cfgErr?.message }, 500);
+  const config = cfg as EmailConfig;
+
   // Auth del cron: secreto DENTRO del handler (verify_jwt:false).
   const auth = req.headers.get("Authorization") ?? "";
   const provided = auth.replace(/^Bearer\s+/i, "");
-  if (!CRON_SECRET || provided !== CRON_SECRET) return json({ error: "unauthorized" }, 401);
+  if (!config.email_internal_secret || provided !== config.email_internal_secret) {
+    return json({ error: "unauthorized" }, 401);
+  }
 
   try {
     // 1) Candidatos pendientes por prioridad.
@@ -277,15 +293,15 @@ Deno.serve(async (req: Request) => {
         ? renderVars((tpl as EmailTemplate).body_html!, vars, false)
         : buildHtml(tpl as EmailTemplate, vars);
       const text = buildText(tpl as EmailTemplate, vars);
-      const replyTo = (tpl as EmailTemplate).reply_to || EMAIL_REPLY_TO;
+      const replyTo = (tpl as EmailTemplate).reply_to || config.email_from;
 
       const mime = buildMime({
-        fromName: EMAIL_FROM_NAME, fromEmail: EMAIL_FROM,
+        fromName: config.email_from_name || "AdorAPP", fromEmail: config.email_from,
         to: job.to_email, toName: job.to_nombre, replyTo,
         subject, html, text,
       });
 
-      const accessToken = await getAccessToken();
+      const accessToken = await getAccessToken(config.gmail_client_id, config.gmail_client_secret, config.gmail_refresh_token);
       const providerMsgId = await gmailSend(accessToken, mime);
 
       // 6) Post-envío: marcar enviado + log + throttle.
@@ -293,7 +309,7 @@ Deno.serve(async (req: Request) => {
         status: "sent", enviado_at: new Date().toISOString(), intento: job.intento + 1, ultimo_error: null,
       }).eq("id", job.id);
       await admin.from("sent_emails").insert({
-        to_email: job.to_email, from_email: EMAIL_FROM, reply_to: replyTo,
+        to_email: job.to_email, from_email: config.email_from, reply_to: replyTo,
         asunto: subject, template_slug: job.template_slug, estado: "sent", provider_msg_id: providerMsgId,
       });
       await admin.from("email_throttle").update({ last_sent_at: new Date().toISOString() }).eq("key", "global");
