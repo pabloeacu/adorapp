@@ -75,6 +75,8 @@ function buildHtml(t: EmailTemplate, vars: Record<string, unknown>): string {
   const cuerpo = renderVars(t.cuerpo_html || "", vars, false); // cuerpo_html ya es HTML curado por el pastor
   const ctaText = renderVars(t.cta_text || "", vars, true);
   const ctaUrlRaw = renderVars(t.cta_url || "", vars, false);  // RAW; se escapa una vez abajo
+  const cta2Text = renderVars(t.cta2_text || "", vars, true);
+  const cta2UrlRaw = renderVars(t.cta2_url || "", vars, false); // 2º botón (ej. descargar manual)
   const firma = renderVars(t.firma || "", vars, true);
 
   // Encabezado oscuro con el logo de AdorAPP (el PNG trae fondo negro → banda dark).
@@ -90,6 +92,16 @@ function buildHtml(t: EmailTemplate, vars: Record<string, unknown>): string {
          <table role="presentation" cellpadding="0" cellspacing="0"><tr>
            <td style="border-radius:8px;background-color:${accent};">
              <a href="${escapeAttr(ctaUrlRaw)}" style="display:inline-block;padding:12px 24px;font-size:15px;font-weight:600;color:#ffffff;text-decoration:none;border-radius:8px;">${ctaText}</a>
+           </td></tr></table></td></tr>`
+    : "";
+
+  // 2º botón, estilo "outline" (borde de acento, texto de acento) → claramente
+  // distinto del CTA primario. Lo usa registro-aprobado para "descargar el manual".
+  const cta2Block = cta2Text && cta2UrlRaw
+    ? `<tr><td style="padding:6px 0 4px;">
+         <table role="presentation" cellpadding="0" cellspacing="0"><tr>
+           <td style="border-radius:8px;border:2px solid ${accent};">
+             <a href="${escapeAttr(cta2UrlRaw)}" style="display:inline-block;padding:11px 22px;font-size:15px;font-weight:600;color:${accent};text-decoration:none;border-radius:8px;">${cta2Text}</a>
            </td></tr></table></td></tr>`
     : "";
 
@@ -113,6 +125,7 @@ ${kickerBlock}
 ${titulo ? `<tr><td style="padding:0 0 14px;font-size:22px;font-weight:700;color:#111827;line-height:1.3;">${titulo}</td></tr>` : ""}
 <tr><td style="font-size:15px;line-height:1.65;color:#374151;">${cuerpo}</td></tr>
 ${ctaBlock}
+${cta2Block}
 ${firmaBlock}
 </table>
 </td></tr>
@@ -130,8 +143,9 @@ function buildText(t: EmailTemplate, vars: Record<string, unknown>): string {
   // Fallback: derivar texto del cuerpo (sin tags) — RAW, nunca escapado (E-GG-79).
   const cuerpo = renderVars(t.cuerpo_html || "", vars, false).replace(/<br\s*\/?>/gi, "\n").replace(/<[^>]+>/g, "");
   const cta = t.cta_url ? `\n\n${renderVars(t.cta_text || "", vars, false)}: ${renderVars(t.cta_url, vars, false)}` : "";
+  const cta2 = t.cta2_url ? `\n\n${renderVars(t.cta2_text || "", vars, false)}: ${renderVars(t.cta2_url, vars, false)}` : "";
   const firma = t.firma ? `\n\n${renderVars(t.firma, vars, false)}` : "";
-  return `${cuerpo}${cta}${firma}\n\nAdorAPP — Adoración CAF · adorapp.net.ar`;
+  return `${cuerpo}${cta}${cta2}${firma}\n\nAdorAPP — Adoración CAF · adorapp.net.ar`;
 }
 
 // --- MIME (handoff §6.3) ----------------------------------------------------
@@ -224,7 +238,8 @@ async function gmailSend(accessToken: string, mime: string): Promise<string> {
 interface EmailTemplate {
   slug: string; asunto: string; from_label: string; reply_to: string | null;
   kicker: string | null; titulo: string | null; cuerpo_html: string | null;
-  cta_text: string | null; cta_url: string | null; color_acento: string | null;
+  cta_text: string | null; cta_url: string | null;
+  cta2_text: string | null; cta2_url: string | null; color_acento: string | null;
   firma: string | null; body_html: string | null; body_text: string | null;
   mostrar_logo: boolean | null;
 }
