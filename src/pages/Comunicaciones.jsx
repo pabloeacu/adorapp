@@ -2,7 +2,7 @@
 // Communications Page - Send messages to members
 import React, { useState, useMemo, useEffect, useCallback } from 'react';
 import { useDocumentTitle } from '../hooks/useDocumentTitle';
-import { Send, Users, X, Check, Loader2, AlertCircle, Mail, FileText, ChevronLeft, Save } from 'lucide-react';
+import { Send, Users, X, Check, Loader2, AlertCircle, Mail, FileText, ChevronLeft, Save, Bell } from 'lucide-react';
 import { useAuthStore } from '../stores/authStore';
 import { useAppStore } from '../stores/appStore';
 import { callAdminFunction, supabase } from '../lib/supabase';
@@ -41,6 +41,8 @@ export const Comunicaciones = () => {
   const [subject, setSubject] = useState('');
   const [message, setMessage] = useState('');
   const [isSending, setIsSending] = useState(false);
+  // Canales de envío: campanita (push) y/o correo. Al menos uno.
+  const [channels, setChannels] = useState({ push: true, mail: false });
 
   // Modal states
   const [showSuccess, setShowSuccess] = useState(false);
@@ -66,6 +68,7 @@ export const Comunicaciones = () => {
     const { data, error } = await supabase
       .from('email_templates')
       .select('slug, descripcion, asunto, titulo, kicker, cuerpo_html, cta_text, cta_url, firma, activo')
+      .neq('slug', 'comunicacion') // plantilla de sistema (la usa el envío multicanal), no editable acá
       .order('descripcion');
     if (error) {
       setTplError('No se pudieron cargar las plantillas: ' + error.message);
@@ -210,6 +213,11 @@ export const Comunicaciones = () => {
       setShowError(true);
       return;
     }
+    if (!channels.push && !channels.mail) {
+      setErrorMessage('Elegí al menos un canal: campanita o correo.');
+      setShowError(true);
+      return;
+    }
 
     const recipientIds = getRecipientIds();
     if (recipientIds.length === 0) {
@@ -220,14 +228,15 @@ export const Comunicaciones = () => {
 
     setIsSending(true);
 
-    // The edge function does the parent insert, fan-out, and rolls back if anything
-    // fails — atomic from the client's perspective. The pastor's identity is taken
-    // from the JWT server-side (no need to send sender info from here).
+    // The edge function does the parent insert, fan-out (campanita) and/or email
+    // enqueue per channel, rolling back if the push fan-out fails — atomic from the
+    // client's perspective. The pastor's identity is taken from the JWT server-side.
     const { data, error } = await callAdminFunction('admin-send-communication', {
       recipientType,
       recipientIds,
       subject: subject.trim(),
       message: message.trim(),
+      channels: { push: channels.push, mail: channels.mail },
     });
 
     setIsSending(false);
@@ -239,7 +248,12 @@ export const Comunicaciones = () => {
       return;
     }
 
-    window.lastSentCount = data?.inserted ?? recipientIds.length;
+    // Resumen por canal para el modal de éxito.
+    const parts = [];
+    if (channels.push) parts.push(`${data?.pushCount ?? recipientIds.length} por campanita`);
+    if (channels.mail) parts.push(`${data?.mailQueued ?? 0} por correo`);
+    window.lastSentSummary = parts.join(' · ');
+    window.lastSentCount = data?.pushCount ?? data?.inserted ?? recipientIds.length;
     setShowSuccess(true);
     resetForm();
     // Push fan-out is handled by the AFTER INSERT trigger on
@@ -441,21 +455,74 @@ export const Comunicaciones = () => {
             </p>
           </div>
 
-          {/* Summary */}
-          <div className="bg-neutral-800/50 rounded-xl p-4">
-            <p className="text-sm text-gray-400">
-              Esta comunicación llegará a{' '}
-              <span className="text-white font-medium">
-                {getRecipientIds().length}
-              </span>{' '}
-              destinatario(s).
-            </p>
+          {/* Canales de envío — campanita (push) y/o correo */}
+          <div>
+            <label className="block text-sm font-medium text-gray-300 mb-2">
+              Canales de envío *
+            </label>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              <button
+                type="button"
+                onClick={() => setChannels(c => ({ ...c, push: !c.push }))}
+                className={`flex items-center gap-3 p-4 rounded-xl border transition-colors ${
+                  channels.push ? 'border-indigo-500 bg-indigo-500/10' : 'border-neutral-700 bg-neutral-800/40 hover:border-neutral-600'
+                }`}
+              >
+                <Bell size={20} className={channels.push ? 'text-indigo-300' : 'text-gray-400'} />
+                <div className="text-left min-w-0">
+                  <p className={`text-sm font-medium ${channels.push ? 'text-white' : 'text-gray-300'}`}>Campanita</p>
+                  <p className="text-xs text-gray-500">Aviso dentro de la app</p>
+                </div>
+                {channels.push && <Check size={16} className="text-indigo-300 ml-auto shrink-0" />}
+              </button>
+              <button
+                type="button"
+                onClick={() => setChannels(c => ({ ...c, mail: !c.mail }))}
+                className={`flex items-center gap-3 p-4 rounded-xl border transition-colors ${
+                  channels.mail ? 'border-indigo-500 bg-indigo-500/10' : 'border-neutral-700 bg-neutral-800/40 hover:border-neutral-600'
+                }`}
+              >
+                <Mail size={20} className={channels.mail ? 'text-indigo-300' : 'text-gray-400'} />
+                <div className="text-left min-w-0">
+                  <p className={`text-sm font-medium ${channels.mail ? 'text-white' : 'text-gray-300'}`}>Correo</p>
+                  <p className="text-xs text-gray-500">Email con el formato de AdorAPP</p>
+                </div>
+                {channels.mail && <Check size={16} className="text-indigo-300 ml-auto shrink-0" />}
+              </button>
+            </div>
           </div>
+
+          {/* Summary — conteo por canal */}
+          {(() => {
+            const idSet = new Set(getRecipientIds());
+            const mailCount = activeMembers.filter(m => m.userId && idSet.has(m.userId) && m.email && m.email.trim()).length;
+            const total = idSet.size;
+            return (
+              <div className="bg-neutral-800/50 rounded-xl p-4 space-y-1">
+                {channels.push && (
+                  <p className="text-sm text-gray-400">
+                    🔔 Campanita: <span className="text-white font-medium">{total}</span> destinatario(s).
+                  </p>
+                )}
+                {channels.mail && (
+                  <p className="text-sm text-gray-400">
+                    ✉️ Correo: <span className="text-white font-medium">{mailCount}</span> destinatario(s) con email.
+                    {total > mailCount && (
+                      <span className="text-amber-400/90"> · {total - mailCount} sin email (no reciben correo)</span>
+                    )}
+                  </p>
+                )}
+                {!channels.push && !channels.mail && (
+                  <p className="text-sm text-amber-400/90">Elegí al menos un canal para poder enviar.</p>
+                )}
+              </div>
+            );
+          })()}
 
           {/* Send Button */}
           <Button
             onClick={handleSend}
-            disabled={isSending || !recipientType || !subject.trim() || !message.trim()}
+            disabled={isSending || !recipientType || !subject.trim() || !message.trim() || (!channels.push && !channels.mail)}
             className="w-full"
             size="lg"
           >
@@ -729,7 +796,9 @@ export const Comunicaciones = () => {
             </div>
             <h3 className="text-lg font-semibold text-white mb-2">¡Comunicación Enviada!</h3>
             <p className="text-gray-400 mb-6">
-              La comunicación ha sido enviada a {window.lastSentCount || 0} destinatario(s).
+              {window.lastSentSummary
+                ? `Enviada: ${window.lastSentSummary}.`
+                : `La comunicación ha sido enviada a ${window.lastSentCount || 0} destinatario(s).`}
             </p>
             <Button onClick={() => setShowSuccess(false)} className="w-full">
               Aceptar
