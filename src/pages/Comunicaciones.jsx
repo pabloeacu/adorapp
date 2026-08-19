@@ -1,13 +1,31 @@
 // AdorAPP - Centro de Avivamiento Familiar
 // Communications Page - Send messages to members
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect, useCallback } from 'react';
 import { useDocumentTitle } from '../hooks/useDocumentTitle';
-import { Send, Users, X, Check, Loader2, AlertCircle } from 'lucide-react';
+import { Send, Users, X, Check, Loader2, AlertCircle, Mail, FileText, ChevronLeft, Save } from 'lucide-react';
 import { useAuthStore } from '../stores/authStore';
 import { useAppStore } from '../stores/appStore';
-import { callAdminFunction } from '../lib/supabase';
+import { callAdminFunction, supabase } from '../lib/supabase';
 import { Card } from '../components/ui/Card';
 import { Button } from '../components/ui/Button';
+
+// Variables que cada plantilla de correo rellena en el momento del envío. Se
+// muestran como ayuda; el pastor edita la COPIA, no las variables ni las URLs
+// (esas las arma el sistema — si las tocara, se romperían los enlaces).
+const TEMPLATE_VARS = {
+  'registro-pendiente': ['nombre'],
+  'registro-aprobado': ['nombre', 'email', 'password', 'url_login', 'url_manual'],
+  'nuevo-orden': ['nombre', 'fecha', 'banda_sufijo', 'url'],
+  'recordatorio-ensayo': ['nombre', 'fecha', 'url'],
+};
+// Campos de copia editables por el pastor (no exponemos slug, cta_url, from_label…).
+const EDITABLE_FIELDS = [
+  { key: 'asunto', label: 'Asunto', type: 'text' },
+  { key: 'titulo', label: 'Título', type: 'text' },
+  { key: 'cuerpo_html', label: 'Cuerpo', type: 'textarea', hint: 'Podés usar {{variables}} y saltos con <br>.' },
+  { key: 'cta_text', label: 'Texto del botón', type: 'text', hint: 'Dejalo vacío si el correo no lleva botón.' },
+  { key: 'firma', label: 'Firma', type: 'text' },
+];
 
 export const Comunicaciones = () => {
   useDocumentTitle('Comunicaciones');
@@ -32,6 +50,56 @@ export const Comunicaciones = () => {
   // Recipient selection modals
   const [showBandSelector, setShowBandSelector] = useState(false);
   const [showUserSelector, setShowUserSelector] = useState(false);
+
+  // --- Email templates (Plantillas de correo) ---
+  const [view, setView] = useState('enviar'); // 'enviar' | 'plantillas'
+  const [templates, setTemplates] = useState([]);
+  const [tplLoading, setTplLoading] = useState(false);
+  const [tplError, setTplError] = useState('');
+  const [editingTpl, setEditingTpl] = useState(null); // fila en edición (draft)
+  const [tplSaving, setTplSaving] = useState(false);
+  const [tplSavedSlug, setTplSavedSlug] = useState('');
+
+  const loadTemplates = useCallback(async () => {
+    setTplLoading(true);
+    setTplError('');
+    const { data, error } = await supabase
+      .from('email_templates')
+      .select('slug, descripcion, asunto, titulo, kicker, cuerpo_html, cta_text, cta_url, firma, activo')
+      .order('descripcion');
+    if (error) {
+      setTplError('No se pudieron cargar las plantillas: ' + error.message);
+      setTemplates([]);
+    } else {
+      setTemplates(data || []);
+    }
+    setTplLoading(false);
+  }, []);
+
+  useEffect(() => {
+    if (view === 'plantillas' && templates.length === 0) loadTemplates();
+  }, [view, templates.length, loadTemplates]);
+
+  const saveTemplate = async () => {
+    if (!editingTpl) return;
+    setTplSaving(true);
+    setTplError('');
+    const { slug, asunto, titulo, cuerpo_html, cta_text, firma, activo } = editingTpl;
+    // Solo la copia editable; nunca slug/cta_url/variables.
+    const { error } = await supabase
+      .from('email_templates')
+      .update({ asunto, titulo, cuerpo_html, cta_text, firma, activo })
+      .eq('slug', slug);
+    setTplSaving(false);
+    if (error) {
+      setTplError('No se pudo guardar: ' + error.message);
+      return;
+    }
+    setTemplates(prev => prev.map(t => (t.slug === slug ? { ...t, asunto, titulo, cuerpo_html, cta_text, firma, activo } : t)));
+    setTplSavedSlug(slug);
+    setEditingTpl(null);
+    setTimeout(() => setTplSavedSlug(''), 2500);
+  };
 
   // Active members with user accounts (can receive notifications)
   const activeMembers = useMemo(
@@ -202,6 +270,27 @@ export const Comunicaciones = () => {
         </p>
       </div>
 
+      {/* Toggle: Enviar mensaje / Plantillas de correo */}
+      <div className="flex gap-2 mb-6 p-1 bg-neutral-800/60 rounded-xl w-full max-w-sm">
+        <button
+          onClick={() => setView('enviar')}
+          className={`flex-1 flex items-center justify-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
+            view === 'enviar' ? 'bg-neutral-700 text-white' : 'text-gray-400 hover:text-white'
+          }`}
+        >
+          <Send size={16} /> Enviar
+        </button>
+        <button
+          onClick={() => setView('plantillas')}
+          className={`flex-1 flex items-center justify-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
+            view === 'plantillas' ? 'bg-neutral-700 text-white' : 'text-gray-400 hover:text-white'
+          }`}
+        >
+          <Mail size={16} /> Plantillas de correo
+        </button>
+      </div>
+
+      {view === 'enviar' && (
       <Card className="p-6">
         <div className="space-y-6">
           {/* Recipient Type Selection */}
@@ -384,6 +473,108 @@ export const Comunicaciones = () => {
           </Button>
         </div>
       </Card>
+      )}
+
+      {/* Plantillas de correo — editor de la copia (solo pastores) */}
+      {view === 'plantillas' && (
+        <Card className="p-6">
+          {tplLoading ? (
+            <div className="flex items-center justify-center py-12 text-gray-400">
+              <Loader2 size={20} className="animate-spin mr-2" /> Cargando plantillas…
+            </div>
+          ) : tplError ? (
+            <div className="text-center py-8">
+              <AlertCircle size={40} className="mx-auto text-red-400 mb-3" />
+              <p className="text-gray-300">{tplError}</p>
+              <Button onClick={loadTemplates} variant="secondary" className="mt-4">Reintentar</Button>
+            </div>
+          ) : editingTpl ? (
+            <div className="space-y-5">
+              <button
+                onClick={() => setEditingTpl(null)}
+                className="flex items-center gap-1 text-sm text-gray-400 hover:text-white"
+              >
+                <ChevronLeft size={16} /> Volver a la lista
+              </button>
+              <div>
+                <h3 className="text-lg font-semibold text-white">{editingTpl.descripcion}</h3>
+                <p className="text-xs text-gray-500 mt-1">
+                  Variables disponibles:{' '}
+                  {(TEMPLATE_VARS[editingTpl.slug] || []).map(v => (
+                    <code key={v} className="text-indigo-300 bg-indigo-500/10 rounded px-1 mx-0.5">{`{{${v}}}`}</code>
+                  ))}
+                </p>
+              </div>
+
+              {EDITABLE_FIELDS.map(f => (
+                <div key={f.key}>
+                  <label className="block text-sm font-medium text-gray-300 mb-1">{f.label}</label>
+                  {f.type === 'textarea' ? (
+                    <textarea
+                      value={editingTpl[f.key] || ''}
+                      onChange={(e) => setEditingTpl(t => ({ ...t, [f.key]: e.target.value }))}
+                      rows={5}
+                      className="w-full px-4 py-3 bg-neutral-800 border border-neutral-700 rounded-xl text-white focus:outline-none focus:ring-2 focus:ring-white/40 transition-colors resize-y"
+                    />
+                  ) : (
+                    <input
+                      type="text"
+                      value={editingTpl[f.key] || ''}
+                      onChange={(e) => setEditingTpl(t => ({ ...t, [f.key]: e.target.value }))}
+                      className="w-full px-4 py-3 bg-neutral-800 border border-neutral-700 rounded-xl text-white focus:outline-none focus:ring-2 focus:ring-white/40 transition-colors"
+                    />
+                  )}
+                  {f.hint && <p className="text-xs text-gray-500 mt-1">{f.hint}</p>}
+                </div>
+              ))}
+
+              <label className="flex items-center gap-3 cursor-pointer select-none">
+                <input
+                  type="checkbox"
+                  checked={!!editingTpl.activo}
+                  onChange={(e) => setEditingTpl(t => ({ ...t, activo: e.target.checked }))}
+                  className="w-4 h-4 accent-indigo-500"
+                />
+                <span className="text-sm text-gray-300">Plantilla activa (si la desactivás, ese correo no se envía)</span>
+              </label>
+
+              <div className="flex gap-3 pt-2">
+                <Button onClick={saveTemplate} disabled={tplSaving} className="flex-1">
+                  {tplSaving ? <><Loader2 size={18} className="animate-spin" /> Guardando…</> : <><Save size={18} /> Guardar</>}
+                </Button>
+                <Button onClick={() => setEditingTpl(null)} variant="secondary" disabled={tplSaving}>Cancelar</Button>
+              </div>
+            </div>
+          ) : (
+            <div className="space-y-3">
+              <p className="text-sm text-gray-400 mb-2">
+                Editá el texto de los correos automáticos que la plataforma envía a los usuarios.
+              </p>
+              {templates.map(t => (
+                <div key={t.slug} className="flex items-center gap-3 p-4 bg-neutral-800/60 rounded-xl">
+                  <FileText size={20} className="text-indigo-400 shrink-0" />
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center gap-2">
+                      <p className="text-white font-medium truncate">{t.descripcion}</p>
+                      {!t.activo && (
+                        <span className="text-[10px] uppercase tracking-wide bg-red-500/20 text-red-300 rounded px-1.5 py-0.5">Inactiva</span>
+                      )}
+                      {tplSavedSlug === t.slug && (
+                        <span className="flex items-center gap-1 text-[11px] text-green-400"><Check size={12} /> Guardada</span>
+                      )}
+                    </div>
+                    <p className="text-xs text-gray-500 truncate mt-0.5">{t.asunto}</p>
+                  </div>
+                  <Button onClick={() => setEditingTpl({ ...t })} variant="secondary" size="sm">Editar</Button>
+                </div>
+              ))}
+              {templates.length === 0 && (
+                <p className="text-center text-gray-500 py-8">No hay plantillas.</p>
+              )}
+            </div>
+          )}
+        </Card>
+      )}
 
       {/* Band Selector Modal */}
       {showBandSelector && (

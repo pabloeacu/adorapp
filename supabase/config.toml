@@ -364,3 +364,8 @@ verify_jwt = false
 
 [functions.record-health-check]
 verify_jwt = false
+
+# Worker de emails: lo pincha pg_cron (sin JWT de usuario) y valida CRON_SECRET
+# dentro del handler.
+[functions.send-emails]
+verify_jwt = false
