@@ -108,5 +108,23 @@ Deno.serve(async (req: Request) => {
     })
     .eq("id", requestId);
 
+  // Email de bienvenida con usuario + contraseña + link al manual. No crítico:
+  // si el encolado falla, la aprobación ya está hecha igual.
+  try {
+    await admin.rpc("encolar_email", {
+      p_slug: "registro-aprobado",
+      p_to_email: request.email,
+      p_to_nombre: request.name,
+      p_variables: {
+        nombre: request.name,
+        email: request.email,
+        password,
+        url_login: "https://adorapp.net.ar/login",
+        url_manual: "https://adorapp.net.ar/AdorAPP-Instructivo.pdf",
+      },
+      p_prioridad: 1,
+    });
+  } catch (_) { /* email no bloquea la aprobación */ }
+
   return json({ ok: true, member, userId });
 });

@@ -5,7 +5,7 @@
   "installCommand": "npm install",
   "regions": ["gru1"],
   "rewrites": [
-    { "source": "/((?!robots.txt|sitemap.xml|manifest.json|sw.js|adorapp-logo.png|adoracion-caf-logo.png|adoracion-caf-logo-blackbg.png|logo.png|logo-caf.png|login-bg.jpg|assets/.*|api/.*).*)", "destination": "/index.html" }
+    { "source": "/((?!robots.txt|sitemap.xml|manifest.json|sw.js|adorapp-logo.png|adoracion-caf-logo.png|adoracion-caf-logo-blackbg.png|logo.png|logo-caf.png|login-bg.jpg|AdorAPP-Instructivo.pdf|assets/.*|api/.*).*)", "destination": "/index.html" }
   ],
   "headers": [
     {
