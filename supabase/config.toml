@@ -332,3 +332,35 @@ s3_region = "env(S3_REGION)"
 s3_access_key = "env(S3_ACCESS_KEY)"
 # Configures AWS_SECRET_ACCESS_KEY for S3 bucket
 s3_secret_key = "env(S3_SECRET_KEY)"
+
+# Edge Functions — per-function config MUST mirror the deployed state, otherwise a
+# `supabase functions deploy` would reset verify_jwt to its default (true) and break
+# the three anon-callable functions (send-push / log-error / record-health-check),
+# which are invoked without a user JWT (from pg_net triggers and GitHub Actions).
+# The admin-* functions verify the caller is a pastor server-side, so they keep JWT on.
+[functions.admin-create-member]
+verify_jwt = true
+
+[functions.admin-delete-member]
+verify_jwt = true
+
+[functions.admin-reset-password]
+verify_jwt = true
+
+[functions.admin-approve-registration]
+verify_jwt = true
+
+[functions.admin-reject-registration]
+verify_jwt = true
+
+[functions.admin-send-communication]
+verify_jwt = true
+
+[functions.send-push]
+verify_jwt = false
+
+[functions.log-error]
+verify_jwt = false
+
+[functions.record-health-check]
+verify_jwt = false
