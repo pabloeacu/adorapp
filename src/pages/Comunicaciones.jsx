@@ -1,8 +1,8 @@
 // AdorAPP - Centro de Avivamiento Familiar
 // Communications Page - Send messages to members
-import React, { useState, useMemo, useEffect, useCallback } from 'react';
+import React, { useState, useMemo, useEffect, useCallback, useRef } from 'react';
 import { useDocumentTitle } from '../hooks/useDocumentTitle';
-import { Send, Users, X, Check, Loader2, AlertCircle, Mail, FileText, ChevronLeft, Save, Bell } from 'lucide-react';
+import { Send, Users, X, Check, Loader2, AlertCircle, Mail, FileText, ChevronLeft, Save, Bell, Bold, Italic, Underline, Smile } from 'lucide-react';
 import { useAuthStore } from '../stores/authStore';
 import { useAppStore } from '../stores/appStore';
 import { callAdminFunction, supabase } from '../lib/supabase';
@@ -18,6 +18,13 @@ const TEMPLATE_VARS = {
   'nuevo-orden': ['nombre', 'fecha', 'banda_sufijo', 'url'],
   'recordatorio-ensayo': ['nombre', 'fecha', 'url'],
 };
+// Emojis curados para la barra de formato del mensaje (contexto del ministerio).
+const MESSAGE_EMOJIS = [
+  '🙏', '🙌', '👏', '❤️', '✨', '🔥', '🎉', '🎊',
+  '🎶', '🎵', '🎸', '🎤', '🥁', '🎹', '😊', '😄',
+  '🤗', '💪', '🌟', '⛪', '📅', '⏰', '✅', '➡️',
+];
+
 // Campos de copia editables por el pastor (no exponemos slug, cta_url, from_label…).
 const EDITABLE_FIELDS = [
   { key: 'asunto', label: 'Asunto', type: 'text' },
@@ -39,13 +46,132 @@ export const Comunicaciones = () => {
   const [selectedUsers, setSelectedUsers] = useState([]);
   const [selectedRoles, setSelectedRoles] = useState([]);
   const [subject, setSubject] = useState('');
-  const [message, setMessage] = useState('');
+  // Mensaje con formato (negrita/cursiva/subrayado/emoji). El editor contentEditable
+  // NO es controlado por React (re-render rompería el cursor): la fuente de verdad
+  // vive en el DOM (editorRef) y estos estados son espejos para validar/contar.
+  // El HTML se sanitiza SIEMPRE server-side (admin-send-communication) — acá solo UX.
+  const editorRef = useRef(null);
+  const emojiPickerRef = useRef(null); // panel de emojis (para cerrar por click afuera)
+  const emojiButtonRef = useRef(null); // botón que abre/cierra el panel
+  const [messagePlain, setMessagePlain] = useState('');
+  const [fmtState, setFmtState] = useState({ bold: false, italic: false, underline: false });
+  const [showEmojiPicker, setShowEmojiPicker] = useState(false);
+  const MESSAGE_MAX = 1000;
+  const overLimit = messagePlain.length > MESSAGE_MAX;
   const [isSending, setIsSending] = useState(false);
   // Canales de envío: campanita (push) y/o correo. Al menos uno.
   const [channels, setChannels] = useState({ push: true, mail: false });
 
+  // --- Editor de mensaje: helpers -------------------------------------------
+  const syncFromEditor = () => {
+    const el = editorRef.current;
+    if (!el) return;
+    // Si quedó "vacío decorativo" (<br> o <div><br></div> tras borrar todo),
+    // limpiarlo para que el placeholder CSS (:empty) reaparezca.
+    if (el.innerText.trim() === '' && el.innerHTML !== '') {
+      el.innerHTML = '';
+    }
+    setMessagePlain(el.innerText);
+  };
+
+  const refreshToolbarState = () => {
+    try {
+      setFmtState({
+        bold: document.queryCommandState('bold'),
+        italic: document.queryCommandState('italic'),
+        underline: document.queryCommandState('underline'),
+      });
+    } catch { /* queryCommandState puede tirar en algunos contextos; irrelevante */ }
+  };
+
+  // Si el foco/cursor no está dentro del editor, enfocarlo con el cursor al final
+  // (así los botones de la barra y los emojis siempre actúan en un lugar sensato).
+  const ensureEditorFocus = () => {
+    const el = editorRef.current;
+    if (!el) return;
+    const sel = window.getSelection();
+    const inside = sel && sel.anchorNode && el.contains(sel.anchorNode);
+    el.focus();
+    if (!inside) {
+      const range = document.createRange();
+      range.selectNodeContents(el);
+      range.collapse(false);
+      sel.removeAllRanges();
+      sel.addRange(range);
+    }
+  };
+
+  const applyFormat = (command) => {
+    ensureEditorFocus();
+    document.execCommand(command);
+    syncFromEditor();
+    refreshToolbarState();
+  };
+
+  const insertEmoji = (emoji) => {
+    ensureEditorFocus();
+    const current = editorRef.current?.innerText ?? '';
+    if (current.length + emoji.length > MESSAGE_MAX) return;
+    document.execCommand('insertText', false, emoji);
+    syncFromEditor();
+  };
+
+  const handleEditorKeyDown = (e) => {
+    const plain = editorRef.current?.innerText ?? '';
+    if (plain.length < MESSAGE_MAX) return;
+    // Al tope: bloquear teclas que agregan contenido, salvo que haya selección
+    // (reemplazar selección no agranda) o modificadores (atajos como Cmd+A/C/B).
+    const sel = window.getSelection();
+    const hasSelection = sel && !sel.isCollapsed && editorRef.current?.contains(sel.anchorNode);
+    const addsContent = e.key.length === 1 || e.key === 'Enter';
+    if (addsContent && !hasSelection && !e.metaKey && !e.ctrlKey) e.preventDefault();
+  };
+
+  // Pegar SIEMPRE como texto plano: evita que entre HTML basura (Word, webs) y
+  // mantiene el formato bajo control de la barra. Truncado al espacio disponible.
+  const handleEditorPaste = (e) => {
+    e.preventDefault();
+    const text = e.clipboardData?.getData('text/plain') ?? '';
+    const current = editorRef.current?.innerText ?? '';
+    const room = Math.max(0, MESSAGE_MAX - current.length);
+    if (room === 0) return;
+    document.execCommand('insertText', false, text.slice(0, room));
+    syncFromEditor();
+  };
+
+  // Soltar (drag&drop) SIEMPRE como texto plano: el default del navegador insertaría
+  // HTML/imagen crudos (esquivaría el pegado-como-texto y el tope), y esa basura
+  // saldría literal en el correo. preventDefault corta el default y reinsertamos
+  // solo el texto, truncado al espacio disponible (mismo criterio que el pegado).
+  const handleEditorDrop = (e) => {
+    e.preventDefault();
+    const text = e.dataTransfer?.getData('text/plain') ?? '';
+    if (!text) return;
+    ensureEditorFocus();
+    const current = editorRef.current?.innerText ?? '';
+    const room = Math.max(0, MESSAGE_MAX - current.length);
+    if (room === 0) return;
+    document.execCommand('insertText', false, text.slice(0, room));
+    syncFromEditor();
+  };
+
+  // Cerrar el picker de emojis al tocar fuera, SIN tragarse ese toque (el overlay
+  // bloqueante anterior se comía el primer click sobre la barra/editor). Un listener
+  // a nivel documento cierra el panel y deja pasar el click a su destino real.
+  useEffect(() => {
+    if (!showEmojiPicker) return;
+    const onDocPointerDown = (e) => {
+      if (emojiPickerRef.current?.contains(e.target)) return;
+      if (emojiButtonRef.current?.contains(e.target)) return;
+      setShowEmojiPicker(false);
+    };
+    document.addEventListener('pointerdown', onDocPointerDown);
+    return () => document.removeEventListener('pointerdown', onDocPointerDown);
+  }, [showEmojiPicker]);
+
   // Modal states
   const [showSuccess, setShowSuccess] = useState(false);
+  const [sentSummary, setSentSummary] = useState(''); // resumen por canal del último envío
   const [showError, setShowError] = useState(false);
   const [errorMessage, setErrorMessage] = useState('');
 
@@ -161,7 +287,10 @@ export const Comunicaciones = () => {
     setSelectedUsers([]);
     setSelectedRoles([]);
     setSubject('');
-    setMessage('');
+    setMessagePlain('');
+    setShowEmojiPicker(false);
+    setFmtState({ bold: false, italic: false, underline: false });
+    if (editorRef.current) editorRef.current.innerHTML = '';
   };
 
   // Get recipient IDs based on selection
@@ -203,7 +332,10 @@ export const Comunicaciones = () => {
       setShowError(true);
       return;
     }
-    if (!message.trim()) {
+    // Fuente de verdad del mensaje: el DOM del editor (los estados son espejo).
+    const msgHtml = editorRef.current?.innerHTML ?? '';
+    const msgPlain = editorRef.current?.innerText ?? messagePlain;
+    if (!msgPlain.trim()) {
       setErrorMessage('El mensaje es obligatorio');
       setShowError(true);
       return;
@@ -231,11 +363,14 @@ export const Comunicaciones = () => {
     // The edge function does the parent insert, fan-out (campanita) and/or email
     // enqueue per channel, rolling back if the push fan-out fails — atomic from the
     // client's perspective. The pastor's identity is taken from the JWT server-side.
+    // Se envía el HTML del editor; el servidor lo sanitiza (solo negrita/cursiva/
+    // subrayado/saltos/emoji) y deriva el texto plano para campanita y registro.
     const { data, error } = await callAdminFunction('admin-send-communication', {
       recipientType,
       recipientIds,
       subject: subject.trim(),
-      message: message.trim(),
+      message: msgHtml,
+      format: 'rich', // el servidor sanitiza el HTML del editor (whitelist strong/em/u/br)
       channels: { push: channels.push, mail: channels.mail },
     });
 
@@ -252,8 +387,7 @@ export const Comunicaciones = () => {
     const parts = [];
     if (channels.push) parts.push(`${data?.pushCount ?? recipientIds.length} por campanita`);
     if (channels.mail) parts.push(`${data?.mailQueued ?? 0} por correo`);
-    window.lastSentSummary = parts.join(' · ');
-    window.lastSentCount = data?.pushCount ?? data?.inserted ?? recipientIds.length;
+    setSentSummary(parts.join(' · '));
     setShowSuccess(true);
     resetForm();
     // Push fan-out is handled by the AFTER INSERT trigger on
@@ -437,21 +571,103 @@ export const Comunicaciones = () => {
             />
           </div>
 
-          {/* Message */}
+          {/* Message — editor con barra de formato (negrita/cursiva/subrayado/emoji).
+              El HTML resultante se sanitiza SIEMPRE en el servidor (whitelist
+              strong/em/u/br); las plantillas de correo no se tocan. */}
           <div>
             <label className="block text-sm font-medium text-gray-300 mb-2">
               Mensaje *
             </label>
-            <textarea
-              value={message}
-              onChange={(e) => setMessage(e.target.value)}
-              placeholder="Escribí tu mensaje aquí..."
-              rows={6}
-              className="w-full px-4 py-3 bg-neutral-800 border border-neutral-700 rounded-xl text-white focus:outline-none focus:ring-2 focus:ring-white/40 focus:border-blue-500 transition-colors resize-none"
-              maxLength={1000}
-            />
-            <p className="text-xs text-gray-500 mt-1 text-right">
-              {message.length}/1000 caracteres
+            <div className="rounded-xl border border-neutral-700 bg-neutral-800 focus-within:ring-2 focus-within:ring-white/40 transition-colors overflow-hidden">
+              {/* Barra de formato */}
+              <div className="relative flex items-center gap-1 px-2 py-1.5 border-b border-neutral-700/70 bg-neutral-900/40">
+                <button
+                  type="button"
+                  title="Negrita"
+                  aria-label="Negrita"
+                  aria-pressed={fmtState.bold}
+                  onMouseDown={(e) => e.preventDefault()}
+                  onClick={() => applyFormat('bold')}
+                  className={`p-2 rounded-lg transition-colors ${fmtState.bold ? 'bg-indigo-500/25 text-indigo-200' : 'text-gray-400 hover:text-white hover:bg-neutral-700/60'}`}
+                >
+                  <Bold size={16} />
+                </button>
+                <button
+                  type="button"
+                  title="Cursiva"
+                  aria-label="Cursiva"
+                  aria-pressed={fmtState.italic}
+                  onMouseDown={(e) => e.preventDefault()}
+                  onClick={() => applyFormat('italic')}
+                  className={`p-2 rounded-lg transition-colors ${fmtState.italic ? 'bg-indigo-500/25 text-indigo-200' : 'text-gray-400 hover:text-white hover:bg-neutral-700/60'}`}
+                >
+                  <Italic size={16} />
+                </button>
+                <button
+                  type="button"
+                  title="Subrayado"
+                  aria-label="Subrayado"
+                  aria-pressed={fmtState.underline}
+                  onMouseDown={(e) => e.preventDefault()}
+                  onClick={() => applyFormat('underline')}
+                  className={`p-2 rounded-lg transition-colors ${fmtState.underline ? 'bg-indigo-500/25 text-indigo-200' : 'text-gray-400 hover:text-white hover:bg-neutral-700/60'}`}
+                >
+                  <Underline size={16} />
+                </button>
+                <div className="w-px h-5 bg-neutral-700 mx-1" />
+                <button
+                  ref={emojiButtonRef}
+                  type="button"
+                  title="Emojis"
+                  aria-label="Emojis"
+                  aria-pressed={showEmojiPicker}
+                  onMouseDown={(e) => e.preventDefault()}
+                  onClick={() => setShowEmojiPicker(v => !v)}
+                  className={`p-2 rounded-lg transition-colors ${showEmojiPicker ? 'bg-indigo-500/25 text-indigo-200' : 'text-gray-400 hover:text-white hover:bg-neutral-700/60'}`}
+                >
+                  <Smile size={16} />
+                </button>
+                {showEmojiPicker && (
+                  <div
+                    ref={emojiPickerRef}
+                    className="absolute left-2 top-full mt-1 z-20 grid grid-cols-8 gap-1 p-2 bg-neutral-900 border border-neutral-700 rounded-xl shadow-xl"
+                  >
+                    {MESSAGE_EMOJIS.map((emo) => (
+                      <button
+                        key={emo}
+                        type="button"
+                        onMouseDown={(e) => e.preventDefault()}
+                        onClick={() => insertEmoji(emo)}
+                        className="w-9 h-9 flex items-center justify-center text-lg rounded-lg hover:bg-neutral-700/70 transition-colors"
+                      >
+                        {emo}
+                      </button>
+                    ))}
+                  </div>
+                )}
+              </div>
+              {/* Editor (contentEditable, no controlado — ver comentario en el estado) */}
+              <div
+                ref={editorRef}
+                contentEditable
+                suppressContentEditableWarning
+                role="textbox"
+                aria-multiline="true"
+                aria-label="Mensaje"
+                data-placeholder="Escribí tu mensaje aquí..."
+                onInput={syncFromEditor}
+                onKeyDown={handleEditorKeyDown}
+                onPaste={handleEditorPaste}
+                onDrop={handleEditorDrop}
+                onKeyUp={refreshToolbarState}
+                onMouseUp={refreshToolbarState}
+                onFocus={refreshToolbarState}
+                className="w-full min-h-[9rem] max-h-72 overflow-y-auto px-4 py-3 text-white focus:outline-none break-words empty:before:content-[attr(data-placeholder)] empty:before:text-gray-500 empty:before:pointer-events-none"
+              />
+            </div>
+            <p className={`text-xs mt-1 text-right ${overLimit ? 'text-red-400' : 'text-gray-500'}`}>
+              {overLimit && <span className="font-medium">Máximo {MESSAGE_MAX} caracteres — </span>}
+              {messagePlain.length}/{MESSAGE_MAX} caracteres
             </p>
           </div>
 
@@ -522,7 +738,7 @@ export const Comunicaciones = () => {
           {/* Send Button */}
           <Button
             onClick={handleSend}
-            disabled={isSending || !recipientType || !subject.trim() || !message.trim() || (!channels.push && !channels.mail)}
+            disabled={isSending || !recipientType || !subject.trim() || !messagePlain.trim() || overLimit || (!channels.push && !channels.mail)}
             className="w-full"
             size="lg"
           >
@@ -796,9 +1012,7 @@ export const Comunicaciones = () => {
             </div>
             <h3 className="text-lg font-semibold text-white mb-2">¡Comunicación Enviada!</h3>
             <p className="text-gray-400 mb-6">
-              {window.lastSentSummary
-                ? `Enviada: ${window.lastSentSummary}.`
-                : `La comunicación ha sido enviada a ${window.lastSentCount || 0} destinatario(s).`}
+              {sentSummary ? `Enviada: ${sentSummary}.` : 'La comunicación ha sido enviada.'}
             </p>
             <Button onClick={() => setShowSuccess(false)} className="w-full">
               Aceptar
