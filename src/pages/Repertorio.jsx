@@ -66,7 +66,7 @@ const sectionTypes = [
 ];
 
 const categoryConfig = {
-  adoraci: { label: 'Adoración', color: 'text-pink-400', bg: 'bg-pink-500/20' },
+  adoracion: { label: 'Adoración', color: 'text-pink-400', bg: 'bg-pink-500/20' },
   intimidad: { label: 'Intimidad', color: 'text-purple-400', bg: 'bg-purple-500/20' },
   guerra: { label: 'Guerra', color: 'text-red-400', bg: 'bg-red-500/20' },
   rapida: { label: 'Rápida', color: 'text-yellow-400', bg: 'bg-yellow-500/20' },
