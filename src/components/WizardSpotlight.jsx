@@ -105,7 +105,7 @@ export function WizardSpotlight({
         <div className="fixed bg-black/75 backdrop-blur-[2px]" style={{ top: rect.top, left: rect.left + rect.width, right: 0, height: rect.height, zIndex: 200 }} />
         {/* highlight ring around the cutout */}
         <div
-          className="fixed pointer-events-none rounded-2xl ring-2 ring-white/80 shadow-[0_0_0_4px_rgba(255,255,255,0.15)]"
+          className="fixed pointer-events-none rounded-2xl ring-2 ring-gold-400/80 shadow-[0_0_0_4px_rgba(242,201,76,0.18)]"
           style={{ top: rect.top, left: rect.left, width: rect.width, height: rect.height, zIndex: 201 }}
         />
       </>
@@ -120,7 +120,7 @@ export function WizardSpotlight({
       <button
         onClick={onSkip}
         aria-label="Saltar tour"
-        className="fixed top-4 right-4 p-2 rounded-full bg-white/10 hover:bg-white/20 text-white/80 hover:text-white"
+        className="fixed top-4 right-4 p-2 rounded-full bg-white/10 hover:bg-gold-500/20 text-white/80 hover:text-gold-100"
         style={{ zIndex: 203 }}
       >
         <X size={18} />
@@ -139,7 +139,7 @@ export function WizardSpotlight({
             {Array.from({ length: stepCount }).map((_, i) => (
               <span
                 key={i}
-                className={`h-1 rounded-full transition-all ${i === stepIndex ? 'w-6 bg-white' : 'w-1.5 bg-neutral-700'}`}
+                className={`h-1 rounded-full transition-all ${i === stepIndex ? 'w-6 bg-gold-gradient' : 'w-1.5 bg-neutral-700'}`}
               />
             ))}
           </div>
@@ -155,7 +155,7 @@ export function WizardSpotlight({
           </button>
           <button
             onClick={onNext}
-            className="flex-1 py-2 bg-white text-black text-sm font-semibold rounded-lg hover:bg-gray-200 flex items-center justify-center gap-1"
+            className="flex-1 py-2 bg-gold-gradient text-black text-sm font-semibold rounded-lg hover:brightness-110 active:scale-95 flex items-center justify-center gap-1"
           >
             {nextLabel} <ArrowRight size={14} />
           </button>

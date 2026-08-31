@@ -12,9 +12,9 @@ export const Button = ({
   const baseStyles = 'font-medium rounded-lg transition-all duration-200 flex items-center justify-center gap-2';
 
   const variants = {
-    primary: 'bg-white text-black hover:bg-gray-200 active:scale-95',
-    secondary: 'bg-transparent border border-neutral-800 text-white hover:bg-neutral-900 active:scale-95',
-    ghost: 'bg-transparent text-gray-400 hover:text-white hover:bg-neutral-900',
+    primary: 'bg-gold-gradient text-black font-semibold hover:brightness-110 active:scale-95 shadow-[0_2px_14px_-3px_rgba(212,175,55,0.45)]',
+    secondary: 'bg-transparent border border-neutral-700 text-gray-200 hover:border-gold-500/50 hover:text-gold-200 hover:bg-gold-500/5 active:scale-95',
+    ghost: 'bg-transparent text-gray-400 hover:text-gold-200 hover:bg-gold-500/5',
     danger: 'bg-red-600 text-white hover:bg-red-700 active:scale-95',
   };
 

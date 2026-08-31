@@ -32,7 +32,7 @@ export function UpdateBanner() {
       <button
         type="button"
         onClick={applyUpdate}
-        className="text-sm bg-blue-500 hover:bg-blue-400 text-white px-3 py-1.5 rounded-lg shrink-0 focus:outline-none focus:ring-2 focus:ring-white/40"
+        className="text-sm bg-gold-gradient text-black hover:brightness-110 px-3 py-1.5 rounded-lg shrink-0 focus:outline-none focus:ring-2 focus:ring-gold-500/40"
       >
         Actualizar
       </button>

@@ -901,7 +901,7 @@ export const MobileNav = () => {
                         type="text"
                         value={editName}
                         onChange={(e) => setEditName(e.target.value)}
-                        className="w-full bg-neutral-800 border border-neutral-700 rounded-xl px-4 py-3 text-white focus:outline-none focus:ring-2 focus:ring-white/40 focus:border-white transition-colors"
+                        className="w-full bg-neutral-800 border border-neutral-700 rounded-xl px-4 py-3 text-white focus:outline-none focus:ring-2 focus:ring-gold-500/40 focus:border-gold-500 transition-colors"
                         placeholder="Tu nombre"
                       />
                     </div>
@@ -914,7 +914,7 @@ export const MobileNav = () => {
                           type="tel"
                           value={editPhone}
                           onChange={(e) => setEditPhone(e.target.value)}
-                          className="w-full bg-neutral-800 border border-neutral-700 rounded-xl pl-11 pr-4 py-3 text-white focus:outline-none focus:ring-2 focus:ring-white/40 focus:border-white transition-colors"
+                          className="w-full bg-neutral-800 border border-neutral-700 rounded-xl pl-11 pr-4 py-3 text-white focus:outline-none focus:ring-2 focus:ring-gold-500/40 focus:border-gold-500 transition-colors"
                           placeholder="+54 11 1234-5678"
                         />
                       </div>
@@ -928,7 +928,7 @@ export const MobileNav = () => {
                           type="text"
                           value={editPastorArea}
                           onChange={(e) => setEditPastorArea(e.target.value)}
-                          className="w-full bg-neutral-800 border border-neutral-700 rounded-xl pl-11 pr-4 py-3 text-white focus:outline-none focus:ring-2 focus:ring-white/40 focus:border-white transition-colors"
+                          className="w-full bg-neutral-800 border border-neutral-700 rounded-xl pl-11 pr-4 py-3 text-white focus:outline-none focus:ring-2 focus:ring-gold-500/40 focus:border-gold-500 transition-colors"
                           placeholder="Nombre del pastor"
                         />
                       </div>
@@ -942,7 +942,7 @@ export const MobileNav = () => {
                           type="text"
                           value={editLeaderOf}
                           onChange={(e) => setEditLeaderOf(e.target.value)}
-                          className="w-full bg-neutral-800 border border-neutral-700 rounded-xl pl-11 pr-4 py-3 text-white focus:outline-none focus:ring-2 focus:ring-white/40 focus:border-white transition-colors"
+                          className="w-full bg-neutral-800 border border-neutral-700 rounded-xl pl-11 pr-4 py-3 text-white focus:outline-none focus:ring-2 focus:ring-gold-500/40 focus:border-gold-500 transition-colors"
                           placeholder="Grupo o área que lidera"
                         />
                       </div>
@@ -956,7 +956,7 @@ export const MobileNav = () => {
                           type="date"
                           value={editBirthdate}
                           onChange={(e) => setEditBirthdate(e.target.value)}
-                          className="w-full bg-neutral-800 border border-neutral-700 rounded-xl pl-11 pr-4 py-3 text-white focus:outline-none focus:ring-2 focus:ring-white/40 focus:border-white transition-colors"
+                          className="w-full bg-neutral-800 border border-neutral-700 rounded-xl pl-11 pr-4 py-3 text-white focus:outline-none focus:ring-2 focus:ring-gold-500/40 focus:border-gold-500 transition-colors"
                         />
                       </div>
                     </div>
@@ -972,7 +972,7 @@ export const MobileNav = () => {
                     </button>
                     <button
                       onClick={handleSaveProfile}
-                      className="flex-1 py-3 bg-white text-black font-medium rounded-xl hover:bg-neutral-200 transition-colors flex items-center justify-center gap-2"
+                      className="flex-1 py-3 bg-gold-gradient text-black font-medium rounded-xl hover:brightness-110 transition-colors flex items-center justify-center gap-2"
                     >
                       <Check size={18} />
                       Guardar
@@ -1191,7 +1191,7 @@ export const MobileNav = () => {
 
               <button
                 onClick={() => fileInputRef.current?.click()}
-                className="w-full py-3 bg-white text-black font-medium rounded-xl hover:bg-neutral-200 transition-colors flex items-center justify-center gap-2"
+                className="w-full py-3 bg-gold-gradient text-black font-medium rounded-xl hover:brightness-110 transition-colors flex items-center justify-center gap-2"
               >
                 <Camera size={18} />
                 Seleccionar imagen
@@ -1399,7 +1399,7 @@ export const MobileNav = () => {
           >
             <button
               onClick={handleSavePhoto}
-              className="w-full py-3 bg-white text-black font-medium rounded-xl hover:bg-neutral-200 transition-colors flex items-center justify-center gap-2"
+              className="w-full py-3 bg-gold-gradient text-black font-medium rounded-xl hover:brightness-110 transition-colors flex items-center justify-center gap-2"
             >
               <Check size={18} />
               Guardar cambios
@@ -1457,11 +1457,11 @@ export const MobileNav = () => {
                     onClick={() => setMenuOpen(false)}
                     className={`flex items-center gap-4 px-6 py-4 rounded-2xl text-lg font-medium transition-all ${
                       isActive
-                        ? 'bg-white text-black'
+                        ? 'bg-gradient-to-r from-gold-500/[0.22] to-transparent text-gold-100 shadow-[inset_3px_0_0_0_#d4af37]'
                         : 'text-gray-400 hover:text-white hover:bg-neutral-800'
                     }`}
                   >
-                    <Icon size={28} />
+                    <Icon size={28} className={isActive ? 'text-gold-300' : ''} />
                     {label}
                   </NavLink>
                 );
@@ -1510,7 +1510,7 @@ export const MobileNav = () => {
                   value={pwNew}
                   onChange={(e) => setPwNew(e.target.value)}
                   autoComplete="new-password"
-                  className="w-full px-4 py-2.5 pr-10 bg-neutral-800 border border-neutral-700 rounded-lg focus:outline-none focus:ring-2 focus:ring-white/40 focus:border-white text-white"
+                  className="w-full px-4 py-2.5 pr-10 bg-neutral-800 border border-neutral-700 rounded-lg focus:outline-none focus:ring-2 focus:ring-gold-500/40 focus:border-gold-500 text-white"
                 />
                 <button
                   type="button"
@@ -1536,7 +1536,7 @@ export const MobileNav = () => {
                       ? 'border-red-500 focus:ring-red-500/40'
                       : pwConfirm && pwConfirm === pwNew
                       ? 'border-green-500 focus:ring-green-500/40'
-                      : 'border-neutral-700 focus:ring-white/40 focus:border-white'
+                      : 'border-neutral-700 focus:ring-gold-500/40 focus:border-gold-500'
                   }`}
                 />
                 <button
@@ -1563,7 +1563,7 @@ export const MobileNav = () => {
               <button
                 onClick={handleChangePassword}
                 disabled={pwSaving || !pwNew || !pwConfirm || pwNew !== pwConfirm}
-                className="flex-1 py-2.5 bg-white text-black font-semibold rounded-lg hover:bg-gray-200 disabled:opacity-50 disabled:cursor-not-allowed"
+                className="flex-1 py-2.5 bg-gold-gradient text-black font-semibold rounded-lg hover:brightness-110 disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 {pwSaving ? 'Guardando…' : 'Guardar'}
               </button>
@@ -1628,7 +1628,7 @@ export const MobileNav = () => {
                       <span className="text-xs text-gray-400">{unreadNotifications.length} sin leer</span>
                       <button
                         onClick={markAllAsRead}
-                        className="text-xs text-blue-400 hover:text-blue-300"
+                        className="text-xs text-gold-300 hover:text-gold-200"
                       >
                         Marcar todas como leídas
                       </button>
@@ -1644,7 +1644,7 @@ export const MobileNav = () => {
                             window.location.href = '/solicitudes';
                           }
                         }}
-                        className="relative p-4 bg-neutral-800/50 rounded-2xl border border-neutral-700 hover:border-blue-500/50 transition-colors cursor-pointer"
+                        className="relative p-4 bg-neutral-800/50 rounded-2xl border border-neutral-700 hover:border-gold-500/50 transition-colors cursor-pointer"
                       >
                         <button
                           type="button"
@@ -1714,7 +1714,7 @@ export const MobileNav = () => {
                               </>
                             )}
                           </div>
-                          <span className="w-2 h-2 bg-blue-500 rounded-full mt-2" />
+                          <span className="w-2 h-2 bg-gold-400 rounded-full mt-2" />
                         </div>
                       </div>
                     ))}
@@ -1742,13 +1742,13 @@ export const MobileNav = () => {
                 to={path}
                 data-tour={`nav-${path === '/' ? 'inicio' : path.replace('/', '')}`}
                 className={`flex flex-col items-center justify-center w-full h-full transition-all ${
-                  isActive ? 'text-white' : 'text-gray-500'
+                  isActive ? 'text-gold-100' : 'text-gray-500'
                 }`}
               >
-                <div className={`p-2 rounded-xl transition-all ${isActive ? 'bg-white/10' : ''}`}>
+                <div className={`p-2 rounded-xl transition-all ${isActive ? 'bg-gold-500/15' : ''}`}>
                   <Icon size={22} strokeWidth={isActive ? 2.5 : 2} />
                 </div>
-                <span className={`text-xs mt-1 font-medium ${isActive ? 'text-white' : ''}`}>
+                <span className={`text-xs mt-1 font-medium ${isActive ? 'text-gold-100' : ''}`}>
                   {label}
                 </span>
               </NavLink>
@@ -1762,13 +1762,13 @@ export const MobileNav = () => {
               aria-haspopup="menu"
               aria-expanded={menuOpen}
               className={`flex flex-col items-center justify-center w-full h-full transition-all ${
-                menuOpen ? 'text-white' : 'text-gray-500'
+                menuOpen ? 'text-gold-100' : 'text-gray-500'
               }`}
             >
-              <div className={`p-2 rounded-xl transition-all ${menuOpen ? 'bg-white/10' : ''}`}>
+              <div className={`p-2 rounded-xl transition-all ${menuOpen ? 'bg-gold-500/15' : ''}`}>
                 <Menu size={22} strokeWidth={menuOpen ? 2.5 : 2} />
               </div>
-              <span className={`text-xs mt-1 font-medium ${menuOpen ? 'text-white' : ''}`}>
+              <span className={`text-xs mt-1 font-medium ${menuOpen ? 'text-gold-100' : ''}`}>
                 Más
               </span>
             </button>

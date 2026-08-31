@@ -16,6 +16,7 @@ import {
   AlarmClock,
   Timer,
 } from 'lucide-react';
+import { MusicNotes, MusicNotesSimple } from '@phosphor-icons/react';
 import { useAppStore, transposeSongStructure } from '../stores/appStore';
 import { milestonesOf, ensayometroPercent } from '../lib/ensayometro';
 import { useDocumentTitle } from '../hooks/useDocumentTitle';
@@ -24,6 +25,7 @@ import { Badge } from '../components/ui/Badge';
 import { Button } from '../components/ui/Button';
 import { Modal } from '../components/ui/Modal';
 import { PageLoader } from '../components/ui/PageLoader';
+import { EmptyState } from '../components/ui/EmptyState';
 
 // El Ensayómetro: registro PERSONAL de práctica por orden. Glosario del
 // ministerio: el "ensamble" es el encuentro de toda la banda (programado en el
@@ -70,9 +72,9 @@ const ProgressRing = ({ percent }) => {
       <svg viewBox="0 0 120 120" className="w-32 h-32 -rotate-90">
         <defs>
           <linearGradient id="ensayometro-grad" x1="0%" y1="0%" x2="100%" y2="100%">
-            <stop offset="0%" stopColor="#818cf8" />
-            <stop offset="50%" stopColor="#a78bfa" />
-            <stop offset="100%" stopColor="#60a5fa" />
+            <stop offset="0%" stopColor="#ffe9a8" />
+            <stop offset="50%" stopColor="#f2c94c" />
+            <stop offset="100%" stopColor="#d4af37" />
           </linearGradient>
         </defs>
         <circle cx="60" cy="60" r={R} fill="none" stroke="rgba(255,255,255,0.08)" strokeWidth="10" />
@@ -351,10 +353,10 @@ export const Practica = () => {
             />
           ))}
           <div className="absolute inset-0 flex items-center justify-center">
-            <div className="animate-fade-in rounded-2xl px-6 py-5 bg-gradient-to-br from-indigo-600/90 to-purple-600/90 border border-white/20 shadow-2xl text-center">
+            <div className="animate-fade-in rounded-2xl px-6 py-5 bg-gold-gradient border border-gold-300/30 shadow-2xl text-center">
               <p className="text-4xl mb-2">🏆</p>
-              <p className="text-lg font-bold text-white">¡Orden dominado!</p>
-              <p className="text-sm text-white/80">Llegás al ensamble con todo.</p>
+              <p className="text-lg font-bold text-black">¡Orden dominado!</p>
+              <p className="text-sm text-black/70">Llegás al ensamble con todo.</p>
             </div>
           </div>
         </div>
@@ -363,7 +365,7 @@ export const Practica = () => {
       <div className="flex items-center gap-3">
         <Link
           to={`/ordenes?order=${order.id}`}
-          className="p-2 rounded-lg bg-neutral-900 border border-neutral-800 text-gray-400 hover:text-white hover:border-neutral-700 transition-colors"
+          className="p-2 rounded-lg bg-neutral-900 border border-neutral-800 text-gray-400 hover:text-gold-200 hover:border-gold-500/40 transition-colors"
           aria-label="Volver al orden"
         >
           <ArrowLeft size={20} />
@@ -382,7 +384,7 @@ export const Practica = () => {
       </div>
 
       {/* Ensayómetro: anillo de progreso + ánimo */}
-      <div className="rounded-2xl p-5 border border-neutral-800 bg-gradient-to-br from-indigo-950/60 via-neutral-900 to-purple-950/40">
+      <div className="rounded-2xl p-5 border border-gold-500/25 bg-gradient-to-br from-gold-600/[0.28] via-neutral-900 to-gold-300/[0.10]">
         <div className="flex items-center gap-5">
           <ProgressRing percent={percent} />
           <div className="flex-1 min-w-0">
@@ -411,7 +413,7 @@ export const Practica = () => {
       <div className="rounded-xl border border-neutral-800 p-4 flex items-center justify-between gap-4">
         <div className="flex-1 min-w-0">
           <p className="text-sm font-medium text-white flex items-center gap-2">
-            <AlarmClock size={16} className="text-amber-400 shrink-0" /> Alarma de ensayo
+            <AlarmClock size={16} className="text-gold-300 shrink-0" /> Alarma de ensayo
           </p>
           <p className="text-xs text-gray-400 mt-0.5">
             Te recordamos todos los días a las 18:00 mientras tengas canciones por practicar. Sin pendientes, no te molestamos.
@@ -428,7 +430,7 @@ export const Practica = () => {
             disabled={alarmEnabled === null}
             onChange={toggleAlarm}
           />
-          <span className="block w-[52px] h-8 rounded-full bg-neutral-700 transition-colors peer-checked:bg-green-500 peer-focus-visible:ring-2 peer-focus-visible:ring-white/40" />
+          <span className="block w-[52px] h-8 rounded-full bg-neutral-700 transition-colors peer-checked:bg-green-500 peer-focus-visible:ring-2 peer-focus-visible:ring-gold-500/50" />
           <span className="pointer-events-none absolute top-[2px] left-[2px] h-7 w-7 rounded-full bg-white shadow transition-transform peer-checked:translate-x-5" />
         </label>
       </div>
@@ -450,7 +452,7 @@ export const Practica = () => {
               <div className="space-y-4">
                 {/* Cabecera de la canción */}
                 <div className="flex items-start gap-3">
-                  <span className={`w-8 h-8 shrink-0 rounded-full flex items-center justify-center font-medium ${done ? 'bg-green-500/20 text-green-400' : 'bg-purple-500/20 text-purple-400'}`}>
+                  <span className={`w-8 h-8 shrink-0 rounded-full flex items-center justify-center font-medium ${done ? 'bg-green-500/20 text-green-400' : 'bg-gold-500/15 text-gold-300'}`}>
                     {done ? '✓' : index + 1}
                   </span>
                   <div className="flex-1 min-w-0">
@@ -471,7 +473,7 @@ export const Practica = () => {
                   <button
                     type="button"
                     onClick={() => addPractice(songRef.songId, 1)}
-                    className="flex-1 flex items-center justify-center gap-2 py-3 rounded-xl bg-gradient-to-r from-indigo-600 to-purple-600 text-white font-semibold hover:brightness-110 active:scale-[0.98] transition-all"
+                    className="flex-1 flex items-center justify-center gap-2 py-3 rounded-xl bg-gold-gradient text-black font-semibold hover:brightness-110 active:scale-[0.98] transition-all"
                   >
                     <Plus size={18} /> La practiqué
                   </button>
@@ -549,14 +551,14 @@ export const Practica = () => {
                           aria-pressed={isTicking}
                           className={`flex items-center gap-1.5 px-2.5 py-2 rounded-lg text-sm transition-all ${
                             isTicking
-                              ? 'bg-indigo-500/30 text-indigo-300 border border-indigo-500/60'
+                              ? 'bg-gold-500/20 text-gold-200 border border-gold-500/50'
                               : 'bg-neutral-800/60 text-gray-400 border border-neutral-700 hover:border-neutral-600'
                           }`}
                         >
                           <Timer size={16} />
                           {isTicking && (
                             <span
-                              className="inline-block w-2 h-2 rounded-full bg-indigo-300 animate-metronome-beat"
+                              className="inline-block w-2 h-2 rounded-full bg-gold-300 animate-metronome-beat"
                               style={{ animationDuration: `${60 / Number(song.bpm)}s` }}
                             />
                           )}
@@ -592,9 +594,12 @@ export const Practica = () => {
 
         {order.songs.length === 0 && (
           <Card>
-            <p className="text-gray-400 text-sm text-center py-6">
-              Este orden todavía no tiene canciones cargadas.
-            </p>
+            <EmptyState
+              icon={MusicNotes}
+              title="Todavía no hay canciones"
+              subtitle="Este orden aún no tiene canciones cargadas para practicar."
+              annotation="Cargalas desde el orden"
+            />
           </Card>
         )}
       </div>
@@ -629,7 +634,7 @@ export const Practica = () => {
                       <Badge variant="primary" size="sm">{section.label}</Badge>
                     </div>
                     {section.chords && (
-                      <p className="text-purple-400 font-mono text-lg mb-3">{section.chords}</p>
+                      <p className="text-gold-300 font-mono text-lg mb-3">{section.chords}</p>
                     )}
                     {section.content && (
                       <p className="text-gray-300 whitespace-pre-line leading-relaxed">{section.content}</p>
@@ -637,9 +642,12 @@ export const Practica = () => {
                   </div>
                 ))}
                 {structure.length === 0 && (
-                  <p className="text-gray-500 text-sm text-center py-4">
-                    Esta canción todavía no tiene acordes cargados en el repertorio.
-                  </p>
+                  <EmptyState
+                    icon={MusicNotesSimple}
+                    title="Sin acordes cargados"
+                    subtitle="Esta canción todavía no tiene acordes en el repertorio."
+                    annotation="Cargalos desde Repertorio"
+                  />
                 )}
               </div>
             </div>

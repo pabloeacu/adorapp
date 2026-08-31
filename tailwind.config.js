@@ -12,6 +12,21 @@ export default {
         'ador-gray': '#171717',
         'ador-neutral': '#262626',
         'ador-border': '#404040',
+        // Champagne-gold — identidad premium (AGREGADO, no reemplaza ningún token
+        // existente). Es la nueva familia de acento; los componentes la consumen
+        // vía `gold-*`. Reemplaza gradualmente los acentos indigo/violeta/blanco.
+        gold: {
+          50:  '#fff9e6',
+          100: '#ffe9a8', // highlight brillante (íconos de acento, textos vivos)
+          200: '#f7d878',
+          300: '#f2c94c', // oro vivo — texto/ícono principal sobre oscuro
+          400: '#e8b923',
+          500: '#d4af37', // metálico medio
+          600: '#b8860b', // profundo
+          700: '#8f6a0d',
+          800: '#6b4f0a',
+          900: '#443206',
+        },
       },
       animation: {
         'fade-in': 'fadeIn 0.5s ease-out',

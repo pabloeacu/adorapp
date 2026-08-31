@@ -2,13 +2,6 @@ import React from 'react';
 import { Link } from 'react-router-dom';
 import { useDocumentTitle } from '../hooks/useDocumentTitle';
 import {
-  Users,
-  Music2,
-  CalendarDays,
-  UsersRound,
-  TrendingUp,
-  Zap,
-  Calendar,
   CalendarClock,
   ChevronRight,
   Guitar,
@@ -17,12 +10,23 @@ import {
   Piano,
   User
 } from 'lucide-react';
+import {
+  UsersThree,
+  MicrophoneStage,
+  MusicNotes as MusicNotesDuo,
+  CalendarDots,
+  TrendUp,
+  Lightning,
+} from '@phosphor-icons/react';
 import { useAppStore } from '../stores/appStore';
 import { useCurrentRole, useCurrentMember } from '../hooks/useCurrentMember';
 import { useAuthStore } from '../stores/authStore';
 import { Card } from '../components/ui/Card';
 import { Badge } from '../components/ui/Badge';
 import { Avatar } from '../components/ui/Avatar';
+import { StatCard } from '../components/ui/StatCard';
+import { EmptyState } from '../components/ui/EmptyState';
+import { GoldWave } from '../components/ui/GoldWave';
 import { SilentBoundary } from '../components/ui/SilentBoundary';
 import { GreetingHeader } from '../components/dashboard/GreetingHeader';
 import { PrepBanner } from '../components/dashboard/PrepBanner';
@@ -73,10 +77,10 @@ export const Dashboard = () => {
   // every order ever created would balloon into the hundreds over time and stop
   // meaning "lo que viene".
   const stats = [
-    { label: 'Miembros Activos', value: activeMembers, icon: Users, color: 'text-blue-400', bg: 'bg-blue-500/20', to: '/miembros', roles: ['pastor', 'leader'] },
-    { label: 'Bandas', value: bands.length, icon: UsersRound, color: 'text-purple-400', bg: 'bg-purple-500/20', to: '/bandas' },
-    { label: 'Canciones', value: songs.length, icon: Music2, color: 'text-green-400', bg: 'bg-green-500/20', to: '/repertorio' },
-    { label: 'Órdenes', value: upcomingOrders.length, icon: CalendarDays, color: 'text-orange-400', bg: 'bg-orange-500/20', to: '/ordenes' },
+    { label: 'Miembros Activos', value: activeMembers, icon: UsersThree, to: '/miembros', roles: ['pastor', 'leader'] },
+    { label: 'Bandas', value: bands.length, icon: MicrophoneStage, to: '/bandas' },
+    { label: 'Canciones', value: songs.length, icon: MusicNotesDuo, to: '/repertorio' },
+    { label: 'Órdenes', value: upcomingOrders.length, icon: CalendarDots, to: '/ordenes' },
   ];
 
   return (
@@ -109,7 +113,7 @@ export const Dashboard = () => {
       {showRehearsalCard && todaysRehearsal && (
         <Link
           to={`/ordenes?order=${todaysRehearsal.id}`}
-          className="block rounded-2xl p-5 bg-gradient-to-r from-amber-400 to-yellow-500 text-black shadow-lg hover:brightness-105 transition-all"
+          className="block rounded-2xl p-5 bg-gold-gradient text-black shadow-lg hover:brightness-105 transition-all"
         >
           <div className="flex items-center gap-4">
             <div className="p-3 rounded-xl bg-black/10 shrink-0">
@@ -131,47 +135,35 @@ export const Dashboard = () => {
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
         {stats.map((stat) => {
           const canAccess = !stat.roles || stat.roles.includes(role);
-          const inner = (
-            <div className="flex items-start justify-between">
-              <div>
-                <p className="text-sm text-gray-400">{stat.label}</p>
-                <p className="text-3xl font-bold mt-1">{stat.value}</p>
-              </div>
-              <div className={`p-2 rounded-lg ${stat.bg}`}>
-                <stat.icon size={24} className={stat.color} />
-              </div>
-            </div>
+          const card = (
+            <StatCard label={stat.label} value={stat.value} icon={stat.icon} interactive={canAccess} />
           );
           return canAccess ? (
-            <Link key={stat.label} to={stat.to} className="block">
-              <Card className="hover:border-neutral-700 hover:bg-neutral-800/40 transition-all cursor-pointer h-full">
-                {inner}
-              </Card>
-            </Link>
+            <Link key={stat.label} to={stat.to} className="block h-full">{card}</Link>
           ) : (
-            <Card key={stat.label} className="transition-all h-full">
-              {inner}
-            </Card>
+            <div key={stat.label} className="h-full">{card}</div>
           );
         })}
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         {/* Recent Songs */}
-        <Card>
+        <Card className="relative overflow-hidden">
           <div className="flex items-center justify-between mb-4">
             <h3 className="font-semibold">Canciones Recientes</h3>
-            <Badge variant="success" size="sm">+{unusedSongs.length} sin usar</Badge>
+            <Link to="/repertorio" className="text-sm font-medium text-gold-300 hover:text-gold-200 transition-colors">
+              Ver todas →
+            </Link>
           </div>
-          <div className="space-y-3">
+          <div className="relative space-y-3">
             {recentSongs.map((song) => (
               <div
                 key={song.id}
                 className="flex items-center justify-between p-3 rounded-lg bg-neutral-800/50 hover:bg-neutral-800 transition-colors"
               >
                 <div className="flex items-center gap-3">
-                  <div className="w-10 h-10 rounded-lg bg-gradient-to-br from-purple-500/20 to-pink-500/20 flex items-center justify-center">
-                    <Music2 size={20} className="text-purple-400" />
+                  <div className="w-11 h-11 rounded-xl bg-gold-gradient-soft ring-1 ring-gold-500/40 flex items-center justify-center">
+                    <MusicNotesDuo size={22} weight="duotone" className="text-gold-100" />
                   </div>
                   <div>
                     <p className="font-medium">{song.title}</p>
@@ -182,13 +174,16 @@ export const Dashboard = () => {
               </div>
             ))}
           </div>
+          <GoldWave className="absolute -bottom-2 left-0 w-full h-16" opacity={0.18} />
         </Card>
 
         {/* Upcoming Services */}
         <Card>
           <div className="flex items-center justify-between mb-4">
             <h3 className="font-semibold">Próximos Servicios</h3>
-            <Badge variant="warning" size="sm">{upcomingOrders.length} programados</Badge>
+            <Link to="/ordenes" className="text-sm font-medium text-gold-300 hover:text-gold-200 transition-colors">
+              Ver agenda →
+            </Link>
           </div>
           <div className="space-y-3">
             {upcomingOrders.slice(0, 3).map((order) => {
@@ -198,19 +193,24 @@ export const Dashboard = () => {
                   key={order.id}
                   className="flex items-center gap-4 p-3 rounded-lg bg-neutral-800/50"
                 >
-                  <div className="p-3 rounded-xl bg-gradient-to-br from-blue-500/20 to-purple-500/20">
-                    <Calendar size={24} className="text-blue-400" />
+                  <div className="w-12 h-12 rounded-xl bg-gold-gradient-soft ring-1 ring-gold-500/40 flex items-center justify-center">
+                    <CalendarDots size={24} weight="duotone" className="text-gold-100" />
                   </div>
                   <div className="flex-1">
                     <p className="font-medium">{new Date(order.date).toLocaleDateString('es-ES', { weekday: 'short', month: 'short', day: 'numeric' })}</p>
                     <p className="text-sm text-gray-400">{order.time} - {band?.name}</p>
                   </div>
-                  <Badge variant="primary" size="sm">{order.songs.length} songs</Badge>
+                  <Badge variant="primary" size="sm">{order.songs.length} canciones</Badge>
                 </div>
               );
             })}
             {upcomingOrders.length === 0 && (
-              <p className="text-gray-400 text-sm text-center py-4">No hay servicios programados</p>
+              <EmptyState
+                icon={CalendarDots}
+                title="No hay servicios programados"
+                subtitle="Aún no hay servicios en tu agenda. Planificá el próximo encuentro."
+                annotation="Programá desde Órdenes"
+              />
             )}
           </div>
         </Card>
@@ -222,12 +222,12 @@ export const Dashboard = () => {
           </div>
           <div className="grid grid-cols-2 gap-4">
             <div className="text-center p-4 rounded-xl bg-neutral-800/50">
-              <TrendingUp size={24} className="mx-auto text-green-400 mb-2" />
+              <TrendUp size={30} weight="duotone" className="mx-auto text-gold-100 mb-2" />
               <p className="text-2xl font-bold">{orders.filter(o => o.status === 'completed').length}</p>
               <p className="text-xs text-gray-400">Servicios completados</p>
             </div>
             <div className="text-center p-4 rounded-xl bg-neutral-800/50">
-              <Zap size={24} className="mx-auto text-yellow-400 mb-2" />
+              <Lightning size={30} weight="duotone" className="mx-auto text-gold-100 mb-2" />
               <p className="text-2xl font-bold">{unusedSongs.length}</p>
               <p className="text-xs text-gray-400">Canciones sin usar 4+ sem</p>
             </div>
@@ -257,7 +257,7 @@ export const Dashboard = () => {
                   <div className="flex items-center gap-2">
                     <InstrumentIcon size={14} className="text-gray-500" />
                     <Badge
-                      variant={member.role === 'pastor' ? 'warning' : member.role === 'leader' ? 'primary' : 'secondary'}
+                      variant={member.role === 'pastor' ? 'warning' : member.role === 'leader' ? 'primary' : 'default'}
                       size="sm"
                     >
                       {member.role === 'pastor' ? 'Pastor' : member.role === 'leader' ? 'Líder' : 'Miembro'}

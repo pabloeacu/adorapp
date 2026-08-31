@@ -12,6 +12,7 @@ import {
 } from 'lucide-react';
 import { useAuthStore } from '../../stores/authStore';
 import { useCurrentRole } from '../../hooks/useCurrentMember';
+import { GoldWave } from '../ui/GoldWave';
 
 export const Sidebar = () => {
   const { logout } = useAuthStore();
@@ -37,7 +38,7 @@ export const Sidebar = () => {
   ];
 
   return (
-    <aside className="w-64 border-r border-neutral-800 h-screen flex flex-col">
+    <aside className="relative overflow-hidden w-64 border-r border-neutral-800 h-screen flex flex-col shadow-[inset_-1px_0_0_0_rgba(212,175,55,0.10)]">
       <div className="p-6">
         <div className="flex items-center gap-3">
           <img
@@ -47,7 +48,9 @@ export const Sidebar = () => {
           />
           <div>
             <h1 className="text-xl font-bold tracking-tight">AdorAPP</h1>
-            <p className="text-xs text-gray-500">La plataforma de Adoración CAF</p>
+            <p className="text-xs text-gray-500">
+              La plataforma de <span className="text-gold-300/90 font-medium">Adoración CAF</span>
+            </p>
           </div>
         </div>
       </div>
@@ -60,21 +63,28 @@ export const Sidebar = () => {
               to={path}
               data-tour={`nav-${path === '/' ? 'inicio' : path.replace('/', '')}`}
               className={({ isActive }) =>
-                `flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-medium transition-all duration-200 ${
+                `relative flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-medium transition-all duration-200 ${
                   isActive
-                    ? 'bg-white text-black'
+                    ? 'bg-gradient-to-r from-gold-500/[0.22] to-transparent text-gold-100 shadow-[inset_3px_0_0_0_#d4af37]'
                     : 'text-gray-400 hover:text-white hover:bg-neutral-800/50'
                 }`
               }
             >
-              <Icon size={20} />
-              {label}
+              {({ isActive }) => (
+                <>
+                  <Icon size={20} className={isActive ? 'text-gold-300' : ''} />
+                  {label}
+                </>
+              )}
             </NavLink>
           ))}
         </div>
       </nav>
 
-      <div className="p-4 border-t border-neutral-800">
+      {/* Onda dorada decorativa al pie (detalle premium de los mockups) */}
+      <GoldWave className="absolute bottom-14 left-0 w-full h-24" opacity={0.4} />
+
+      <div className="relative p-4 border-t border-neutral-800">
         <button
           onClick={() => { logout(); window.location.href = '/login'; }}
           className="w-full flex items-center justify-center gap-3 px-4 py-3 rounded-xl text-sm font-medium text-gray-400 hover:text-white hover:bg-neutral-800/50 transition-all duration-200"

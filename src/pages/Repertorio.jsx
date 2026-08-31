@@ -2,10 +2,11 @@ import React, { useState, useMemo, useRef, useEffect } from 'react';
 import { useDocumentTitle } from '../hooks/useDocumentTitle';
 // jspdf is loaded on demand inside generateSongPDF (~140 KB; no need at first paint).
 import {
-  Plus, Search, Music, Edit, Trash2, Clock,
-  Eye, ExternalLink, Filter, X, GripVertical, Music2, Save,
+  Plus, Search, Edit, Trash2, Clock,
+  Eye, ExternalLink, Filter, X, GripVertical, Save,
   LayoutGrid, List, FileDown, AlertTriangle, ChevronDown
 } from 'lucide-react';
+import { MusicNotes } from '@phosphor-icons/react';
 import { useAppStore, SONG_CATEGORIES, MUSICAL_KEYS, transposeSongStructure } from '../stores/appStore';
 import { useCurrentMember } from '../hooks/useCurrentMember';
 import { Card } from '../components/ui/Card';
@@ -13,6 +14,7 @@ import { Button } from '../components/ui/Button';
 import { Badge } from '../components/ui/Badge';
 import { Modal } from '../components/ui/Modal';
 import { Input } from '../components/ui/Input';
+import { EmptyState } from '../components/ui/EmptyState';
 import { ConfirmModal, SuccessModal, ErrorModal } from '../components/ui/ConfirmModal';
 import { foldText, toCSV, downloadCSV } from '../lib/csv';
 import {
@@ -47,7 +49,7 @@ function SortableSection({ id, children }) {
     <div
       ref={setNodeRef}
       style={style}
-      className="structure-section bg-neutral-800 rounded-xl p-4 transition-all duration-300 hover:ring-2 hover:ring-purple-500/30"
+      className="structure-section bg-neutral-800 rounded-xl p-4 transition-all duration-300 hover:ring-2 hover:ring-gold-500/30"
     >
       {children({ attributes, listeners })}
     </div>
@@ -567,14 +569,14 @@ export const Repertorio = () => {
             <div className="flex bg-neutral-900 rounded-lg p-1 border border-neutral-800">
               <button
                 onClick={() => setViewMode('cards')}
-                className={`p-2 rounded-md transition-colors ${viewMode === 'cards' ? 'bg-white text-black' : 'hover:bg-neutral-800 text-gray-400'}`}
+                className={`p-2 rounded-md transition-colors ${viewMode === 'cards' ? 'bg-gold-gradient text-black' : 'hover:bg-neutral-800 text-gray-400'}`}
                 title="Vista de tarjetas"
               >
                 <LayoutGrid size={18} />
               </button>
               <button
                 onClick={() => setViewMode('table')}
-                className={`p-2 rounded-md transition-colors ${viewMode === 'table' ? 'bg-white text-black' : 'hover:bg-neutral-800 text-gray-400'}`}
+                className={`p-2 rounded-md transition-colors ${viewMode === 'table' ? 'bg-gold-gradient text-black' : 'hover:bg-neutral-800 text-gray-400'}`}
                 title="Vista de grilla"
               >
                 <List size={18} />
@@ -621,7 +623,7 @@ export const Repertorio = () => {
             placeholder="Buscar por título o artista..."
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
-            className="w-full pl-12 pr-4 py-3 bg-neutral-900 border border-neutral-800 rounded-xl focus:outline-none focus:ring-2 focus:ring-white/40 focus:border-white transition-colors"
+            className="w-full pl-12 pr-4 py-3 bg-neutral-900 border border-neutral-800 rounded-xl focus:outline-none focus:ring-2 focus:ring-gold-500/40 focus:border-gold-500 transition-colors"
           />
         </div>
         <div className="flex flex-wrap sm:flex-nowrap gap-2 w-full sm:w-auto">
@@ -630,7 +632,7 @@ export const Repertorio = () => {
             <button
               onClick={() => setShowCategoryDropdown(!showCategoryDropdown)}
               className={`w-full flex items-center justify-between gap-2 px-4 py-3 bg-neutral-900 border rounded-xl transition-colors ${
-                filterCategories.length > 0 ? 'border-purple-500 text-white' : 'border-neutral-800 text-gray-400 hover:text-white'
+                filterCategories.length > 0 ? 'border-gold-500 text-white' : 'border-neutral-800 text-gray-400 hover:text-white'
               }`}
             >
               <div className="flex items-center gap-2">
@@ -653,7 +655,7 @@ export const Repertorio = () => {
                   <div className="sticky top-0 p-2 border-b border-neutral-800 flex justify-between items-center bg-neutral-900">
                     <span className="text-xs text-gray-400">Seleccionar categorías</span>
                     {filterCategories.length > 0 && (
-                      <button onClick={clearCategoryFilters} className="text-xs text-purple-400 hover:text-purple-300">
+                      <button onClick={clearCategoryFilters} className="text-xs text-gold-300 hover:text-gold-200">
                         Limpiar
                       </button>
                     )}
@@ -667,11 +669,11 @@ export const Repertorio = () => {
                       >
                         <div className={`w-5 h-5 rounded border flex items-center justify-center shrink-0 ${
                           filterCategories.includes(cat.id)
-                            ? 'bg-purple-500 border-purple-500'
+                            ? 'bg-gold-gradient border-gold-500'
                             : 'border-neutral-600'
                         }`}>
                           {filterCategories.includes(cat.id) && (
-                            <svg className="w-3 h-3 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <svg className="w-3 h-3 text-black" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" />
                             </svg>
                           )}
@@ -726,8 +728,8 @@ export const Repertorio = () => {
             <Card key={song.id} hover className="group">
               <div className="flex items-start justify-between gap-2 mb-4 flex-wrap">
                 <div className="flex items-center gap-3 min-w-0">
-                  <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-purple-500/20 to-pink-500/20 flex items-center justify-center shrink-0">
-                    <Music2 size={24} className="text-purple-400" />
+                  <div className="w-12 h-12 rounded-xl bg-gold-gradient-soft ring-1 ring-gold-500/40 flex items-center justify-center shrink-0">
+                    <MusicNotes size={24} weight="duotone" className="text-gold-100" />
                   </div>
                   <div className="min-w-0">
                     <h3 className="font-semibold truncate">{song.title}</h3>
@@ -840,8 +842,8 @@ export const Repertorio = () => {
                   >
                     <td className="px-4 py-3">
                       <div className="flex items-center gap-3">
-                        <div className="w-8 h-8 rounded-lg bg-purple-500/20 flex items-center justify-center">
-                          <Music2 size={16} className="text-purple-400" />
+                        <div className="w-8 h-8 rounded-lg bg-gold-gradient-soft ring-1 ring-gold-500/40 flex items-center justify-center">
+                          <MusicNotes size={16} weight="duotone" className="text-gold-100" />
                         </div>
                         <span className="font-medium">{song.title}</span>
                       </div>
@@ -920,20 +922,22 @@ export const Repertorio = () => {
       )}
 
       {filteredSongs.length === 0 && (
-        <div className="text-center py-12">
-          <Music size={48} className="mx-auto text-gray-600 mb-4" />
-          <p className="text-gray-400">No se encontraron canciones</p>
+        <EmptyState
+          icon={MusicNotes}
+          title="No se encontraron canciones"
+          subtitle="No hay canciones que coincidan con tu búsqueda. Sumá la primera al repertorio."
+          annotation="Comenzá desde acá"
+        >
           {(isPastor || isLeader || currentMember?.editor) && (
             <Button
               variant="secondary"
               icon={Plus}
               onClick={() => handleOpenModal()}
-              className="mt-4"
             >
               Agregar primera canción
             </Button>
           )}
-        </div>
+        </EmptyState>
       )}
 
       {/* Add/Edit Song Modal - Mobile optimized */}
@@ -955,7 +959,7 @@ export const Repertorio = () => {
               type="button"
               onClick={handleSubmit}
               disabled={!formData.title.trim()}
-              className="flex-1 px-4 py-3 bg-purple-600 hover:bg-purple-500 disabled:bg-purple-600/50 disabled:opacity-50 text-white rounded-xl font-medium transition-colors flex items-center justify-center gap-2"
+              className="flex-1 px-4 py-3 bg-gold-gradient hover:brightness-105 disabled:opacity-50 text-black rounded-xl font-medium transition-all flex items-center justify-center gap-2"
             >
               <Save size={18} />
               {editingSong ? 'Guardar' : 'Crear'}
@@ -1057,11 +1061,11 @@ export const Repertorio = () => {
                           >
                             <div className={`w-4 h-4 rounded border flex items-center justify-center shrink-0 ${
                               formData.categories.includes(cat.id)
-                                ? 'bg-purple-500 border-purple-500'
+                                ? 'bg-gold-gradient border-gold-500'
                                 : 'border-neutral-600'
                             }`}>
                               {formData.categories.includes(cat.id) && (
-                                <svg className="w-2.5 h-2.5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <svg className="w-2.5 h-2.5 text-black" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" />
                                 </svg>
                               )}
@@ -1136,7 +1140,7 @@ export const Repertorio = () => {
                       aria-label="Mover sección"
                       {...attributes}
                       {...listeners}
-                      className="cursor-grab active:cursor-grabbing text-gray-500 hover:text-gray-300 touch-none focus:outline-none focus:ring-2 focus:ring-white/40 rounded shrink-0"
+                      className="cursor-grab active:cursor-grabbing text-gray-500 hover:text-gray-300 touch-none focus:outline-none focus:ring-2 focus:ring-gold-500/40 rounded shrink-0"
                     >
                       <GripVertical size={16} />
                     </button>
@@ -1291,7 +1295,7 @@ export const Repertorio = () => {
                       <Badge variant="primary" size="sm">{section.label}</Badge>
                     </div>
                     {section.chords && (
-                      <p className="text-purple-400 font-mono text-lg mb-3">{section.chords}</p>
+                      <p className="text-gold-300 font-mono text-lg mb-3">{section.chords}</p>
                     )}
                     {section.content && (
                       <p className="text-gray-300 whitespace-pre-line leading-relaxed">
@@ -1351,8 +1355,8 @@ export const Repertorio = () => {
           <div className="space-y-4">
             <div className="bg-neutral-800/50 rounded-xl p-4">
               <div className="flex items-center gap-3 mb-3">
-                <div className="w-10 h-10 rounded-lg bg-purple-500/20 flex items-center justify-center">
-                  <Music2 size={20} className="text-purple-400" />
+                <div className="w-10 h-10 rounded-lg bg-gold-gradient-soft ring-1 ring-gold-500/40 flex items-center justify-center">
+                  <MusicNotes size={20} weight="duotone" className="text-gold-100" />
                 </div>
                 <div>
                   <h3 className="font-semibold">{exportModalSong.title}</h3>
@@ -1402,7 +1406,7 @@ export const Repertorio = () => {
               <p>El PDF incluirá:</p>
               <ul className="mt-2 space-y-1">
                 <li>• Título y artista de la canción</li>
-                <li>• Tonalidad seleccionada: <strong className="text-purple-400">{exportSongKey}</strong></li>
+                <li>• Tonalidad seleccionada: <strong className="text-gold-300">{exportSongKey}</strong></li>
                 <li>• Estructura con acordes transportados</li>
                 <li>• Letra de cada sección</li>
                 <li>• Categoría de la canción</li>

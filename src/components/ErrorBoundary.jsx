@@ -49,7 +49,7 @@ export class ErrorBoundary extends React.Component {
           </details>
           <button
             onClick={this.handleReload}
-            className="px-6 py-3 bg-white text-black font-semibold rounded-xl hover:bg-gray-200 transition-colors focus:outline-none focus:ring-2 focus:ring-white/40"
+            className="px-6 py-3 bg-gold-gradient text-black font-semibold rounded-xl hover:brightness-110 transition-colors focus:outline-none focus:ring-2 focus:ring-gold-500/40"
           >
             Recargar la app
           </button>

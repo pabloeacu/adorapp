@@ -16,8 +16,9 @@
 import React, { useState } from 'react';
 import {
   Phone, Calendar, Cross, Music, Check, ArrowRight, Bell,
-  Smartphone, Share, Plus, Download, Menu,
+  Share, Plus, Download, Menu,
 } from 'lucide-react';
+import { Bell as BellDuotone, DeviceMobile } from '@phosphor-icons/react';
 import { supabase } from '../lib/supabase';
 import { useAppStore, INSTRUMENTS } from '../stores/appStore';
 import { useAuthStore } from '../stores/authStore';
@@ -152,7 +153,7 @@ export function OnboardingWizard({ member, onClose }) {
               <div
                 key={i}
                 className={`h-1.5 rounded-full transition-all ${
-                  i === step ? 'w-8 bg-white' : i < step ? 'w-4 bg-white/60' : 'w-4 bg-neutral-700'
+                  i === step ? 'w-8 bg-gold-gradient' : i < step ? 'w-4 bg-gold-500/50' : 'w-4 bg-neutral-700'
                 }`}
               />
             ))}
@@ -173,7 +174,7 @@ export function OnboardingWizard({ member, onClose }) {
 
               <button
                 onClick={() => setStep(1)}
-                className="w-full py-3 bg-white text-black font-semibold rounded-xl hover:bg-gray-200 transition-colors flex items-center justify-center gap-2 focus:outline-none focus:ring-2 focus:ring-white/40"
+                className="w-full py-3 bg-gold-gradient text-black font-semibold rounded-xl hover:brightness-110 active:scale-95 transition-all flex items-center justify-center gap-2 focus:outline-none focus:ring-2 focus:ring-gold-500/50"
               >
                 Empezar <ArrowRight size={18} />
               </button>
@@ -206,7 +207,7 @@ export function OnboardingWizard({ member, onClose }) {
                   value={phone}
                   onChange={(e) => setPhone(e.target.value)}
                   placeholder="+54 11 1234-5678"
-                  className="w-full px-4 py-2.5 bg-neutral-800 border border-neutral-700 rounded-lg focus:outline-none focus:ring-2 focus:ring-white/40 focus:border-white"
+                  className="w-full px-4 py-2.5 bg-neutral-800 border border-neutral-700 rounded-lg focus:outline-none focus:ring-2 focus:ring-gold-500/40 focus:border-gold-500"
                 />
               </label>
 
@@ -218,7 +219,7 @@ export function OnboardingWizard({ member, onClose }) {
                   type="date"
                   value={birthdate}
                   onChange={(e) => setBirthdate(e.target.value)}
-                  className="w-full px-4 py-2.5 bg-neutral-800 border border-neutral-700 rounded-lg focus:outline-none focus:ring-2 focus:ring-white/40 focus:border-white"
+                  className="w-full px-4 py-2.5 bg-neutral-800 border border-neutral-700 rounded-lg focus:outline-none focus:ring-2 focus:ring-gold-500/40 focus:border-gold-500"
                 />
               </label>
 
@@ -231,20 +232,20 @@ export function OnboardingWizard({ member, onClose }) {
                   value={pastorArea}
                   onChange={(e) => setPastorArea(e.target.value)}
                   placeholder="Nombre de tu pastor"
-                  className="w-full px-4 py-2.5 bg-neutral-800 border border-neutral-700 rounded-lg focus:outline-none focus:ring-2 focus:ring-white/40 focus:border-white"
+                  className="w-full px-4 py-2.5 bg-neutral-800 border border-neutral-700 rounded-lg focus:outline-none focus:ring-2 focus:ring-gold-500/40 focus:border-gold-500"
                 />
               </label>
 
               <div className="flex gap-2 pt-2">
                 <button
                   onClick={() => setStep(1)}
-                  className="flex-1 py-2.5 bg-neutral-800 hover:bg-neutral-700 rounded-lg focus:outline-none focus:ring-2 focus:ring-white/40"
+                  className="flex-1 py-2.5 bg-neutral-800 hover:bg-neutral-700 rounded-lg focus:outline-none focus:ring-2 focus:ring-gold-500/40"
                 >
                   Atrás
                 </button>
                 <button
                   onClick={() => setDataSubStep(1)}
-                  className="flex-1 py-2.5 bg-white text-black font-semibold rounded-lg hover:bg-gray-200 focus:outline-none focus:ring-2 focus:ring-white/40"
+                  className="flex-1 py-2.5 bg-gold-gradient text-black font-semibold rounded-lg hover:brightness-110 active:scale-95 focus:outline-none focus:ring-2 focus:ring-gold-500/50"
                 >
                   Siguiente
                 </button>
@@ -267,9 +268,9 @@ export function OnboardingWizard({ member, onClose }) {
                     key={i}
                     type="button"
                     onClick={() => toggleInstrument(i)}
-                    className={`p-2.5 rounded-lg text-sm border-2 transition-all focus:outline-none focus:ring-2 focus:ring-white/40 ${
+                    className={`p-2.5 rounded-lg text-sm border-2 transition-all focus:outline-none focus:ring-2 focus:ring-gold-500/40 ${
                       instruments.includes(i)
-                        ? 'border-white bg-white/10 text-white'
+                        ? 'border-gold-500 bg-gold-500/10 text-gold-200'
                         : 'border-neutral-800 hover:border-neutral-700 text-gray-300'
                     }`}
                   >
@@ -283,13 +284,13 @@ export function OnboardingWizard({ member, onClose }) {
               <div className="flex gap-2 pt-2">
                 <button
                   onClick={() => setDataSubStep(0)}
-                  className="flex-1 py-2.5 bg-neutral-800 hover:bg-neutral-700 rounded-lg focus:outline-none focus:ring-2 focus:ring-white/40"
+                  className="flex-1 py-2.5 bg-neutral-800 hover:bg-neutral-700 rounded-lg focus:outline-none focus:ring-2 focus:ring-gold-500/40"
                 >
                   Atrás
                 </button>
                 <button
                   onClick={() => setStep(3)}
-                  className="flex-1 py-2.5 bg-white text-black font-semibold rounded-lg hover:bg-gray-200 focus:outline-none focus:ring-2 focus:ring-white/40"
+                  className="flex-1 py-2.5 bg-gold-gradient text-black font-semibold rounded-lg hover:brightness-110 active:scale-95 focus:outline-none focus:ring-2 focus:ring-gold-500/50"
                 >
                   Siguiente
                 </button>
@@ -301,8 +302,8 @@ export function OnboardingWizard({ member, onClose }) {
           {step === 3 && (
             <>
               <div className="text-center space-y-3">
-                <div className="w-16 h-16 mx-auto bg-blue-500/20 rounded-full flex items-center justify-center">
-                  <Bell size={32} className="text-blue-400" />
+                <div className="w-16 h-16 mx-auto bg-gold-gradient-soft ring-[1.5px] ring-gold-500/50 shadow-[0_0_30px_-6px_rgba(242,201,76,0.5)] rounded-full flex items-center justify-center">
+                  <BellDuotone size={32} weight="duotone" className="text-gold-100" />
                 </div>
                 <h2 className="text-xl font-bold">¿Activás las notificaciones?</h2>
                 <p className="text-sm text-gray-400">
@@ -337,7 +338,7 @@ export function OnboardingWizard({ member, onClose }) {
                     }
                   }}
                   disabled={pushBusy || saving}
-                  className="w-full py-3.5 bg-blue-500 hover:bg-blue-600 text-white font-semibold rounded-xl disabled:opacity-50 flex items-center justify-center gap-2 focus:outline-none focus:ring-2 focus:ring-blue-300"
+                  className="w-full py-3.5 bg-gold-gradient text-black font-semibold rounded-xl hover:brightness-110 active:scale-95 disabled:opacity-50 flex items-center justify-center gap-2 focus:outline-none focus:ring-2 focus:ring-gold-500/50"
                 >
                   <Bell size={18} />
                   {pushBusy ? 'Activando…' : 'Activar notificaciones'}
@@ -361,8 +362,8 @@ export function OnboardingWizard({ member, onClose }) {
           {step === 4 && (
             <>
               <div className="text-center space-y-3">
-                <div className="w-16 h-16 mx-auto bg-violet-500/20 rounded-full flex items-center justify-center">
-                  <Smartphone size={32} className="text-violet-300" />
+                <div className="w-16 h-16 mx-auto bg-gold-gradient-soft ring-[1.5px] ring-gold-500/50 shadow-[0_0_30px_-6px_rgba(242,201,76,0.5)] rounded-full flex items-center justify-center">
+                  <DeviceMobile size={32} weight="duotone" className="text-gold-100" />
                 </div>
                 <h2 className="text-xl font-bold">¿Guardás la app en tu pantalla?</h2>
                 <p className="text-sm text-gray-400">
@@ -389,7 +390,7 @@ export function OnboardingWizard({ member, onClose }) {
                     // 'dismissed' → quedate en este paso, el usuario puede usar "Más tarde".
                   }}
                   disabled={installBusy}
-                  className="w-full py-3.5 bg-violet-500 hover:bg-violet-600 text-white font-semibold rounded-xl disabled:opacity-50 flex items-center justify-center gap-2 focus:outline-none focus:ring-2 focus:ring-violet-300"
+                  className="w-full py-3.5 bg-gold-gradient text-black font-semibold rounded-xl hover:brightness-110 active:scale-95 disabled:opacity-50 flex items-center justify-center gap-2 focus:outline-none focus:ring-2 focus:ring-gold-500/50"
                 >
                   <Download size={18} />
                   {installBusy ? 'Abriendo instalador…' : 'Instalar AdorAPP'}
@@ -404,15 +405,15 @@ export function OnboardingWizard({ member, onClose }) {
                   </p>
                   <ol className="space-y-2 text-sm text-gray-200">
                     <li className="flex items-center gap-3">
-                      <span className="flex-shrink-0 w-7 h-7 rounded-full bg-violet-500/30 text-violet-200 font-semibold flex items-center justify-center text-xs">1</span>
+                      <span className="flex-shrink-0 w-7 h-7 rounded-full bg-gold-500/20 text-gold-200 ring-1 ring-gold-500/30 font-semibold flex items-center justify-center text-xs">1</span>
                       <span className="flex items-center gap-2">
-                        Tocá <Share size={16} className="inline text-violet-300" /> <span className="font-semibold">Compartir</span> abajo en la barra
+                        Tocá <Share size={16} className="inline text-gold-300" /> <span className="font-semibold">Compartir</span> abajo en la barra
                       </span>
                     </li>
                     <li className="flex items-center gap-3">
-                      <span className="flex-shrink-0 w-7 h-7 rounded-full bg-violet-500/30 text-violet-200 font-semibold flex items-center justify-center text-xs">2</span>
+                      <span className="flex-shrink-0 w-7 h-7 rounded-full bg-gold-500/20 text-gold-200 ring-1 ring-gold-500/30 font-semibold flex items-center justify-center text-xs">2</span>
                       <span className="flex items-center gap-2">
-                        Elegí <Plus size={16} className="inline text-violet-300" /> <span className="font-semibold">Agregar a inicio</span>
+                        Elegí <Plus size={16} className="inline text-gold-300" /> <span className="font-semibold">Agregar a inicio</span>
                       </span>
                     </li>
                   </ol>
@@ -423,7 +424,7 @@ export function OnboardingWizard({ member, onClose }) {
               {!canPromptInstall && platform !== 'ios' && (
                 <div className="space-y-3 bg-neutral-800/60 border border-neutral-700 rounded-xl p-4">
                   <p className="text-sm text-gray-300 text-center flex items-center justify-center gap-2">
-                    Tocá el menú <Menu size={16} className="inline text-violet-300" /> de tu navegador
+                    Tocá el menú <Menu size={16} className="inline text-gold-300" /> de tu navegador
                     {platform === 'desktop' ? ' y elegí "Instalar AdorAPP".' : ' y elegí "Instalar app" o "Agregar a inicio".'}
                   </p>
                 </div>

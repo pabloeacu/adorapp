@@ -120,13 +120,13 @@ export function CommandPalette() {
                 Nada coincide. Probá con otro término.
               </Command.Empty>
 
-              <Command.Group heading="Ir a" className="text-xs uppercase text-gray-500 px-2 pt-2 pb-1">
+              <Command.Group heading="Ir a" className="text-xs uppercase tracking-wider text-gold-300/60 px-2 pt-2 pb-1">
                 {pageItems.map((p) => (
                   <Command.Item
                     key={p.id}
                     value={`pagina ${p.label}`}
                     onSelect={() => go(p.path)}
-                    className="flex items-center gap-3 px-3 py-2 rounded-lg cursor-pointer text-white aria-selected:bg-white/10"
+                    className="flex items-center gap-3 px-3 py-2 rounded-lg cursor-pointer text-white aria-selected:bg-gold-500/10 aria-selected:text-gold-100"
                   >
                     <p.icon size={16} className="text-gray-400" />
                     <span>{p.label}</span>
@@ -136,15 +136,15 @@ export function CommandPalette() {
               </Command.Group>
 
               {songs.length > 0 && (
-                <Command.Group heading="Canciones" className="text-xs uppercase text-gray-500 px-2 pt-2 pb-1">
+                <Command.Group heading="Canciones" className="text-xs uppercase tracking-wider text-gold-300/60 px-2 pt-2 pb-1">
                   {songs.slice(0, 50).map((s) => (
                     <Command.Item
                       key={`song-${s.id}`}
                       value={`cancion ${s.title} ${s.artist || ''}`}
                       onSelect={() => go(`/repertorio?song=${s.id}`)}
-                      className="flex items-center gap-3 px-3 py-2 rounded-lg cursor-pointer text-white aria-selected:bg-white/10"
+                      className="flex items-center gap-3 px-3 py-2 rounded-lg cursor-pointer text-white aria-selected:bg-gold-500/10 aria-selected:text-gold-100"
                     >
-                      <Music2 size={16} className="text-purple-400 shrink-0" />
+                      <Music2 size={16} className="text-gold-300 shrink-0" />
                       <div className="flex-1 min-w-0">
                         <div className="truncate">{s.title}</div>
                         {s.artist && <div className="text-xs text-gray-500 truncate">{s.artist}</div>}
@@ -159,15 +159,15 @@ export function CommandPalette() {
                   Plain members get bounced from that route, so hiding the
                   search results too avoids a confusing dead-end. */}
               {canSeeMembers && members.length > 0 && (
-                <Command.Group heading="Miembros" className="text-xs uppercase text-gray-500 px-2 pt-2 pb-1">
+                <Command.Group heading="Miembros" className="text-xs uppercase tracking-wider text-gold-300/60 px-2 pt-2 pb-1">
                   {members.filter((m) => m.active !== false).slice(0, 50).map((m) => (
                     <Command.Item
                       key={`member-${m.id}`}
                       value={`miembro ${m.name} ${isPastor ? (m.email || '') : ''}`}
                       onSelect={() => go(`/miembros?member=${m.id}`)}
-                      className="flex items-center gap-3 px-3 py-2 rounded-lg cursor-pointer text-white aria-selected:bg-white/10"
+                      className="flex items-center gap-3 px-3 py-2 rounded-lg cursor-pointer text-white aria-selected:bg-gold-500/10 aria-selected:text-gold-100"
                     >
-                      <UserCircle size={16} className="text-blue-400 shrink-0" />
+                      <UserCircle size={16} className="text-gold-300 shrink-0" />
                       <div className="flex-1 min-w-0">
                         <div className="truncate">{m.name}</div>
                         {isPastor && m.email && <div className="text-xs text-gray-500 truncate">{m.email}</div>}
@@ -179,15 +179,15 @@ export function CommandPalette() {
               )}
 
               {bands.length > 0 && (
-                <Command.Group heading="Bandas" className="text-xs uppercase text-gray-500 px-2 pt-2 pb-1">
+                <Command.Group heading="Bandas" className="text-xs uppercase tracking-wider text-gold-300/60 px-2 pt-2 pb-1">
                   {bands.filter((b) => b.active !== false).map((b) => (
                     <Command.Item
                       key={`band-${b.id}`}
                       value={`banda ${b.name}`}
                       onSelect={() => go(`/bandas?band=${b.id}`)}
-                      className="flex items-center gap-3 px-3 py-2 rounded-lg cursor-pointer text-white aria-selected:bg-white/10"
+                      className="flex items-center gap-3 px-3 py-2 rounded-lg cursor-pointer text-white aria-selected:bg-gold-500/10 aria-selected:text-gold-100"
                     >
-                      <Users size={16} className="text-green-400 shrink-0" />
+                      <Users size={16} className="text-gold-300 shrink-0" />
                       <span className="flex-1">{b.name}</span>
                     </Command.Item>
                   ))}
@@ -195,7 +195,7 @@ export function CommandPalette() {
               )}
 
               {recentOrders.length > 0 && (
-                <Command.Group heading="Órdenes recientes" className="text-xs uppercase text-gray-500 px-2 pt-2 pb-1">
+                <Command.Group heading="Órdenes recientes" className="text-xs uppercase tracking-wider text-gold-300/60 px-2 pt-2 pb-1">
                   {recentOrders.map((o) => {
                     const band = bands.find((b) => b.id === o.bandId);
                     return (
@@ -203,9 +203,9 @@ export function CommandPalette() {
                         key={`order-${o.id}`}
                         value={`orden ${o.date} ${band?.name || ''}`}
                         onSelect={() => go(`/ordenes?order=${o.id}`)}
-                        className="flex items-center gap-3 px-3 py-2 rounded-lg cursor-pointer text-white aria-selected:bg-white/10"
+                        className="flex items-center gap-3 px-3 py-2 rounded-lg cursor-pointer text-white aria-selected:bg-gold-500/10 aria-selected:text-gold-100"
                       >
-                        <CalendarDays size={16} className="text-orange-400 shrink-0" />
+                        <CalendarDays size={16} className="text-gold-300 shrink-0" />
                         <span className="flex-1">{band?.name || 'Banda'}</span>
                         <span className="text-xs text-gray-500">{o.date}</span>
                       </Command.Item>

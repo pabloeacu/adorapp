@@ -914,7 +914,7 @@ export const Header = () => {
               )}
               <button
                 onClick={handleCameraClick}
-                className="absolute bottom-0 right-0 p-2 bg-blue-600 rounded-full hover:bg-blue-500 transition-colors shadow-lg"
+                className="absolute bottom-0 right-0 p-2 bg-gold-gradient rounded-full hover:brightness-110 transition-colors shadow-lg"
                 title="Cambiar foto"
               >
                 <Camera size={16} className="text-white" />
@@ -946,7 +946,7 @@ export const Header = () => {
                     type="text"
                     value={editName}
                     onChange={(e) => setEditName(e.target.value)}
-                    className="w-full bg-neutral-700 border border-neutral-600 rounded-lg px-3 py-1.5 text-white focus:outline-none focus:ring-2 focus:ring-white/40 focus:border-blue-500"
+                    className="w-full bg-neutral-700 border border-neutral-600 rounded-lg px-3 py-1.5 text-white focus:outline-none focus:ring-2 focus:ring-gold-500/40 focus:border-gold-500"
                     placeholder="Tu nombre"
                   />
                 ) : (
@@ -966,7 +966,7 @@ export const Header = () => {
                     type="tel"
                     value={editPhone}
                     onChange={(e) => setEditPhone(e.target.value)}
-                    className="w-full bg-neutral-700 border border-neutral-600 rounded-lg px-3 py-1.5 text-white focus:outline-none focus:ring-2 focus:ring-white/40 focus:border-blue-500"
+                    className="w-full bg-neutral-700 border border-neutral-600 rounded-lg px-3 py-1.5 text-white focus:outline-none focus:ring-2 focus:ring-gold-500/40 focus:border-gold-500"
                     placeholder="+54 11 1234-5678"
                   />
                 ) : (
@@ -986,7 +986,7 @@ export const Header = () => {
                     type="text"
                     value={editPastorArea}
                     onChange={(e) => setEditPastorArea(e.target.value)}
-                    className="w-full bg-neutral-700 border border-neutral-600 rounded-lg px-3 py-1.5 text-white focus:outline-none focus:ring-2 focus:ring-white/40 focus:border-blue-500"
+                    className="w-full bg-neutral-700 border border-neutral-600 rounded-lg px-3 py-1.5 text-white focus:outline-none focus:ring-2 focus:ring-gold-500/40 focus:border-gold-500"
                     placeholder="Nombre del pastor"
                   />
                 ) : (
@@ -1006,7 +1006,7 @@ export const Header = () => {
                     type="text"
                     value={editLeaderOf}
                     onChange={(e) => setEditLeaderOf(e.target.value)}
-                    className="w-full bg-neutral-700 border border-neutral-600 rounded-lg px-3 py-1.5 text-white focus:outline-none focus:ring-2 focus:ring-white/40 focus:border-blue-500"
+                    className="w-full bg-neutral-700 border border-neutral-600 rounded-lg px-3 py-1.5 text-white focus:outline-none focus:ring-2 focus:ring-gold-500/40 focus:border-gold-500"
                     placeholder="Grupo o área"
                   />
                 ) : (
@@ -1026,7 +1026,7 @@ export const Header = () => {
                     type="date"
                     value={editBirthdate}
                     onChange={(e) => setEditBirthdate(e.target.value)}
-                    className="w-full bg-neutral-700 border border-neutral-600 rounded-lg px-3 py-1.5 text-white focus:outline-none focus:ring-2 focus:ring-white/40 focus:border-blue-500"
+                    className="w-full bg-neutral-700 border border-neutral-600 rounded-lg px-3 py-1.5 text-white focus:outline-none focus:ring-2 focus:ring-gold-500/40 focus:border-gold-500"
                   />
                 ) : (
                   <p className="font-medium">{(currentUserMember?.birthdate || profile?.birthdate) ? formatDateLocal(currentUserMember?.birthdate || profile?.birthdate) : 'No configurada'}</p>
@@ -1255,7 +1255,7 @@ export const Header = () => {
                   step="0.05"
                   value={zoom}
                   onChange={(e) => setZoom(parseFloat(e.target.value))}
-                  className="w-full h-2 bg-neutral-700 rounded-lg appearance-none cursor-pointer accent-purple-500"
+                  className="w-full h-2 bg-neutral-700 rounded-lg appearance-none cursor-pointer accent-gold-500"
                 />
               </div>
             </div>
@@ -1277,7 +1277,7 @@ export const Header = () => {
                   step="5"
                   value={rotation}
                   onChange={(e) => setRotation(parseInt(e.target.value))}
-                  className="w-full h-2 bg-neutral-700 rounded-lg appearance-none cursor-pointer accent-purple-500"
+                  className="w-full h-2 bg-neutral-700 rounded-lg appearance-none cursor-pointer accent-gold-500"
                 />
               </div>
             </div>
@@ -1376,7 +1376,7 @@ export const Header = () => {
                 value={newPassword}
                 onChange={(e) => setNewPassword(e.target.value)}
                 placeholder="Mínimo 6 caracteres"
-                className="w-full px-4 py-3 bg-neutral-900 border border-neutral-800 rounded-xl focus:outline-none focus:ring-2 focus:ring-white/40 focus:border-blue-500 transition-colors pr-12"
+                className="w-full px-4 py-3 bg-neutral-900 border border-neutral-800 rounded-xl focus:outline-none focus:ring-2 focus:ring-gold-500/40 focus:border-gold-500 transition-colors pr-12"
               />
               <button
                 type="button"
@@ -1399,12 +1399,12 @@ export const Header = () => {
                 value={confirmPassword}
                 onChange={(e) => setConfirmPassword(e.target.value)}
                 placeholder="Repetí la nueva contraseña"
-                className={`w-full px-4 py-3 bg-neutral-900 border rounded-xl focus:outline-none focus:ring-2 focus:ring-white/40 transition-colors pr-12 ${
+                className={`w-full px-4 py-3 bg-neutral-900 border rounded-xl focus:outline-none focus:ring-2 focus:ring-gold-500/40 transition-colors pr-12 ${
                   confirmPassword && confirmPassword !== newPassword
                     ? 'border-red-500 focus:border-red-500'
                     : confirmPassword && confirmPassword === newPassword
                     ? 'border-green-500 focus:border-green-500'
-                    : 'border-neutral-800 focus:border-blue-500'
+                    : 'border-neutral-800 focus:border-gold-500'
                 }`}
               />
               <button
@@ -1457,7 +1457,7 @@ export const Header = () => {
                   <span className="text-xs text-gray-400">{unreadNotifications.length} notificación(es) sin leer</span>
                   <button
                     onClick={markAllAsRead}
-                    className="text-xs text-blue-400 hover:text-blue-300"
+                    className="text-xs text-gold-300 hover:text-gold-200"
                   >
                     Marcar todas como leídas
                   </button>
@@ -1473,7 +1473,7 @@ export const Header = () => {
                         navigate('/solicitudes');
                       }
                     }}
-                    className="relative p-4 bg-neutral-800/50 rounded-xl border border-neutral-700 hover:border-blue-500/50 transition-colors cursor-pointer"
+                    className="relative p-4 bg-neutral-800/50 rounded-xl border border-neutral-700 hover:border-gold-500/50 transition-colors cursor-pointer"
                   >
                     <button
                       type="button"
@@ -1537,7 +1537,7 @@ export const Header = () => {
                           </>
                         )}
                       </div>
-                      <span className="w-2 h-2 bg-blue-500 rounded-full flex-shrink-0 mt-2" />
+                      <span className="w-2 h-2 bg-gold-400 rounded-full flex-shrink-0 mt-2" />
                     </div>
                   </div>
                 ))}

@@ -1,7 +1,9 @@
 import React, { useMemo } from 'react';
-import { Activity, Sparkles, Music2 } from 'lucide-react';
+import { Sparkles, Music2 } from 'lucide-react';
+import { Pulse } from '@phosphor-icons/react';
 import { useAppStore } from '../stores/appStore';
 import { Modal } from './ui/Modal';
+import { IconBadge } from './ui/IconBadge';
 import { computeRepertoireInsights } from '../lib/repertoireInsights';
 
 // Radiografía del repertorio — modal de SOLO LECTURA. No escribe nada: calcula en
@@ -26,7 +28,7 @@ export const RepertoireInsightsModal = ({ isOpen, onClose }) => {
     { label: 'Sobreutilizadas', val: r.buckets.sobreutilizada, cls: 'text-amber-300 border-amber-500/25 bg-amber-500/10' },
     { label: 'En riesgo de olvido', val: r.buckets.enRiesgo, cls: 'text-orange-300 border-orange-500/25 bg-orange-500/10' },
     { label: 'Dormidas', val: r.buckets.dormida, cls: 'text-gray-300 border-gray-500/25 bg-gray-500/10' },
-    { label: 'Sin estrenar', val: r.buckets.sinEstrenar, cls: 'text-indigo-300 border-indigo-500/25 bg-indigo-500/10' },
+    { label: 'Sin estrenar', val: r.buckets.sinEstrenar, cls: 'text-gold-300 border-gold-500/25 bg-gold-500/10' },
   ] : [];
   // Sugerencias: climas nunca sonados o hace mucho, para balancear el próximo orden.
   const gaps = r ? r.climaGaps.filter((g) => !g.everPlayed || g.weeksSince >= 4).slice(0, 5) : [];
@@ -38,9 +40,7 @@ export const RepertoireInsightsModal = ({ isOpen, onClose }) => {
       <div className="space-y-6">
         {/* Resumen */}
         <div className="flex items-center gap-4">
-          <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl bg-indigo-500/15 text-indigo-300">
-            <Activity size={24} />
-          </div>
+          <IconBadge icon={Pulse} size="md" />
           <div className="min-w-0">
             <p className="text-2xl font-semibold text-white leading-tight">
               {r.total} <span className="text-base font-normal text-gray-400">canciones activas</span>
@@ -64,7 +64,7 @@ export const RepertoireInsightsModal = ({ isOpen, onClose }) => {
                 <span className="w-24 shrink-0 truncate text-sm text-gray-300" title={c.label}>{c.label}</span>
                 <div className="relative h-2.5 flex-1 overflow-hidden rounded-full bg-neutral-700/50">
                   <div
-                    className="absolute inset-y-0 left-0 rounded-full bg-gradient-to-r from-indigo-500 to-violet-400"
+                    className="absolute inset-y-0 left-0 rounded-full bg-gradient-to-r from-gold-400 to-gold-600"
                     style={{ width: `${c.count ? Math.max(4, (c.count / maxCount) * 100) : 0}%` }}
                   />
                 </div>
@@ -90,7 +90,7 @@ export const RepertoireInsightsModal = ({ isOpen, onClose }) => {
           </div>
           {thinHistory && (
             <p className="mt-2 flex items-start gap-1.5 text-xs text-gray-500">
-              <Sparkles size={13} className="mt-0.5 shrink-0 text-indigo-400" />
+              <Sparkles size={13} className="mt-0.5 shrink-0 text-gold-300" />
               Con {r.historyWeeks} {r.historyWeeks === 1 ? 'semana' : 'semanas'} de historia, la rotación recién arranca — estos números se afinan solos a medida que cargás órdenes.
             </p>
           )}
@@ -100,7 +100,7 @@ export const RepertoireInsightsModal = ({ isOpen, onClose }) => {
         {rescate.length > 0 && (
           <section>
             <h3 className="mb-2 flex items-center gap-2 text-sm font-semibold text-gray-200">
-              <Music2 size={15} className="text-indigo-400" /> Para rescatar
+              <Music2 size={15} className="text-gold-300" /> Para rescatar
             </h3>
             <p className="mb-2 text-xs text-gray-500">
               {r.buckets.sinEstrenar} {r.buckets.sinEstrenar === 1 ? 'canción sin estrenar' : 'canciones sin estrenar'}. Algunas joyas esperando:
@@ -115,8 +115,8 @@ export const RepertoireInsightsModal = ({ isOpen, onClose }) => {
 
         {/* Sugerencias de balance */}
         {gaps.length > 0 && (
-          <section className="rounded-xl border border-indigo-500/20 bg-indigo-500/5 p-4">
-            <h3 className="mb-2 flex items-center gap-2 text-sm font-semibold text-indigo-200">
+          <section className="rounded-xl border border-gold-500/20 bg-gold-500/5 p-4">
+            <h3 className="mb-2 flex items-center gap-2 text-sm font-semibold text-gold-200">
               <Sparkles size={15} /> Para balancear el próximo orden
             </h3>
             <ul className="space-y-1.5">
