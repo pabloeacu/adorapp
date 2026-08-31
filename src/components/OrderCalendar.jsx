@@ -105,7 +105,7 @@ export function OrderCalendar({ orders, getBandById, onSelectOrder }) {
             type="button"
             onClick={goPrev}
             aria-label="Mes anterior"
-            className="p-2 rounded-lg hover:bg-white/5 focus:outline-none focus:ring-2 focus:ring-white/40"
+            className="p-2 rounded-lg hover:bg-white/5 focus:outline-none focus:ring-2 focus:ring-gold-500/40"
           >
             <ChevronLeft size={18} />
           </button>
@@ -113,14 +113,14 @@ export function OrderCalendar({ orders, getBandById, onSelectOrder }) {
             type="button"
             onClick={goNext}
             aria-label="Mes siguiente"
-            className="p-2 rounded-lg hover:bg-white/5 focus:outline-none focus:ring-2 focus:ring-white/40"
+            className="p-2 rounded-lg hover:bg-white/5 focus:outline-none focus:ring-2 focus:ring-gold-500/40"
           >
             <ChevronRight size={18} />
           </button>
           <button
             type="button"
             onClick={goToday}
-            className="px-3 py-1.5 text-xs rounded-lg border border-neutral-700 hover:bg-white/5 focus:outline-none focus:ring-2 focus:ring-white/40"
+            className="px-3 py-1.5 text-xs rounded-lg border border-neutral-700 hover:bg-white/5 focus:outline-none focus:ring-2 focus:ring-gold-500/40"
           >
             Hoy
           </button>
@@ -149,9 +149,9 @@ export function OrderCalendar({ orders, getBandById, onSelectOrder }) {
                 inMonth
                   ? 'border-neutral-800 bg-neutral-900'
                   : 'border-neutral-900 bg-neutral-950 opacity-50'
-              } ${isToday ? 'ring-1 ring-white/40' : ''}`}
+              } ${isToday ? 'ring-1 ring-gold-500/50' : ''}`}
             >
-              <div className={`text-[11px] ${isToday ? 'text-white font-semibold' : 'text-gray-400'}`}>
+              <div className={`text-[11px] ${isToday ? 'text-gold-200 font-semibold' : 'text-gray-400'}`}>
                 {d.getDate()}
               </div>
               {dayOrders.slice(0, 3).map((o) => {
@@ -163,7 +163,7 @@ export function OrderCalendar({ orders, getBandById, onSelectOrder }) {
                     type="button"
                     onClick={() => onSelectOrder?.(o)}
                     title={`${band?.name || 'Banda'} · ${o.time || ''}`}
-                    className={`text-left text-[10px] px-1.5 py-0.5 rounded border truncate ${cls} hover:brightness-125 focus:outline-none focus:ring-2 focus:ring-white/40`}
+                    className={`text-left text-[10px] px-1.5 py-0.5 rounded border truncate ${cls} hover:brightness-125 focus:outline-none focus:ring-2 focus:ring-gold-500/40`}
                   >
                     {o.time ? `${o.time.slice(0, 5)} ` : ''}
                     {band?.name || 'Banda'}
@@ -183,7 +183,7 @@ export function OrderCalendar({ orders, getBandById, onSelectOrder }) {
                     type="button"
                     onClick={() => onSelectOrder?.(o)}
                     title={`Ensamble · ${band?.name || 'Banda'}${o.rehearsalTime ? ' · ' + o.rehearsalTime : ''}`}
-                    className="text-left text-[10px] px-1.5 py-0.5 rounded border truncate bg-amber-500/30 text-amber-100 border-amber-500/40 hover:brightness-125 focus:outline-none focus:ring-2 focus:ring-white/40"
+                    className="text-left text-[10px] px-1.5 py-0.5 rounded border truncate bg-gold-500/15 text-gold-200 border-gold-500/40 hover:brightness-125 focus:outline-none focus:ring-2 focus:ring-gold-500/40"
                   >
                     {o.rehearsalTime ? `${o.rehearsalTime.slice(0, 5)} ` : ''}Ensamble · {band?.name || 'Banda'}
                   </button>

@@ -81,8 +81,13 @@ export const Login = () => {
   };
 
   return (
-    <div className="min-h-screen bg-black flex items-center justify-center p-4">
-      <div className="w-full max-w-md">
+    <div className="relative min-h-screen bg-black flex items-center justify-center p-4 overflow-hidden">
+      {/* Halo dorado sutil detrás del card — premium, decorativo */}
+      <div
+        className="gold-radial-glow pointer-events-none absolute left-1/2 top-1/3 h-[32rem] w-[32rem] -translate-x-1/2 -translate-y-1/2 rounded-full"
+        aria-hidden="true"
+      />
+      <div className="relative w-full max-w-md">
         {/* Header con logos */}
         <div className="text-center mb-8">
           {/* Logo ADORACIÓN CAF */}
@@ -103,8 +108,11 @@ export const Login = () => {
           <p className="text-gray-500 mt-4">La plataforma de Adoración CAF</p>
         </div>
 
-        <div className="bg-neutral-900 border border-neutral-800 rounded-2xl p-8">
-          <h2 className="text-xl font-semibold mb-6 text-center">Iniciar Sesión</h2>
+        <div className="relative overflow-hidden bg-neutral-900 border border-gold-500/20 rounded-2xl p-8 shadow-[0_0_40px_-12px_rgba(212,175,55,0.25)]">
+          {/* Hairline dorado en el borde superior + glow de esquina */}
+          <div className="gold-hairline absolute inset-x-0 top-0 h-px" aria-hidden="true" />
+          <div className="gold-radial-glow pointer-events-none absolute -right-16 -top-16 h-40 w-40 rounded-full" aria-hidden="true" />
+          <h2 className="relative text-xl font-semibold mb-6 text-center">Iniciar Sesión</h2>
 
           <form onSubmit={handleSubmit} className="space-y-4">
             <div className="relative">
@@ -114,7 +122,7 @@ export const Login = () => {
                 placeholder="Email"
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
-                className="w-full pl-12 pr-4 py-3 bg-neutral-800 border border-neutral-700 rounded-xl text-white placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-white/40 focus:border-white transition-colors"
+                className="w-full pl-12 pr-4 py-3 bg-neutral-800 border border-neutral-700 rounded-xl text-white placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-gold-500/40 focus:border-gold-500 transition-colors"
                 autoComplete="username"
                 disabled={loading}
               />
@@ -127,7 +135,7 @@ export const Login = () => {
                 placeholder="Contraseña"
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
-                className="w-full pl-12 pr-12 py-3 bg-neutral-800 border border-neutral-700 rounded-xl text-white placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-white/40 focus:border-white transition-colors"
+                className="w-full pl-12 pr-12 py-3 bg-neutral-800 border border-neutral-700 rounded-xl text-white placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-gold-500/40 focus:border-gold-500 transition-colors"
                 autoComplete="current-password"
                 disabled={loading}
               />
@@ -151,7 +159,7 @@ export const Login = () => {
                     onChange={(e) => setRememberMe(e.target.checked)}
                     className="sr-only"
                   />
-                  <div className={`w-11 h-6 rounded-full transition-colors ${rememberMe ? 'bg-white' : 'bg-neutral-700'}`}>
+                  <div className={`w-11 h-6 rounded-full transition-colors ${rememberMe ? 'bg-gold-gradient' : 'bg-neutral-700'}`}>
                     <div className={`w-5 h-5 bg-black rounded-full shadow-md transform transition-transform mt-0.5 ${rememberMe ? 'translate-x-5 ml-0.5' : 'translate-x-0.5'}`} />
                   </div>
                 </div>
@@ -166,7 +174,7 @@ export const Login = () => {
             <button
               type="submit"
               disabled={loading}
-              className="w-full py-3 bg-white text-black font-semibold rounded-xl hover:bg-gray-200 transition-all active:scale-[0.98] disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+              className="w-full py-3 bg-gold-gradient text-black font-semibold rounded-xl hover:brightness-110 shadow-[0_2px_14px_-3px_rgba(212,175,55,0.45)] transition-all active:scale-[0.98] disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
             >
               {loading && <Loader2 size={18} className="animate-spin" />}
               {loading ? 'Iniciando sesión...' : 'Entrar'}
@@ -183,7 +191,7 @@ export const Login = () => {
           <div className="mt-4">
             <button
               onClick={handleOpenRegister}
-              className="w-full py-3 border border-neutral-700 text-gray-300 font-medium rounded-xl hover:bg-neutral-800 hover:border-neutral-600 transition-all flex items-center justify-center gap-2"
+              className="w-full py-3 border border-neutral-700 text-gray-300 font-medium rounded-xl hover:bg-gold-500/5 hover:border-gold-500/50 hover:text-gold-200 transition-all flex items-center justify-center gap-2"
             >
               <UserPlus size={18} />
               Quiero registrarme
@@ -352,7 +360,7 @@ const RegisterModal = ({ isOpen, onClose, onSuccess }) => {
           required
         />
 
-        <div className="p-3 bg-blue-500/10 border border-blue-500/30 rounded-lg text-sm text-blue-300">
+        <div className="p-3 bg-gold-500/10 border border-gold-500/30 rounded-lg text-sm text-gold-200">
           Cuando un pastor apruebe tu solicitud, te va a generar una contraseña inicial y te la va a hacer llegar por un canal seguro.
         </div>
 
@@ -401,8 +409,8 @@ const RegisterModal = ({ isOpen, onClose, onSuccess }) => {
                 className={`
                   p-2 rounded-lg text-xs transition-all border-2
                   ${formData.instruments.includes(inst)
-                    ? 'border-white bg-white/10'
-                    : 'border-neutral-800 hover:border-neutral-700'
+                    ? 'border-gold-500 bg-gold-500/10 text-gold-200'
+                    : 'border-neutral-800 hover:border-gold-500/40'
                   }
                 `}
               >
@@ -454,7 +462,7 @@ const Input = ({ label, name, type = 'text', placeholder, value, onChange, requi
       value={value}
       onChange={onChange}
       required={required}
-      className="w-full px-4 py-3 bg-neutral-800 border border-neutral-700 rounded-xl text-white placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-white/40 focus:border-white transition-colors"
+      className="w-full px-4 py-3 bg-neutral-800 border border-neutral-700 rounded-xl text-white placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-gold-500/40 focus:border-gold-500 transition-colors"
     />
   </div>
 );

@@ -3,9 +3,10 @@ import { useDocumentTitle } from '../hooks/useDocumentTitle';
 import { useSearchParams } from 'react-router-dom';
 import {
   Plus, Search, Mail, Phone, Shield, Edit, Trash2,
-  UserPlus, Check, X, Filter, Key,
+  Check, X, Filter, Key,
   LayoutGrid, List, AlertTriangle, UserX, Cross, Users2, Calendar
 } from 'lucide-react';
+import { UsersThree, UserPlus } from '@phosphor-icons/react';
 import { useAppStore, MEMBER_ROLES, INSTRUMENTS } from '../stores/appStore';
 import { useAuthStore } from '../stores/authStore';
 import { useCurrentRole } from '../hooks/useCurrentMember';
@@ -13,6 +14,8 @@ import { Card } from '../components/ui/Card';
 import { Button } from '../components/ui/Button';
 import { Badge } from '../components/ui/Badge';
 import { Avatar } from '../components/ui/Avatar';
+import { IconBadge } from '../components/ui/IconBadge';
+import { EmptyState } from '../components/ui/EmptyState';
 import { Modal } from '../components/ui/Modal';
 import { Input } from '../components/ui/Input';
 import { ConfirmModal, SuccessModal, ErrorModal } from '../components/ui/ConfirmModal';
@@ -342,26 +345,29 @@ export const Miembros = () => {
     <div className="space-y-6 animate-fade-in">
       {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-        <div>
-          <h2 className="text-2xl font-bold">Miembros del Ministerio</h2>
-          <p className="text-sm text-gray-400 mt-1">
-            {filteredMembers.filter(m => m.active).length} miembros activos
-            {filterRole !== 'all' && ` · Filtrado: ${roleConfig[filterRole]?.label}`}
-          </p>
+        <div className="flex items-center gap-3">
+          <IconBadge icon={UsersThree} size="md" />
+          <div>
+            <h2 className="text-2xl font-bold">Miembros del Ministerio</h2>
+            <p className="text-sm text-gray-400 mt-1">
+              {filteredMembers.filter(m => m.active).length} miembros activos
+              {filterRole !== 'all' && ` · Filtrado: ${roleConfig[filterRole]?.label}`}
+            </p>
+          </div>
         </div>
         {/* View mode toggle - visible to all users */}
         <div className="flex flex-wrap items-center gap-2 justify-end">
           <div className="flex bg-neutral-900 rounded-lg p-1 border border-neutral-800">
             <button
               onClick={() => setViewMode('cards')}
-              className={`p-2 rounded-md transition-colors ${viewMode === 'cards' ? 'bg-white text-black' : 'hover:bg-neutral-800 text-gray-400'}`}
+              className={`p-2 rounded-md transition-colors ${viewMode === 'cards' ? 'bg-gold-gradient text-black' : 'hover:bg-neutral-800 text-gray-400'}`}
               title="Vista de tarjetas"
             >
               <LayoutGrid size={18} />
             </button>
             <button
               onClick={() => setViewMode('table')}
-              className={`p-2 rounded-md transition-colors ${viewMode === 'table' ? 'bg-white text-black' : 'hover:bg-neutral-800 text-gray-400'}`}
+              className={`p-2 rounded-md transition-colors ${viewMode === 'table' ? 'bg-gold-gradient text-black' : 'hover:bg-neutral-800 text-gray-400'}`}
               title="Vista de grilla"
             >
               <List size={18} />
@@ -411,7 +417,7 @@ export const Miembros = () => {
               placeholder={isPastor ? "Buscar por nombre, email o instrumento..." : "Buscar por nombre o instrumento..."}
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
-              className="w-full pl-12 pr-4 py-3 bg-neutral-900 border border-neutral-800 rounded-xl focus:outline-none focus:ring-2 focus:ring-white/40 focus:border-white transition-colors"
+              className="w-full pl-12 pr-4 py-3 bg-neutral-900 border border-neutral-800 rounded-xl focus:outline-none focus:ring-2 focus:ring-gold-500/40 focus:border-gold-500 transition-colors"
             />
           </div>
           <Button
@@ -452,7 +458,7 @@ export const Miembros = () => {
                     onClick={() => setFilterRole('all')}
                     className={`px-3 py-1.5 rounded-lg text-sm transition-all ${
                       filterRole === 'all'
-                        ? 'bg-white text-black'
+                        ? 'bg-gold-gradient text-black'
                         : 'bg-neutral-800 hover:bg-neutral-700'
                     }`}
                   >
@@ -464,7 +470,7 @@ export const Miembros = () => {
                       onClick={() => setFilterRole(role.id)}
                       className={`px-3 py-1.5 rounded-lg text-sm transition-all ${
                         filterRole === role.id
-                          ? 'bg-white text-black'
+                          ? 'bg-gold-gradient text-black'
                           : 'bg-neutral-800 hover:bg-neutral-700'
                       }`}
                     >
@@ -483,7 +489,7 @@ export const Miembros = () => {
                     onClick={() => setFilterActive('true')}
                     className={`px-3 py-1.5 rounded-lg text-sm transition-all ${
                       filterActive === 'true'
-                        ? 'bg-white text-black'
+                        ? 'bg-gold-gradient text-black'
                         : 'bg-neutral-800 hover:bg-neutral-700'
                     }`}
                   >
@@ -493,7 +499,7 @@ export const Miembros = () => {
                     onClick={() => setFilterActive('false')}
                     className={`px-3 py-1.5 rounded-lg text-sm transition-all ${
                       filterActive === 'false'
-                        ? 'bg-white text-black'
+                        ? 'bg-gold-gradient text-black'
                         : 'bg-neutral-800 hover:bg-neutral-700'
                     }`}
                   >
@@ -503,7 +509,7 @@ export const Miembros = () => {
                     onClick={() => setFilterActive('all')}
                     className={`px-3 py-1.5 rounded-lg text-sm transition-all ${
                       filterActive === 'all'
-                        ? 'bg-white text-black'
+                        ? 'bg-gold-gradient text-black'
                         : 'bg-neutral-800 hover:bg-neutral-700'
                     }`}
                   >
@@ -527,7 +533,7 @@ export const Miembros = () => {
                       }}
                       className={`px-2 py-1 rounded text-xs transition-all ${
                         selectedInstruments.includes(inst)
-                          ? 'bg-purple-500/30 text-purple-300 border border-purple-500/50'
+                          ? 'bg-gold-500/15 text-gold-200 border border-gold-500/40'
                           : 'bg-neutral-800 hover:bg-neutral-700'
                       }`}
                     >
@@ -584,7 +590,7 @@ export const Miembros = () => {
                       className="p-2 rounded-lg hover:bg-neutral-800 transition-colors"
                       title="Restablecer contraseña"
                     >
-                      <Key size={16} className="text-purple-400" />
+                      <Key size={16} className="text-gold-300" />
                     </button>
                     <button
                       onClick={() => handleOpenModal(member)}
@@ -797,13 +803,12 @@ export const Miembros = () => {
       )}
 
       {filteredMembers.length === 0 && (
-        <div className="text-center py-12">
-          <UserPlus size={48} className="mx-auto text-gray-600 mb-4" />
-          <p className="text-gray-400">No se encontraron miembros</p>
-          <p className="text-sm text-gray-500 mt-1">
-            {searchTerm ? 'Intenta con otro término de búsqueda' : 'Agrega tu primer miembro'}
-          </p>
-        </div>
+        <EmptyState
+          icon={UserPlus}
+          title="No se encontraron miembros"
+          subtitle={searchTerm ? 'Intentá con otro término de búsqueda.' : 'Todavía no hay miembros que mostrar en el ministerio.'}
+          annotation={searchTerm ? 'Probá otro nombre' : 'Sumá al primero'}
+        />
       )}
 
       {/* Add/Edit Modal */}
@@ -880,7 +885,7 @@ export const Miembros = () => {
           {!editingMember && (
             <div className="p-4 bg-neutral-800/30 rounded-xl border border-neutral-800">
               <div className="flex items-center gap-2 mb-3">
-                <Key size={18} className="text-purple-400" />
+                <Key size={18} className="text-gold-300" />
                 <label className="text-sm font-medium">Credenciales de Acceso</label>
               </div>
               <Input
@@ -909,7 +914,7 @@ export const Miembros = () => {
                   className={`
                     p-4 rounded-xl text-left transition-all border-2
                     ${formData.role === role.id
-                      ? 'border-white bg-white/10'
+                      ? 'border-gold-500 bg-gold-500/10'
                       : 'border-neutral-800 hover:border-neutral-700'
                     }
                   `}
@@ -924,11 +929,11 @@ export const Miembros = () => {
 
           {/* Editor Permission Switch - Only visible to pastors when editing/creating members */}
           {isPastor && formData.role === 'member' && (
-            <div className="p-4 bg-purple-500/10 border border-purple-500/30 rounded-xl">
+            <div className="p-4 bg-gold-500/10 border border-gold-500/30 rounded-xl">
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-3">
-                  <div className="w-10 h-10 rounded-lg bg-purple-500/20 flex items-center justify-center">
-                    <Edit size={20} className="text-purple-400" />
+                  <div className="w-10 h-10 rounded-lg bg-gold-gradient-soft ring-1 ring-gold-500/40 flex items-center justify-center">
+                    <Edit size={20} className="text-gold-100" />
                   </div>
                   <div>
                     <p className="font-medium text-white">Permiso de Editor</p>
@@ -940,7 +945,7 @@ export const Miembros = () => {
                   onClick={() => setFormData(prev => ({ ...prev, editor: !prev.editor }))}
                   className={`
                     relative w-14 h-8 rounded-full transition-colors duration-200
-                    ${formData.editor ? 'bg-purple-500' : 'bg-neutral-700'}
+                    ${formData.editor ? 'bg-gold-gradient' : 'bg-neutral-700'}
                   `}
                 >
                   <span
@@ -967,7 +972,7 @@ export const Miembros = () => {
                   className={`
                     p-3 rounded-xl text-sm transition-all border-2
                     ${formData.instruments.includes(inst)
-                      ? 'border-white bg-white/10'
+                      ? 'border-gold-500 bg-gold-500/10'
                       : 'border-neutral-800 hover:border-neutral-700'
                     }
                   `}
@@ -1011,7 +1016,7 @@ export const Miembros = () => {
               </div>
             </div>
             <div className="flex items-center gap-3">
-              <Key size={18} className="text-purple-400" />
+              <Key size={18} className="text-gold-300" />
               <div className="flex-1">
                 <p className="text-xs text-gray-400">Contraseña</p>
                 <p className="font-medium font-mono bg-neutral-900 px-3 py-2 rounded-lg">
@@ -1081,7 +1086,7 @@ export const Miembros = () => {
               placeholder="Ingresá la nueva contraseña"
               value={newPassword}
               onChange={(e) => setNewPassword(e.target.value)}
-              className="w-full px-4 py-3 bg-neutral-900 border border-neutral-800 rounded-xl focus:outline-none focus:ring-2 focus:ring-white/40 focus:border-purple-500 transition-colors"
+              className="w-full px-4 py-3 bg-neutral-900 border border-neutral-800 rounded-xl focus:outline-none focus:ring-2 focus:ring-gold-500/40 focus:border-gold-500 transition-colors"
             />
           </div>
 

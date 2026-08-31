@@ -97,16 +97,16 @@ export const PrepBanner = ({ member, todayART }) => {
   return (
     <Link
       to={`/practica/${activeOrder.id}`}
-      className="block rounded-2xl p-5 border border-neutral-800 bg-gradient-to-br from-indigo-950/50 via-neutral-900 to-purple-950/30 hover:border-indigo-700/60 transition-colors"
+      className="block rounded-2xl p-5 border border-gold-500/25 bg-gradient-to-br from-gold-600/[0.28] via-neutral-900 to-gold-300/[0.10] hover:border-gold-500/50 transition-colors"
     >
       <div className="flex items-start gap-4">
-        <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-indigo-500/15 text-indigo-300">
+        <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-gold-500/15 ring-1 ring-gold-500/25 text-gold-300">
           <Music2 size={22} />
         </div>
         <div className="min-w-0 flex-1">
           <div className="flex items-center justify-between gap-3">
             <p className="text-sm font-semibold text-white">Tu preparación</p>
-            <span className={`text-sm font-bold tabular-nums ${ready ? 'text-green-300' : 'text-indigo-200'}`}>{percent}%</span>
+            <span className={`text-sm font-bold tabular-nums ${ready ? 'text-green-300' : 'text-gold-200'}`}>{percent}%</span>
           </div>
           <p className="text-xs text-gray-500 mt-0.5 truncate">
             {band?.name ? `${band.name} · ` : ''}orden del {fmtDate(activeOrder.date)}
@@ -115,7 +115,7 @@ export const PrepBanner = ({ member, todayART }) => {
           {/* Barra de progreso */}
           <div className="mt-2.5 h-2 w-full overflow-hidden rounded-full bg-neutral-700/50">
             <div
-              className={`h-full rounded-full ${ready ? 'bg-green-400' : 'bg-gradient-to-r from-indigo-500 to-violet-400'}`}
+              className={`h-full rounded-full ${ready ? 'bg-green-400' : 'bg-gradient-to-r from-gold-400 to-gold-600'}`}
               style={{ width: `${Math.max(4, Math.min(100, percent))}%` }}
             />
           </div>
@@ -141,12 +141,12 @@ export const PrepBanner = ({ member, todayART }) => {
           <div className="mt-3 flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-gray-400">
             {hasRehearsal && (
               <span className="inline-flex items-center gap-1.5">
-                <CalendarClock size={13} className="text-indigo-400" />
+                <CalendarClock size={13} className="text-gold-400" />
                 Ensamble: {fmtDate(activeOrder.rehearsalDate)}{activeOrder.rehearsalTime ? ` · ${activeOrder.rehearsalTime}` : ''}
               </span>
             )}
             <span className="inline-flex items-center gap-1.5">
-              <Clock size={13} className="text-purple-400" />
+              <Clock size={13} className="text-gold-400" />
               Servicio: {fmtDate(activeOrder.date)}{activeOrder.time ? ` · ${activeOrder.time}` : ''}
             </span>
           </div>

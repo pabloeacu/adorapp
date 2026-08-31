@@ -2,12 +2,18 @@ import React, { useState, useMemo, useEffect } from 'react';
 import { useSearchParams, Link } from 'react-router-dom';
 import { useDocumentTitle } from '../hooks/useDocumentTitle';
 import {
-  Plus, Calendar, Music, Clock, Copy, Activity,
+  Plus, Music, Clock, Copy, Activity,
   MessageSquare, Eye, Trash2, Search, Check, X,
   User, Zap, AlertCircle, ChevronDown, FileDown, History, Award,
   FileText, Printer, Copy as CopyIcon,
   Edit, CheckCircle, XCircle, RotateCcw, Target, ChevronRight
 } from 'lucide-react';
+import {
+  CalendarDots,
+  CalendarBlank,
+  MusicNotes as MusicNotesDuo,
+  MagnifyingGlass,
+} from '@phosphor-icons/react';
 // jspdf is loaded on demand inside generateOrderPDF / generateSongsPDF
 // (~140 KB; no need at first paint).
 import { useAppStore, MEETING_TYPES, MUSICAL_KEYS, transposeSongStructure } from '../stores/appStore';
@@ -19,6 +25,7 @@ import { Badge } from '../components/ui/Badge';
 import { Modal } from '../components/ui/Modal';
 import { Input } from '../components/ui/Input';
 import { ConfirmModal, SuccessModal, ErrorModal } from '../components/ui/ConfirmModal';
+import { EmptyState } from '../components/ui/EmptyState';
 import { OrderHistoryTimeline } from '../components/OrderHistoryTimeline';
 import { OrderCalendar } from '../components/OrderCalendar';
 import { RepertoireInsightsModal } from '../components/RepertoireInsightsModal';
@@ -57,7 +64,7 @@ function SortableSongRow({ id, children }) {
         aria-label="Mover canción"
         {...attributes}
         {...listeners}
-        className="px-2 cursor-grab active:cursor-grabbing text-gray-500 hover:text-gray-300 touch-none focus:outline-none focus:ring-2 focus:ring-white/40 rounded"
+        className="px-2 cursor-grab active:cursor-grabbing text-gray-500 hover:text-gray-300 touch-none focus:outline-none focus:ring-2 focus:ring-gold-500/40 rounded"
       >
         ⋮⋮
       </button>
@@ -972,7 +979,7 @@ export const Ordenes = () => {
               aria-selected={viewMode === 'list'}
               onClick={() => setViewMode('list')}
               className={`px-3 py-1.5 text-sm rounded-lg transition-colors ${
-                viewMode === 'list' ? 'bg-white/10 text-white' : 'text-gray-400 hover:text-white'
+                viewMode === 'list' ? 'bg-gold-500/15 text-gold-200 ring-1 ring-gold-500/30' : 'text-gray-400 hover:text-gold-200'
               }`}
             >
               Lista
@@ -983,7 +990,7 @@ export const Ordenes = () => {
               aria-selected={viewMode === 'calendar'}
               onClick={() => setViewMode('calendar')}
               className={`px-3 py-1.5 text-sm rounded-lg transition-colors ${
-                viewMode === 'calendar' ? 'bg-white/10 text-white' : 'text-gray-400 hover:text-white'
+                viewMode === 'calendar' ? 'bg-gold-500/15 text-gold-200 ring-1 ring-gold-500/30' : 'text-gray-400 hover:text-gold-200'
               }`}
             >
               Calendario
@@ -1061,12 +1068,12 @@ export const Ordenes = () => {
                   <div className={`w-14 h-14 rounded-xl flex items-center justify-center ${
                     order.status === 'completed' ? 'bg-green-500/20' :
                     order.status === 'cancelled' ? 'bg-red-500/20' :
-                    'bg-gradient-to-br from-blue-500 to-purple-500'
+                    'bg-gold-gradient-soft ring-1 ring-gold-500/40'
                   }`}>
-                    <Calendar size={24} className={
+                    <CalendarDots size={26} weight="duotone" className={
                       order.status === 'completed' ? 'text-green-400' :
                       order.status === 'cancelled' ? 'text-red-400' :
-                      'text-white'
+                      'text-gold-100'
                     } />
                   </div>
                   <div>
@@ -1177,15 +1184,20 @@ export const Ordenes = () => {
       )}
 
       {filteredOrders.length === 0 && viewMode === 'list' && (
-        <div className="text-center py-12">
-          <Calendar size={48} className="mx-auto text-gray-600 mb-4" />
-          <p className="text-gray-400">No hay órdenes {filterStatus !== 'all' ? 'con este filtro' : ''}</p>
+        <EmptyState
+          icon={CalendarBlank}
+          title={filterStatus !== 'all' ? 'No hay órdenes con este filtro' : 'Todavía no hay órdenes'}
+          subtitle={filterStatus !== 'all'
+            ? 'Probá cambiar el estado o la banda para ver otros órdenes.'
+            : 'Armá el primer orden del ministerio y empezá a planificar los encuentros.'}
+          annotation={(isPastor || isLeader) ? 'Creá el primero acá' : undefined}
+        >
           {(isPastor || isLeader) && (
-            <Button variant="secondary" icon={Plus} onClick={() => handleOpenModal()} className="mt-4">
+            <Button variant="secondary" icon={Plus} onClick={() => handleOpenModal()}>
               Crear primer orden
             </Button>
           )}
-        </div>
+        </EmptyState>
       )}
 
       {/* Create Order Modal */}
@@ -1276,7 +1288,7 @@ export const Ordenes = () => {
                   checked={formData.rehearsalEnabled}
                   onChange={() => setFormData({ ...formData, rehearsalEnabled: !formData.rehearsalEnabled })}
                 />
-                <span className="block w-[52px] h-8 rounded-full bg-neutral-700 transition-colors peer-checked:bg-green-500 peer-focus-visible:ring-2 peer-focus-visible:ring-white/40" />
+                <span className="block w-[52px] h-8 rounded-full bg-neutral-700 transition-colors peer-checked:bg-green-500 peer-focus-visible:ring-2 peer-focus-visible:ring-gold-500/40" />
                 <span className="pointer-events-none absolute top-[2px] left-[2px] h-7 w-7 rounded-full bg-white shadow transition-transform peer-checked:translate-x-5" />
               </label>
             </div>
@@ -1316,8 +1328,8 @@ export const Ordenes = () => {
 
             {/* Unused Songs Suggestion */}
             {showUnused && formData.bandId && (
-              <div className="mb-4 p-4 bg-purple-500/10 border border-purple-500/30 rounded-xl">
-                <div className="flex items-center gap-2 text-purple-400 text-sm mb-3">
+              <div className="mb-4 p-4 bg-gold-500/[0.06] border border-gold-500/30 rounded-xl">
+                <div className="flex items-center gap-2 text-gold-300 text-sm mb-3">
                   <Zap size={14} />
                   Canciones sin usar en las últimas 4 semanas
                 </div>
@@ -1331,11 +1343,17 @@ export const Ordenes = () => {
                       <Music size={14} />
                       {song.title}
                       <Badge size="sm" variant="primary">{song.key}</Badge>
-                      <span className="text-green-400">+</span>
+                      <span className="text-gold-300">+</span>
                     </button>
                   ))}
                   {unusedSongs.length === 0 && (
-                    <p className="text-gray-400 text-sm">No hay canciones sin usar</p>
+                    <EmptyState
+                      className="w-full !py-8"
+                      icon={MusicNotesDuo}
+                      title="Sin canciones para sugerir"
+                      subtitle="Esta banda usó todo su repertorio en las últimas 4 semanas."
+                      annotation="Buscala más abajo"
+                    />
                   )}
                 </div>
               </div>
@@ -1370,7 +1388,7 @@ export const Ordenes = () => {
                       <select
                         className={`bg-neutral-900 border rounded-lg px-2 py-1.5 text-sm w-40 ${
                           songRef._suggestedDirector
-                            ? 'border-purple-500/60'
+                            ? 'border-gold-500/60'
                             : 'border-neutral-700'
                         }`}
                         value={songRef.directorId || ''}
@@ -1394,7 +1412,7 @@ export const Ordenes = () => {
                       </select>
                       {songRef._suggestedDirector && (
                         <span
-                          className="absolute -top-1.5 -right-1.5 text-[9px] bg-purple-500 text-white rounded-full px-1.5 py-0.5 leading-none pointer-events-none"
+                          className="absolute -top-1.5 -right-1.5 text-[9px] bg-gold-gradient text-black rounded-full px-1.5 py-0.5 leading-none pointer-events-none"
                           aria-label="Sugerencia automática"
                         >
                           ★
@@ -1422,7 +1440,7 @@ export const Ordenes = () => {
                               ? 'text-green-400 hover:text-green-300'
                               : keyHistoryTooltip?.isFirstTime === true
                               ? 'text-yellow-400 hover:text-yellow-300'
-                              : 'text-gray-400 hover:text-purple-400'
+                              : 'text-gray-400 hover:text-gold-300'
                           }`}
                           title={keyHistoryTooltip?.found === true
                             ? `Tonalidad de ${keyHistoryTooltip.orderDate}`
@@ -1563,7 +1581,7 @@ export const Ordenes = () => {
                           className="w-full px-4 py-3 flex items-center justify-between hover:bg-neutral-700 transition-colors border-b border-neutral-800 last:border-0"
                         >
                           <div className="flex items-center gap-3">
-                            <Music size={16} className="text-purple-400" />
+                            <Music size={16} className="text-gold-300" />
                             <div className="text-left">
                               <p className="font-medium text-sm">{song.title}</p>
                               <p className="text-xs text-gray-400">{song.artist}</p>
@@ -1573,10 +1591,13 @@ export const Ordenes = () => {
                         </button>
                       ))
                     ) : (
-                      <div className="px-4 py-6 text-center text-gray-400 text-sm">
-                        <Music size={24} className="mx-auto mb-2 text-gray-600" />
-                        No se encontraron canciones
-                      </div>
+                      <EmptyState
+                        className="!py-8"
+                        icon={MagnifyingGlass}
+                        title="No se encontraron canciones"
+                        subtitle="Probá con otro nombre, artista o tonalidad."
+                        annotation="Revisá el repertorio"
+                      />
                     )}
                   </div>
                 )}
@@ -1637,18 +1658,18 @@ export const Ordenes = () => {
             {viewingOrder.status === 'scheduled' && (
               <Link
                 to={`/practica/${viewingOrder.id}`}
-                className="flex items-center gap-3 rounded-xl p-4 bg-gradient-to-r from-indigo-600/80 to-purple-600/80 text-white hover:brightness-110 transition-all"
+                className="flex items-center gap-3 rounded-xl p-4 bg-gold-gradient text-black shadow-lg hover:brightness-105 transition-all"
               >
-                <div className="p-2 rounded-lg bg-white/15 shrink-0">
-                  <Target size={22} />
+                <div className="p-2 rounded-lg bg-black/10 shrink-0">
+                  <Target size={22} className="text-black" />
                 </div>
                 <div className="flex-1 min-w-0">
                   <p className="font-semibold">Practicar este orden</p>
-                  <p className="text-sm text-white/80 truncate">
+                  <p className="text-sm text-black/80 truncate">
                     Tu ensayo personal: pasadas, letra, estructura y arreglos de cada canción
                   </p>
                 </div>
-                <ChevronRight size={20} className="shrink-0 text-white/70" />
+                <ChevronRight size={20} className="shrink-0 text-black/70" />
               </Link>
             )}
 
@@ -1692,7 +1713,7 @@ export const Ordenes = () => {
                   const director = getMemberById(songRef.directorId);
                   return (
                     <div key={index} className="flex items-center gap-4 p-3 bg-neutral-800/50 rounded-xl">
-                      <span className="w-8 h-8 rounded-full bg-purple-500/20 text-purple-400 flex items-center justify-center font-medium">
+                      <span className="w-8 h-8 rounded-full bg-gold-500/15 text-gold-300 flex items-center justify-center font-medium">
                         {index + 1}
                       </span>
                       <div className="flex-1">
@@ -1718,7 +1739,7 @@ export const Ordenes = () => {
                   Devolución del Pastor
                 </label>
                 <textarea
-                  className="w-full h-24 bg-neutral-800 border border-neutral-700 rounded-xl px-4 py-3 resize-none focus:outline-none focus:ring-2 focus:ring-white/40"
+                  className="w-full h-24 bg-neutral-800 border border-neutral-700 rounded-xl px-4 py-3 resize-none focus:outline-none focus:ring-2 focus:ring-gold-500/40"
                   placeholder="Agregar comentarios sobre la ejecución del servicio..."
                   value={viewingOrder.feedback || ''}
                   onChange={(e) => handleUpdateFeedback(viewingOrder.id, e.target.value)}

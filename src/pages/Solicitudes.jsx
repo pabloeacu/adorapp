@@ -2,9 +2,10 @@ import React, { useState, useMemo } from 'react';
 import { useDocumentTitle } from '../hooks/useDocumentTitle';
 import {
   Search, Mail, Phone, Shield,
-  Check, X, Filter, UserPlus, CheckCircle, XCircle,
+  Check, X, Filter, CheckCircle, XCircle,
   Cross, Clock, AlertTriangle
 } from 'lucide-react';
+import { UserPlus } from '@phosphor-icons/react';
 import { useAuthStore } from '../stores/authStore';
 import { PageLoader } from '../components/ui/PageLoader';
 import { useAppStore, MEMBER_ROLES } from '../stores/appStore';
@@ -12,6 +13,7 @@ import { supabase, callAdminFunction } from '../lib/supabase';
 import { Card } from '../components/ui/Card';
 import { Button } from '../components/ui/Button';
 import { Modal } from '../components/ui/Modal';
+import { EmptyState } from '../components/ui/EmptyState';
 import { ConfirmModal, SuccessModal, ErrorModal } from '../components/ui/ConfirmModal';
 
 // Helper to format dates WITHOUT timezone shift
@@ -240,7 +242,7 @@ export const Solicitudes = () => {
           <div className="flex bg-neutral-900 rounded-lg p-1 border border-neutral-800">
             <button
               onClick={() => setViewMode('cards')}
-              className={`p-2 rounded-md transition-colors ${viewMode === 'cards' ? 'bg-white text-black' : 'hover:bg-neutral-800 text-gray-400'}`}
+              className={`p-2 rounded-md transition-colors ${viewMode === 'cards' ? 'bg-gold-gradient text-black' : 'hover:bg-neutral-800 text-gray-400'}`}
               title="Vista de tarjetas"
             >
               <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -249,7 +251,7 @@ export const Solicitudes = () => {
             </button>
             <button
               onClick={() => setViewMode('table')}
-              className={`p-2 rounded-md transition-colors ${viewMode === 'table' ? 'bg-white text-black' : 'hover:bg-neutral-800 text-gray-400'}`}
+              className={`p-2 rounded-md transition-colors ${viewMode === 'table' ? 'bg-gold-gradient text-black' : 'hover:bg-neutral-800 text-gray-400'}`}
               title="Vista de lista"
             >
               <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -270,7 +272,7 @@ export const Solicitudes = () => {
               placeholder="Buscar por nombre o email..."
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
-              className="w-full pl-12 pr-4 py-3 bg-neutral-900 border border-neutral-800 rounded-xl focus:outline-none focus:ring-2 focus:ring-white/40 focus:border-white transition-colors"
+              className="w-full pl-12 pr-4 py-3 bg-neutral-900 border border-neutral-800 rounded-xl focus:outline-none focus:ring-2 focus:ring-gold-500/40 focus:border-gold-500 transition-colors"
             />
           </div>
           <Button
@@ -291,7 +293,7 @@ export const Solicitudes = () => {
                   key={key}
                   onClick={() => setFilterStatus(key)}
                   className={`px-4 py-2 rounded-lg text-sm transition-all ${filterStatus === key
-                    ? 'bg-white text-black'
+                    ? 'bg-gold-gradient text-black'
                     : 'bg-neutral-800 hover:bg-neutral-700'
                     }`}
                 >
@@ -307,16 +309,16 @@ export const Solicitudes = () => {
       {loading ? (
         <PageLoader label="Cargando solicitudes…" />
       ) : filteredRequests.length === 0 ? (
-        <div className="text-center py-12">
-          <UserPlus size={48} className="mx-auto text-gray-600 mb-4" />
-          <p className="text-gray-400">No se encontraron solicitudes</p>
-          <p className="text-sm text-gray-500 mt-1">
-            {searchTerm || filterStatus !== 'pending'
+        <EmptyState
+          icon={UserPlus}
+          title="No se encontraron solicitudes"
+          subtitle={
+            searchTerm || filterStatus !== 'pending'
               ? 'Intenta con otros filtros'
               : 'Las nuevas solicitudes aparecerán aquí'
-            }
-          </p>
-        </div>
+          }
+          annotation="Acá aparecen las nuevas"
+        />
       ) : viewMode === 'cards' ? (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
           {filteredRequests.map((request) => (
@@ -540,8 +542,8 @@ export const Solicitudes = () => {
                   className={`
                     p-4 rounded-xl text-left transition-all border-2
                     ${selectedRole === role.id
-                      ? 'border-white bg-white/10'
-                      : 'border-neutral-800 hover:border-neutral-700'
+                      ? 'border-gold-500 bg-gold-500/10'
+                      : 'border-neutral-800 hover:border-gold-500/40'
                     }
                   `}
                 >
@@ -562,7 +564,7 @@ export const Solicitudes = () => {
                 type="text"
                 value={generatedPassword}
                 onChange={(e) => setGeneratedPassword(e.target.value)}
-                className="flex-1 px-4 py-3 bg-neutral-900 border border-neutral-800 rounded-xl font-mono focus:outline-none focus:ring-2 focus:ring-white/40 focus:border-white transition-colors"
+                className="flex-1 px-4 py-3 bg-neutral-900 border border-neutral-800 rounded-xl font-mono focus:outline-none focus:ring-2 focus:ring-gold-500/40 focus:border-gold-500 transition-colors"
                 placeholder="Mínimo 6 caracteres"
                 minLength={6}
               />
@@ -579,7 +581,7 @@ export const Solicitudes = () => {
             </p>
           </div>
 
-          <div className="p-3 bg-blue-500/10 border border-blue-500/30 rounded-lg text-sm text-blue-300">
+          <div className="p-3 bg-gold-500/10 border border-gold-500/30 rounded-lg text-sm text-gold-200">
             Al aprobar se crea un usuario en el sistema con esta contraseña inicial. El miembro la podrá cambiar después.
           </div>
         </div>

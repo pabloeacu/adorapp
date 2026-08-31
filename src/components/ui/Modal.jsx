@@ -139,7 +139,7 @@ export const Modal = ({
           <button
             onClick={onClose}
             aria-label="Cerrar"
-            className="shrink-0 flex items-center gap-1 px-3 py-2 rounded-lg hover:bg-neutral-800 transition-colors text-gray-400 focus:outline-none focus:ring-2 focus:ring-white/40"
+            className="shrink-0 flex items-center gap-1 px-3 py-2 rounded-lg hover:bg-neutral-800 transition-colors text-gray-400 focus:outline-none focus:ring-2 focus:ring-gold-500/40"
           >
             <X size={20} />
             <span className="text-sm font-medium lg:hidden">Cerrar</span>

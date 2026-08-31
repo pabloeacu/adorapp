@@ -149,9 +149,9 @@ export const ServiceFeedbackPrompt = ({ member, role }) => {
   // status === 'prompt'
   return (
     <>
-      <div className="rounded-2xl p-5 border border-neutral-800 bg-gradient-to-br from-purple-950/40 via-neutral-900 to-indigo-950/30">
+      <div className="rounded-2xl p-5 border border-gold-500/25 bg-gradient-to-br from-gold-600/[0.28] via-neutral-900 to-gold-300/[0.10]">
         <div className="flex items-start gap-4">
-          <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-purple-500/15 text-purple-300">
+          <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-gold-500/15 ring-1 ring-gold-500/25 text-gold-300">
             <MessageSquare size={22} />
           </div>
           <div className="min-w-0 flex-1">
@@ -163,7 +163,7 @@ export const ServiceFeedbackPrompt = ({ member, role }) => {
             <div className="mt-3 flex flex-wrap items-center gap-2">
               <button
                 onClick={() => { setError(''); setModalOpen(true); }}
-                className="inline-flex items-center gap-1.5 rounded-lg bg-purple-600 hover:bg-purple-500 px-3.5 py-2 text-sm font-medium text-white transition-colors"
+                className="inline-flex items-center gap-1.5 rounded-lg bg-gold-gradient hover:brightness-110px-3.5 py-2 text-sm font-semibold text-black transition-colors"
               >
                 <MessageSquare size={15} /> Dar mi feedback
               </button>
@@ -204,7 +204,7 @@ export const ServiceFeedbackPrompt = ({ member, role }) => {
               <button
                 onClick={handleSend}
                 disabled={!hasContent || sending}
-                className="inline-flex items-center gap-1.5 rounded-lg bg-purple-600 hover:bg-purple-500 px-4 py-2 text-sm font-medium text-white transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+                className="inline-flex items-center gap-1.5 rounded-lg bg-gold-gradient hover:brightness-110px-4 py-2 text-sm font-semibold text-black transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
               >
                 <Send size={15} /> {sending ? 'Enviando…' : 'Enviar a la banda'}
               </button>
@@ -235,7 +235,7 @@ export const ServiceFeedbackPrompt = ({ member, role }) => {
           />
           <FeedbackField
             label="Reflexión final"
-            accent="text-purple-300"
+            accent="text-gold-300"
             value={form.reflexion}
             onChange={(v) => setForm((f) => ({ ...f, reflexion: v }))}
             placeholder="Una palabra de aliento, una lectura del momento, gratitud…"
@@ -256,7 +256,7 @@ const FeedbackField = ({ label, accent, value, onChange, placeholder }) => (
       onChange={(e) => onChange(e.target.value.slice(0, MAXLEN))}
       placeholder={placeholder}
       rows={3}
-      className="w-full rounded-lg bg-neutral-800/60 border border-neutral-700 focus:border-purple-500 focus:ring-1 focus:ring-purple-500 px-3 py-2 text-sm text-gray-100 placeholder-gray-500 outline-none resize-y"
+      className="w-full rounded-lg bg-neutral-800/60 border border-neutral-700 focus:border-gold-500 focus:ring-1 focus:ring-gold-500 px-3 py-2 text-sm text-gray-100 placeholder-gray-500 outline-none resize-y"
     />
   </div>
 );

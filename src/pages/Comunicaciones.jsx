@@ -2,12 +2,14 @@
 // Communications Page - Send messages to members
 import React, { useState, useMemo, useEffect, useCallback, useRef } from 'react';
 import { useDocumentTitle } from '../hooks/useDocumentTitle';
-import { Send, Users, X, Check, Loader2, AlertCircle, Mail, FileText, ChevronLeft, Save, Bell, Bold, Italic, Underline, Smile } from 'lucide-react';
+import { Send, X, Check, Loader2, AlertCircle, Mail, ChevronLeft, Save, Bell, Bold, Italic, Underline, Smile } from 'lucide-react';
+import { EnvelopeSimple, MicrophoneStage, UsersThree, IdentificationBadge, UsersFour } from '@phosphor-icons/react';
 import { useAuthStore } from '../stores/authStore';
 import { useAppStore } from '../stores/appStore';
 import { callAdminFunction, supabase } from '../lib/supabase';
 import { Card } from '../components/ui/Card';
 import { Button } from '../components/ui/Button';
+import { EmptyState } from '../components/ui/EmptyState';
 
 // Variables que cada plantilla de correo rellena en el momento del envío. Se
 // muestran como ayuda; el pastor edita la COPIA, no las variables ni las URLs
@@ -422,16 +424,16 @@ export const Comunicaciones = () => {
       <div className="flex gap-2 mb-6 p-1 bg-neutral-800/60 rounded-xl w-full max-w-sm">
         <button
           onClick={() => setView('enviar')}
-          className={`flex-1 flex items-center justify-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
-            view === 'enviar' ? 'bg-neutral-700 text-white' : 'text-gray-400 hover:text-white'
+          className={`flex-1 flex items-center justify-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-all ${
+            view === 'enviar' ? 'bg-gold-gradient text-black shadow-[0_2px_14px_-3px_rgba(212,175,55,0.45)]' : 'text-gray-400 hover:text-gold-200'
           }`}
         >
           <Send size={16} /> Enviar
         </button>
         <button
           onClick={() => setView('plantillas')}
-          className={`flex-1 flex items-center justify-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
-            view === 'plantillas' ? 'bg-neutral-700 text-white' : 'text-gray-400 hover:text-white'
+          className={`flex-1 flex items-center justify-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-all ${
+            view === 'plantillas' ? 'bg-gold-gradient text-black shadow-[0_2px_14px_-3px_rgba(212,175,55,0.45)]' : 'text-gray-400 hover:text-gold-200'
           }`}
         >
           <Mail size={16} /> Plantillas de correo
@@ -455,11 +457,11 @@ export const Comunicaciones = () => {
                 }}
                 className={`p-4 rounded-xl border-2 transition-all text-left ${
                   recipientType === 'bands'
-                    ? 'border-blue-500 bg-blue-500/10'
-                    : 'border-neutral-700 hover:border-neutral-600'
+                    ? 'border-gold-500 bg-gold-500/10'
+                    : 'border-neutral-700 hover:border-gold-500/40'
                 }`}
               >
-                <Users size={24} className={recipientType === 'bands' ? 'text-blue-400' : 'text-gray-400'} />
+                <MicrophoneStage size={24} weight="duotone" className={recipientType === 'bands' ? 'text-gold-100' : 'text-gray-500'} />
                 <p className="font-medium text-white mt-2">Bandas</p>
                 <p className="text-xs text-gray-400 mt-1">
                   {selectedBands.length > 0
@@ -476,11 +478,11 @@ export const Comunicaciones = () => {
                 }}
                 className={`p-4 rounded-xl border-2 transition-all text-left ${
                   recipientType === 'users'
-                    ? 'border-blue-500 bg-blue-500/10'
-                    : 'border-neutral-700 hover:border-neutral-600'
+                    ? 'border-gold-500 bg-gold-500/10'
+                    : 'border-neutral-700 hover:border-gold-500/40'
                 }`}
               >
-                <Users size={24} className={recipientType === 'users' ? 'text-blue-400' : 'text-gray-400'} />
+                <UsersThree size={24} weight="duotone" className={recipientType === 'users' ? 'text-gold-100' : 'text-gray-500'} />
                 <p className="font-medium text-white mt-2">Usuarios</p>
                 <p className="text-xs text-gray-400 mt-1">
                   {selectedUsers.length > 0
@@ -499,11 +501,11 @@ export const Comunicaciones = () => {
                 }}
                 className={`p-4 rounded-xl border-2 transition-all text-left ${
                   recipientType === 'roles'
-                    ? 'border-blue-500 bg-blue-500/10'
-                    : 'border-neutral-700 hover:border-neutral-600'
+                    ? 'border-gold-500 bg-gold-500/10'
+                    : 'border-neutral-700 hover:border-gold-500/40'
                 }`}
               >
-                <Users size={24} className={recipientType === 'roles' ? 'text-blue-400' : 'text-gray-400'} />
+                <IdentificationBadge size={24} weight="duotone" className={recipientType === 'roles' ? 'text-gold-100' : 'text-gray-500'} />
                 <p className="font-medium text-white mt-2">Por Rol</p>
                 <p className="text-xs text-gray-400 mt-1">
                   Pastores, líderes o miembros
@@ -515,11 +517,11 @@ export const Comunicaciones = () => {
                 onClick={() => setRecipientType('all')}
                 className={`p-4 rounded-xl border-2 transition-all text-left ${
                   recipientType === 'all'
-                    ? 'border-blue-500 bg-blue-500/10'
-                    : 'border-neutral-700 hover:border-neutral-600'
+                    ? 'border-gold-500 bg-gold-500/10'
+                    : 'border-neutral-700 hover:border-gold-500/40'
                 }`}
               >
-                <Users size={24} className={recipientType === 'all' ? 'text-blue-400' : 'text-gray-400'} />
+                <UsersFour size={24} weight="duotone" className={recipientType === 'all' ? 'text-gold-100' : 'text-gray-500'} />
                 <p className="font-medium text-white mt-2">Todos</p>
                 <p className="text-xs text-gray-400 mt-1">
                   {membersWithAccounts.length} miembro(s) con cuenta
@@ -545,7 +547,7 @@ export const Comunicaciones = () => {
                     }}
                     className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
                       selectedRoles.includes(role)
-                        ? 'bg-blue-500 text-white'
+                        ? 'bg-gold-gradient text-black font-semibold'
                         : 'bg-neutral-700 text-gray-300 hover:bg-neutral-600'
                     }`}
                   >
@@ -566,7 +568,7 @@ export const Comunicaciones = () => {
               value={subject}
               onChange={(e) => setSubject(e.target.value)}
               placeholder="Ej: Reunión de líderes este sábado"
-              className="w-full px-4 py-3 bg-neutral-800 border border-neutral-700 rounded-xl text-white focus:outline-none focus:ring-2 focus:ring-white/40 focus:border-blue-500 transition-colors"
+              className="w-full px-4 py-3 bg-neutral-800 border border-neutral-700 rounded-xl text-white focus:outline-none focus:ring-2 focus:ring-gold-500/40 focus:border-gold-500 transition-colors"
               maxLength={100}
             />
           </div>
@@ -578,7 +580,7 @@ export const Comunicaciones = () => {
             <label className="block text-sm font-medium text-gray-300 mb-2">
               Mensaje *
             </label>
-            <div className="rounded-xl border border-neutral-700 bg-neutral-800 focus-within:ring-2 focus-within:ring-white/40 transition-colors overflow-hidden">
+            <div className="rounded-xl border border-neutral-700 bg-neutral-800 focus-within:ring-2 focus-within:ring-gold-500/40 transition-colors overflow-hidden">
               {/* Barra de formato */}
               <div className="relative flex items-center gap-1 px-2 py-1.5 border-b border-neutral-700/70 bg-neutral-900/40">
                 <button
@@ -588,7 +590,7 @@ export const Comunicaciones = () => {
                   aria-pressed={fmtState.bold}
                   onMouseDown={(e) => e.preventDefault()}
                   onClick={() => applyFormat('bold')}
-                  className={`p-2 rounded-lg transition-colors ${fmtState.bold ? 'bg-indigo-500/25 text-indigo-200' : 'text-gray-400 hover:text-white hover:bg-neutral-700/60'}`}
+                  className={`p-2 rounded-lg transition-colors ${fmtState.bold ? 'bg-gold-500/20 text-gold-200' : 'text-gray-400 hover:text-white hover:bg-neutral-700/60'}`}
                 >
                   <Bold size={16} />
                 </button>
@@ -599,7 +601,7 @@ export const Comunicaciones = () => {
                   aria-pressed={fmtState.italic}
                   onMouseDown={(e) => e.preventDefault()}
                   onClick={() => applyFormat('italic')}
-                  className={`p-2 rounded-lg transition-colors ${fmtState.italic ? 'bg-indigo-500/25 text-indigo-200' : 'text-gray-400 hover:text-white hover:bg-neutral-700/60'}`}
+                  className={`p-2 rounded-lg transition-colors ${fmtState.italic ? 'bg-gold-500/20 text-gold-200' : 'text-gray-400 hover:text-white hover:bg-neutral-700/60'}`}
                 >
                   <Italic size={16} />
                 </button>
@@ -610,7 +612,7 @@ export const Comunicaciones = () => {
                   aria-pressed={fmtState.underline}
                   onMouseDown={(e) => e.preventDefault()}
                   onClick={() => applyFormat('underline')}
-                  className={`p-2 rounded-lg transition-colors ${fmtState.underline ? 'bg-indigo-500/25 text-indigo-200' : 'text-gray-400 hover:text-white hover:bg-neutral-700/60'}`}
+                  className={`p-2 rounded-lg transition-colors ${fmtState.underline ? 'bg-gold-500/20 text-gold-200' : 'text-gray-400 hover:text-white hover:bg-neutral-700/60'}`}
                 >
                   <Underline size={16} />
                 </button>
@@ -623,7 +625,7 @@ export const Comunicaciones = () => {
                   aria-pressed={showEmojiPicker}
                   onMouseDown={(e) => e.preventDefault()}
                   onClick={() => setShowEmojiPicker(v => !v)}
-                  className={`p-2 rounded-lg transition-colors ${showEmojiPicker ? 'bg-indigo-500/25 text-indigo-200' : 'text-gray-400 hover:text-white hover:bg-neutral-700/60'}`}
+                  className={`p-2 rounded-lg transition-colors ${showEmojiPicker ? 'bg-gold-500/20 text-gold-200' : 'text-gray-400 hover:text-white hover:bg-neutral-700/60'}`}
                 >
                   <Smile size={16} />
                 </button>
@@ -681,29 +683,29 @@ export const Comunicaciones = () => {
                 type="button"
                 onClick={() => setChannels(c => ({ ...c, push: !c.push }))}
                 className={`flex items-center gap-3 p-4 rounded-xl border transition-colors ${
-                  channels.push ? 'border-indigo-500 bg-indigo-500/10' : 'border-neutral-700 bg-neutral-800/40 hover:border-neutral-600'
+                  channels.push ? 'border-gold-500 bg-gold-500/10' : 'border-neutral-700 bg-neutral-800/40 hover:border-neutral-600'
                 }`}
               >
-                <Bell size={20} className={channels.push ? 'text-indigo-300' : 'text-gray-400'} />
+                <Bell size={20} className={channels.push ? 'text-gold-300' : 'text-gray-400'} />
                 <div className="text-left min-w-0">
                   <p className={`text-sm font-medium ${channels.push ? 'text-white' : 'text-gray-300'}`}>Campanita</p>
                   <p className="text-xs text-gray-500">Aviso dentro de la app</p>
                 </div>
-                {channels.push && <Check size={16} className="text-indigo-300 ml-auto shrink-0" />}
+                {channels.push && <Check size={16} className="text-gold-300 ml-auto shrink-0" />}
               </button>
               <button
                 type="button"
                 onClick={() => setChannels(c => ({ ...c, mail: !c.mail }))}
                 className={`flex items-center gap-3 p-4 rounded-xl border transition-colors ${
-                  channels.mail ? 'border-indigo-500 bg-indigo-500/10' : 'border-neutral-700 bg-neutral-800/40 hover:border-neutral-600'
+                  channels.mail ? 'border-gold-500 bg-gold-500/10' : 'border-neutral-700 bg-neutral-800/40 hover:border-neutral-600'
                 }`}
               >
-                <Mail size={20} className={channels.mail ? 'text-indigo-300' : 'text-gray-400'} />
+                <Mail size={20} className={channels.mail ? 'text-gold-300' : 'text-gray-400'} />
                 <div className="text-left min-w-0">
                   <p className={`text-sm font-medium ${channels.mail ? 'text-white' : 'text-gray-300'}`}>Correo</p>
                   <p className="text-xs text-gray-500">Email con el formato de AdorAPP</p>
                 </div>
-                {channels.mail && <Check size={16} className="text-indigo-300 ml-auto shrink-0" />}
+                {channels.mail && <Check size={16} className="text-gold-300 ml-auto shrink-0" />}
               </button>
             </div>
           </div>
@@ -784,7 +786,7 @@ export const Comunicaciones = () => {
                 <p className="text-xs text-gray-500 mt-1">
                   Variables disponibles:{' '}
                   {(TEMPLATE_VARS[editingTpl.slug] || []).map(v => (
-                    <code key={v} className="text-indigo-300 bg-indigo-500/10 rounded px-1 mx-0.5">{`{{${v}}}`}</code>
+                    <code key={v} className="text-gold-300 bg-gold-500/10 rounded px-1 mx-0.5">{`{{${v}}}`}</code>
                   ))}
                 </p>
               </div>
@@ -797,14 +799,14 @@ export const Comunicaciones = () => {
                       value={editingTpl[f.key] || ''}
                       onChange={(e) => setEditingTpl(t => ({ ...t, [f.key]: e.target.value }))}
                       rows={5}
-                      className="w-full px-4 py-3 bg-neutral-800 border border-neutral-700 rounded-xl text-white focus:outline-none focus:ring-2 focus:ring-white/40 transition-colors resize-y"
+                      className="w-full px-4 py-3 bg-neutral-800 border border-neutral-700 rounded-xl text-white focus:outline-none focus:ring-2 focus:ring-gold-500/40 transition-colors resize-y"
                     />
                   ) : (
                     <input
                       type="text"
                       value={editingTpl[f.key] || ''}
                       onChange={(e) => setEditingTpl(t => ({ ...t, [f.key]: e.target.value }))}
-                      className="w-full px-4 py-3 bg-neutral-800 border border-neutral-700 rounded-xl text-white focus:outline-none focus:ring-2 focus:ring-white/40 transition-colors"
+                      className="w-full px-4 py-3 bg-neutral-800 border border-neutral-700 rounded-xl text-white focus:outline-none focus:ring-2 focus:ring-gold-500/40 transition-colors"
                     />
                   )}
                   {f.hint && <p className="text-xs text-gray-500 mt-1">{f.hint}</p>}
@@ -816,7 +818,7 @@ export const Comunicaciones = () => {
                   type="checkbox"
                   checked={!!editingTpl.activo}
                   onChange={(e) => setEditingTpl(t => ({ ...t, activo: e.target.checked }))}
-                  className="w-4 h-4 accent-indigo-500"
+                  className="w-4 h-4 accent-gold-500"
                 />
                 <span className="text-sm text-gray-300">Plantilla activa (si la desactivás, ese correo no se envía)</span>
               </label>
@@ -835,7 +837,7 @@ export const Comunicaciones = () => {
               </p>
               {templates.map(t => (
                 <div key={t.slug} className="flex items-center gap-3 p-4 bg-neutral-800/60 rounded-xl">
-                  <FileText size={20} className="text-indigo-400 shrink-0" />
+                  <EnvelopeSimple size={20} weight="duotone" className="text-gold-300 shrink-0" />
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center gap-2">
                       <p className="text-white font-medium truncate">{t.descripcion}</p>
@@ -852,7 +854,12 @@ export const Comunicaciones = () => {
                 </div>
               ))}
               {templates.length === 0 && (
-                <p className="text-center text-gray-500 py-8">No hay plantillas.</p>
+                <EmptyState
+                  icon={EnvelopeSimple}
+                  title="No hay plantillas"
+                  subtitle="Todavía no hay plantillas de correo para editar."
+                  annotation="Actualizá para verlas"
+                />
               )}
             </div>
           )}
@@ -886,17 +893,17 @@ export const Comunicaciones = () => {
                     onClick={() => toggleBand(band.id)}
                     className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl transition-colors ${
                       selectedBands.includes(band.id)
-                        ? 'bg-blue-500/20 border-2 border-blue-500'
+                        ? 'bg-gold-500/15 border-2 border-gold-500'
                         : 'bg-neutral-800 hover:bg-neutral-700 border-2 border-transparent'
                     }`}
                   >
                     <div className={`w-5 h-5 rounded border-2 flex items-center justify-center ${
                       selectedBands.includes(band.id)
-                        ? 'bg-blue-500 border-blue-500'
+                        ? 'bg-gold-500 border-gold-500'
                         : 'border-neutral-600'
                     }`}>
                       {selectedBands.includes(band.id) && (
-                        <Check size={14} className="text-white" />
+                        <Check size={14} className="text-black" />
                       )}
                     </div>
                     <div className="flex-1 text-left">
@@ -908,9 +915,12 @@ export const Comunicaciones = () => {
                   </button>
                 ))}
                 {activeBands.length === 0 && (
-                  <p className="text-center text-gray-500 py-8">
-                    No hay bandas activas
-                  </p>
+                  <EmptyState
+                    icon={MicrophoneStage}
+                    title="No hay bandas activas"
+                    subtitle="Cuando actives una banda, va a aparecer acá para elegir."
+                    annotation="Creá una banda primero"
+                  />
                 )}
               </div>
             </div>
@@ -957,17 +967,17 @@ export const Comunicaciones = () => {
                     }}
                     className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl transition-colors ${
                       selectedUsers.includes(member.userId)
-                        ? 'bg-blue-500/20 border-2 border-blue-500'
+                        ? 'bg-gold-500/15 border-2 border-gold-500'
                         : 'bg-neutral-800 hover:bg-neutral-700 border-2 border-transparent'
                     }`}
                   >
                     <div className={`w-5 h-5 rounded border-2 flex items-center justify-center ${
                       selectedUsers.includes(member.userId)
-                        ? 'bg-blue-500 border-blue-500'
+                        ? 'bg-gold-500 border-gold-500'
                         : 'border-neutral-600'
                     }`}>
                       {selectedUsers.includes(member.userId) && (
-                        <Check size={14} className="text-white" />
+                        <Check size={14} className="text-black" />
                       )}
                     </div>
                     <div className="flex-1 text-left">
@@ -979,9 +989,12 @@ export const Comunicaciones = () => {
                   </button>
                 ))}
                 {membersWithAccounts.length === 0 && (
-                  <p className="text-center text-gray-500 py-8">
-                    No hay miembros con cuentas de usuario
-                  </p>
+                  <EmptyState
+                    icon={UsersThree}
+                    title="Sin usuarios con cuenta"
+                    subtitle="Ningún miembro activo tiene cuenta de usuario todavía."
+                    annotation="Invitá miembros primero"
+                  />
                 )}
               </div>
             </div>

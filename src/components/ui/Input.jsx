@@ -27,7 +27,7 @@ export const Input = ({
       {label && (
         <label
           htmlFor={inputId}
-          className="text-xs text-gray-400 font-medium uppercase tracking-wide"
+          className="text-xs text-gold-300/70 font-medium uppercase tracking-wide"
         >
           {label}
         </label>

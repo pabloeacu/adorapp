@@ -1,15 +1,18 @@
 import React, { useState } from 'react';
 import { useDocumentTitle } from '../hooks/useDocumentTitle';
 import {
-  Plus, Users, Calendar, Clock, Edit, Trash2,
+  Plus, Calendar, Clock, Edit, Trash2,
   Check, ChevronDown, AlertTriangle
 } from 'lucide-react';
+import { MicrophoneStage, UsersThree } from '@phosphor-icons/react';
 import { useAppStore, MEETING_TYPES } from '../stores/appStore';
 import { useCurrentRole } from '../hooks/useCurrentMember';
 import { Card } from '../components/ui/Card';
 import { Button } from '../components/ui/Button';
 import { Badge } from '../components/ui/Badge';
 import { Avatar } from '../components/ui/Avatar';
+import { IconBadge } from '../components/ui/IconBadge';
+import { EmptyState } from '../components/ui/EmptyState';
 import { Modal } from '../components/ui/Modal';
 import { Input } from '../components/ui/Input';
 import { ConfirmModal, SuccessModal, ErrorModal } from '../components/ui/ConfirmModal';
@@ -179,15 +182,15 @@ export const Bandas = () => {
           const isExpanded = expandedBand === band.id;
 
           return (
-            <Card key={band.id} className="overflow-hidden">
+            <Card key={band.id} className="relative overflow-hidden">
+              {/* barra de acento dorada a la izquierda */}
+              <div className="bg-gold-gradient absolute inset-y-0 left-0 w-1" />
               <div
                 className="flex flex-wrap items-center justify-between gap-3 p-4 cursor-pointer hover:bg-neutral-800/30 transition-colors"
                 onClick={() => setExpandedBand(isExpanded ? null : band.id)}
               >
                 <div className="flex items-center gap-4 min-w-0">
-                  <div className="w-14 h-14 rounded-xl bg-gradient-to-br from-purple-500 to-pink-500 flex items-center justify-center">
-                    <Users size={24} className="text-white" />
-                  </div>
+                  <IconBadge icon={MicrophoneStage} size="md" />
                   <div>
                     <h3 className="text-lg font-semibold">{band.name}</h3>
                     <div className="flex flex-wrap items-center gap-3 text-sm text-gray-400 mt-1">
@@ -199,7 +202,7 @@ export const Bandas = () => {
                         <Clock size={14} />
                         {band.meetingTime}
                       </span>
-                      <Badge variant="primary" size="sm">
+                      <Badge variant="gold" size="sm">
                         {getMeetingTypeLabel(band.meetingType)}
                       </Badge>
                     </div>
@@ -217,7 +220,7 @@ export const Bandas = () => {
                       </div>
                     )}
                   </div>
-                  <Badge variant="success" size="sm">
+                  <Badge variant="primary" size="sm">
                     {songCount} servicios
                   </Badge>
                   <ChevronDown
@@ -277,10 +280,12 @@ export const Bandas = () => {
                   </div>
 
                   {bandMembers.length === 0 && (
-                    <div className="text-center py-6 text-gray-500">
-                      <Users size={32} className="mx-auto mb-2 opacity-50" />
-                      <p className="text-sm">No hay miembros asignados</p>
-                    </div>
+                    <EmptyState
+                      icon={UsersThree}
+                      title="No hay miembros asignados"
+                      subtitle="Todavía nadie integra esta banda."
+                      annotation="Editá para sumar miembros"
+                    />
                   )}
                 </div>
               )}
@@ -290,20 +295,22 @@ export const Bandas = () => {
       </div>
 
       {activeBands.length === 0 && (
-        <div className="text-center py-12">
-          <Users size={48} className="mx-auto text-gray-600 mb-4" />
-          <p className="text-gray-400">No hay bandas creadas</p>
+        <EmptyState
+          icon={MicrophoneStage}
+          title="No hay bandas creadas"
+          subtitle="Armá tu primera banda de adoración y empezá a organizar los encuentros."
+          annotation="Creá tu primera banda"
+        >
           {(isPastor || isLeader) && (
             <Button
               variant="secondary"
               icon={Plus}
               onClick={() => handleOpenModal()}
-              className="mt-4"
             >
               Crear primera banda
             </Button>
           )}
-        </div>
+        </EmptyState>
       )}
 
       {/* Create/Edit Modal */}
@@ -387,7 +394,7 @@ export const Bandas = () => {
                   className={`
                     flex items-center gap-3 p-3 rounded-xl text-left transition-all border-2
                     ${formData.members.includes(member.id)
-                      ? 'border-white bg-white/10'
+                      ? 'border-gold-500/60 bg-gold-500/10'
                       : 'border-neutral-800 hover:border-neutral-700'
                     }
                   `}
@@ -401,10 +408,10 @@ export const Bandas = () => {
                   </div>
                   <div className={`
                     w-5 h-5 rounded-full border-2 flex items-center justify-center
-                    ${formData.members.includes(member.id) ? 'border-black bg-black' : 'border-gray-500'}
+                    ${formData.members.includes(member.id) ? 'border-gold-500 bg-gold-gradient' : 'border-gray-500'}
                   `}>
                     {formData.members.includes(member.id) && (
-                      <Check size={12} className="text-white" />
+                      <Check size={12} className="text-black" />
                     )}
                   </div>
                 </button>
