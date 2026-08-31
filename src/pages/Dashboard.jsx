@@ -18,10 +18,14 @@ import {
   User
 } from 'lucide-react';
 import { useAppStore } from '../stores/appStore';
-import { useCurrentRole } from '../hooks/useCurrentMember';
+import { useCurrentRole, useCurrentMember } from '../hooks/useCurrentMember';
+import { useAuthStore } from '../stores/authStore';
 import { Card } from '../components/ui/Card';
 import { Badge } from '../components/ui/Badge';
 import { Avatar } from '../components/ui/Avatar';
+import { SilentBoundary } from '../components/ui/SilentBoundary';
+import { GreetingHeader } from '../components/dashboard/GreetingHeader';
+import { PrepBanner } from '../components/dashboard/PrepBanner';
 
 const getInstrumentIcon = (instrument) => {
   const lower = instrument.toLowerCase();
@@ -36,6 +40,8 @@ export const Dashboard = () => {
   useDocumentTitle('Inicio');
   const { members, bands, songs, orders, getUnusedSongs } = useAppStore();
   const role = useCurrentRole();
+  const member = useCurrentMember();
+  const profile = useAuthStore((s) => s.profile);
 
   const activeMembers = members.filter(m => m.active).length;
   const upcomingOrders = orders.filter(o => o.status === 'scheduled');
@@ -74,6 +80,23 @@ export const Dashboard = () => {
 
   return (
     <div className="space-y-6 animate-fade-in">
+      {/* Encabezado premium "Mi Adorapp" — SIEMPRE presente (saludo + versículo del
+          día + hora + cumpleaños + rol/instrumento). Construido para no lanzar. */}
+      <GreetingHeader
+        member={member}
+        role={role}
+        todayART={todayART}
+        artHour={artHour}
+        profileName={profile?.name}
+      />
+
+      {/* Preparación personal — CONDICIONAL: sólo si el miembro participa en un
+          orden programado próximo con canciones. En SilentBoundary para que, ante
+          cualquier problema, no muestre nada sin tumbar la app (el saludo queda). */}
+      <SilentBoundary>
+        <PrepBanner member={member} todayART={todayART} />
+      </SilentBoundary>
+
       {/* Hoy tenés ensayo — full-width highlight card, links to the order */}
       {showRehearsalCard && todaysRehearsal && (
         <Link

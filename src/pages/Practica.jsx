@@ -17,6 +17,7 @@ import {
   Timer,
 } from 'lucide-react';
 import { useAppStore, transposeSongStructure } from '../stores/appStore';
+import { milestonesOf, ensayometroPercent } from '../lib/ensayometro';
 import { useDocumentTitle } from '../hooks/useDocumentTitle';
 import { Card } from '../components/ui/Card';
 import { Badge } from '../components/ui/Badge';
@@ -44,16 +45,8 @@ const MASTERY_CHECKS = [
   { field: 'knowsArrangements', label: 'Frases y arreglos', icon: Sparkles },
 ];
 
-// 4 hitos por canción: al menos una pasada + los 3 checks de dominio.
-const milestonesOf = (log) => {
-  if (!log) return 0;
-  return (
-    (log.timesPracticed > 0 ? 1 : 0) +
-    (log.knowsLyrics ? 1 : 0) +
-    (log.knowsStructure ? 1 : 0) +
-    (log.knowsArrangements ? 1 : 0)
-  );
-};
+// milestonesOf y el cálculo del % viven en src/lib/ensayometro.js (fuente única
+// compartida con el banner del Dashboard y espejo del cron; landmine #27).
 
 const emptyLog = (orderId, songId) => ({
   orderId,
@@ -301,12 +294,10 @@ export const Practica = () => {
     [order]
   );
 
-  const percent = useMemo(() => {
-    if (uniqueSongIds.length === 0) return 0;
-    const total = uniqueSongIds.length * 4;
-    const done = uniqueSongIds.reduce((acc, id) => acc + milestonesOf(logs[id]), 0);
-    return Math.round((done / total) * 100);
-  }, [uniqueSongIds, logs]);
+  const percent = useMemo(
+    () => ensayometroPercent(uniqueSongIds, logs),
+    [uniqueSongIds, logs]
+  );
 
   const totalPasses = useMemo(
     () => uniqueSongIds.reduce((acc, id) => acc + (logs[id]?.timesPracticed || 0), 0),

@@ -769,6 +769,31 @@ export const useAppStore = create((set, get) => ({
     }
   },
 
+  // Versículo del día — el MISMO que manda el push de la mañana
+  // (send_daily_devotional_notification): día del año en ART, clampeado con
+  // ((doy - 1) % 365) + 1, y select en daily_devotionals por ese day_of_year.
+  // Lectura on-demand (fuera de initialize/realtime), no-throw (null si falla).
+  fetchDailyDevotional: async () => {
+    try {
+      const artDate = new Date().toLocaleDateString('en-CA', {
+        timeZone: 'America/Argentina/Buenos_Aires',
+      }); // 'YYYY-MM-DD' en ART
+      const [y, m, d] = artDate.split('-').map(Number);
+      const doy = Math.floor((Date.UTC(y, m - 1, d) - Date.UTC(y, 0, 1)) / 86400000) + 1;
+      const dayIdx = ((doy - 1) % 365) + 1;
+      const { data, error } = await supabase
+        .from('daily_devotionals')
+        .select('reference, verse')
+        .eq('day_of_year', dayIdx)
+        .maybeSingle();
+      if (error) throw error;
+      return data || null;
+    } catch (err) {
+      console.error('Error fetching daily devotional:', err);
+      return null;
+    }
+  },
+
   // Takes a COMPLETE log object (see DATA-LOSS LANDMINE on the converter).
   // Upsert on (user_id, order_id, song_id): user_id comes from the DB default
   // auth.uid(), so the same call transparently creates or updates the row.
