@@ -794,6 +794,24 @@ export const useAppStore = create((set, get) => ({
     }
   },
 
+  // Feedback post-servicio ya registrado para un orden. RLS: el autor ve lo suyo, el
+  // pastor ve todo. Se usa SOLO para suprimir el modal ("¿ya envié yo?"). Lectura
+  // on-demand, no-throw. El envío NO pasa por acá: va por la Edge Function
+  // send-service-feedback (service_role) vía callAdminFunction.
+  fetchServiceFeedbackForOrder: async (orderId) => {
+    try {
+      const { data, error } = await supabase
+        .from('service_feedback')
+        .select('id, author_id, created_at')
+        .eq('order_id', orderId);
+      if (error) throw error;
+      return data || [];
+    } catch (err) {
+      console.error('Error fetching service feedback:', err);
+      return [];
+    }
+  },
+
   // Takes a COMPLETE log object (see DATA-LOSS LANDMINE on the converter).
   // Upsert on (user_id, order_id, song_id): user_id comes from the DB default
   // auth.uid(), so the same call transparently creates or updates the row.

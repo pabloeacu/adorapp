@@ -26,6 +26,7 @@ import { Avatar } from '../components/ui/Avatar';
 import { SilentBoundary } from '../components/ui/SilentBoundary';
 import { GreetingHeader } from '../components/dashboard/GreetingHeader';
 import { PrepBanner } from '../components/dashboard/PrepBanner';
+import { ServiceFeedbackPrompt } from '../components/dashboard/ServiceFeedbackPrompt';
 
 const getInstrumentIcon = (instrument) => {
   const lower = instrument.toLowerCase();
@@ -95,6 +96,13 @@ export const Dashboard = () => {
           cualquier problema, no muestre nada sin tumbar la app (el saludo queda). */}
       <SilentBoundary>
         <PrepBanner member={member} todayART={todayART} />
+      </SilentBoundary>
+
+      {/* Feedback post-servicio — CONDICIONAL y OPTATIVO: sólo para pastor/líder de la
+          banda de un servicio ya ocurrido (≥4h), que todavía no envió su devolución.
+          En SilentBoundary por la misma razón que PrepBanner. */}
+      <SilentBoundary>
+        <ServiceFeedbackPrompt member={member} role={role} />
       </SilentBoundary>
 
       {/* Hoy tenés ensayo — full-width highlight card, links to the order */}
