@@ -2,7 +2,7 @@ import React, { useState, useMemo, useEffect } from 'react';
 import { useSearchParams, Link } from 'react-router-dom';
 import { useDocumentTitle } from '../hooks/useDocumentTitle';
 import {
-  Plus, Calendar, Music, Clock, Copy,
+  Plus, Calendar, Music, Clock, Copy, Activity,
   MessageSquare, Eye, Trash2, Search, Check, X,
   User, Zap, AlertCircle, ChevronDown, FileDown, History, Award,
   FileText, Printer, Copy as CopyIcon,
@@ -21,6 +21,7 @@ import { Input } from '../components/ui/Input';
 import { ConfirmModal, SuccessModal, ErrorModal } from '../components/ui/ConfirmModal';
 import { OrderHistoryTimeline } from '../components/OrderHistoryTimeline';
 import { OrderCalendar } from '../components/OrderCalendar';
+import { RepertoireInsightsModal } from '../components/RepertoireInsightsModal';
 import { suggestDirectorForSong } from '../lib/orders';
 import {
   DndContext,
@@ -79,6 +80,7 @@ export const Ordenes = () => {
   const isLeader = userRole === 'leader';
 
   const [isModalOpen, setIsModalOpen] = useState(false);
+  const [showInsights, setShowInsights] = useState(false); // Radiografía del repertorio (solo lectura)
   const [editingOrder, setEditingOrder] = useState(null);
   const [isDetailOpen, setIsDetailOpen] = useState(false);
   const [viewingOrder, setViewingOrder] = useState(null);
@@ -988,9 +990,14 @@ export const Ordenes = () => {
             </button>
           </div>
           {(isPastor || isLeader) && (
-            <Button icon={Plus} onClick={() => handleOpenModal()}>
-              Nuevo Orden
-            </Button>
+            <div className="flex flex-wrap items-center gap-2">
+              <Button variant="secondary" icon={Activity} onClick={() => setShowInsights(true)}>
+                Radiografía
+              </Button>
+              <Button icon={Plus} onClick={() => handleOpenModal()}>
+                Nuevo Orden
+              </Button>
+            </div>
           )}
         </div>
       </div>
@@ -1763,6 +1770,9 @@ export const Ordenes = () => {
         title={errorModal.title}
         message={errorModal.message}
       />
+
+      {/* Radiografía del repertorio (solo lectura) */}
+      <RepertoireInsightsModal isOpen={showInsights} onClose={() => setShowInsights(false)} />
     </div>
   );
 };
