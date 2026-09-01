@@ -16,6 +16,8 @@ export const EmptyState = ({ icon: Icon, title, subtitle, annotation, children, 
     {title && <p className="relative mt-5 text-lg font-bold text-white">{title}</p>}
     {subtitle && <p className="relative mt-1.5 max-w-sm text-sm text-gray-400">{subtitle}</p>}
     {children && <div className="relative mt-5">{children}</div>}
-    {annotation && <Annotation text={annotation} className="mt-4" />}
+    {/* La anotación SOLO acompaña a un botón de acción: la flecha apunta hacia él.
+        Sin botón no tendría a qué apuntar, así que no se muestra. */}
+    {annotation && children && <Annotation text={annotation} className="mt-2" />}
   </div>
 );

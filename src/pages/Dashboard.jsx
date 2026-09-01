@@ -159,7 +159,7 @@ export const Dashboard = () => {
             {recentSongs.map((song) => (
               <div
                 key={song.id}
-                className="flex items-center justify-between p-3 rounded-lg bg-neutral-800/50 hover:bg-neutral-800 transition-colors"
+                className="hover-relief flex items-center justify-between p-3 rounded-lg bg-neutral-800/50 hover:bg-neutral-800 transition-colors"
               >
                 <div className="flex items-center gap-3">
                   <div className="w-11 h-11 rounded-xl bg-gold-gradient-soft ring-1 ring-gold-500/40 flex items-center justify-center">
@@ -246,7 +246,7 @@ export const Dashboard = () => {
               return (
                 <div
                   key={member.id}
-                  className="flex items-center gap-3 px-3 py-2.5 bg-neutral-800/50 rounded-xl hover:bg-neutral-800 transition-colors cursor-pointer"
+                  className="hover-relief flex items-center gap-3 px-3 py-2.5 bg-neutral-800/50 rounded-xl hover:bg-neutral-800 transition-colors cursor-pointer"
                   title={`${member.instruments.join(', ')}`}
                 >
                   <Avatar name={member.name} size="md" />

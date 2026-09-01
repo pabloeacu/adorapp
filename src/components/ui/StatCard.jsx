@@ -7,7 +7,7 @@ import { IconBadge } from './IconBadge';
 export const StatCard = ({ label, value, icon, sub, interactive = false }) => (
   <div
     className={`relative overflow-hidden rounded-2xl border border-neutral-800 bg-neutral-900 p-5 transition-all duration-200 h-full ${
-      interactive ? 'hover:border-gold-500/50 hover:bg-neutral-800/40' : ''
+      interactive ? 'hover-relief hover:border-gold-500/50 hover:bg-neutral-800/40 cursor-pointer' : ''
     }`}
   >
     {/* barra dorada metálica superior */}

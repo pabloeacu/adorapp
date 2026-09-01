@@ -22,21 +22,13 @@ export const Avatar = ({
     return name.slice(0, 2).toUpperCase();
   };
 
-  const getColorFromName = (name) => {
-    if (!name) return 'bg-neutral-700';
-    const colors = [
-      'bg-blue-600', 'bg-green-600', 'bg-purple-600',
-      'bg-orange-600', 'bg-pink-600', 'bg-teal-600'
-    ];
-    const index = name.split('').reduce((acc, char) => acc + char.charCodeAt(0), 0);
-    return colors[index % colors.length];
-  };
-
+  // Iniciales sin foto: degradé dorado intenso con letras blancas (identidad premium).
+  // El text-shadow mantiene las letras legibles sobre el oro brillante.
   return (
     <div
       className={`
         ${sizes[size]} rounded-full flex items-center justify-center
-        font-semibold text-white ${getColorFromName(name)}
+        font-bold text-white ${src ? 'bg-neutral-800' : 'bg-gold-gradient [text-shadow:0_1px_2px_rgba(0,0,0,0.4)] ring-1 ring-gold-300/40'}
         ${className}
       `}
     >
