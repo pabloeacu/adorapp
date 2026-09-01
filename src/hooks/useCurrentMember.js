@@ -12,7 +12,12 @@ export function useCurrentMember() {
   const members = useAppStore((s) => s.members);
   return useMemo(() => {
     if (!user?.email) return null;
-    return members.find((m) => m.email === user.email) || null;
+    // Match case-insensitive: GoTrue guarda auth.users.email en minúscula, pero
+    // members.email podría tener otra capitalización (datos viejos u otros flujos
+    // de alta). Comparar en minúscula evita que un miembro pierda su ficha por un
+    // simple desajuste de mayúsculas.
+    const target = user.email.toLowerCase();
+    return members.find((m) => (m.email || '').toLowerCase() === target) || null;
   }, [user, members]);
 }
 

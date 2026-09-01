@@ -75,7 +75,7 @@ export const useAuthStore = create((set, get) => ({
       // If not found by user_id, try to get from appStore by email
       if ((error || !data) && get().user?.email) {
         const appStore = useAppStore.getState();
-        const memberFromAppStore = appStore.members?.find(m => m.email === get().user.email);
+        const memberFromAppStore = appStore.members?.find(m => (m.email || '').toLowerCase() === get().user.email.toLowerCase());
         if (memberFromAppStore) {
           // Get fresh data from DB
           const memberId = memberFromAppStore.id;
