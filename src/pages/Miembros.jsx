@@ -43,7 +43,7 @@ const roleConfig = {
 
 export const Miembros = () => {
   useDocumentTitle('Miembros');
-  const { members, addMember, updateMember, deleteMember, toggleMemberActive } = useAppStore();
+  const { members, addMember, updateMember, updateMemberViaAdmin, deleteMember, toggleMemberActive } = useAppStore();
   const { user } = useAuthStore();
   const [searchParams, setSearchParams] = useSearchParams();
   // Role gating: pastors see everything (and can act). Leaders see a stripped
@@ -61,6 +61,7 @@ export const Miembros = () => {
   const [selectedInstruments, setSelectedInstruments] = useState([]);
   const [sortBy, setSortBy] = useState('name_asc');
   const [viewMode, setViewMode] = useState('cards'); // 'cards' or 'table'
+  const [isSubmitting, setIsSubmitting] = useState(false); // bloquea el botón Guardar en vuelo
 
   const [formData, setFormData] = useState({
     name: '',
@@ -197,30 +198,80 @@ export const Miembros = () => {
     e.preventDefault();
 
     if (!formData.name.trim()) return;
+    if (isSubmitting) return; // guard anti doble-submit (ruta privilegiada: evita doble Admin API)
+    setIsSubmitting(true);
+    try {
+      if (editingMember) {
+        // El email es login + identidad de auth + contacto Y la app matchea
+        // usuario↔ficha por email: cambiarlo solo en `members` desincroniza el
+        // login y ROMPE al miembro. Si el email cambió, va por la ruta privilegiada
+        // (EF admin-update-member: Admin API + members + revoca sesiones). Si no
+        // cambió, el camino directo de siempre (RLS self-or-pastor) queda intacto.
+        const isSelf = editingMember.userId === user?.id;
+        const newEmail = (formData.email || '').trim();
 
-    if (editingMember) {
-      // Update member in DB and appStore
-      await updateMember(editingMember.id, formData);
+        // Un miembro CON acceso a la app (userId) no puede quedarse sin correo: el
+        // correo es su login. Vaciarlo desincronizaría members↔auth y lo dejaría sin
+        // ficha. Bloqueamos antes de guardar.
+        if (editingMember.userId && !newEmail) {
+          setErrorModal({
+            isOpen: true,
+            title: 'El correo es obligatorio',
+            message: 'Este miembro tiene acceso a la app, así que no puede quedarse sin correo (es su usuario para entrar). Ingresá un correo válido.',
+          });
+          return;
+        }
 
-      // CRITICAL: If the edited member is the CURRENT LOGGED-IN USER,
-      // refresh authStore.profile so all pages instantly see the new role/permissions
-      if (editingMember.userId === user?.id) {
-        await useAuthStore.getState().refreshProfile();
+        const emailChanged = newEmail.length > 0 &&
+          newEmail.toLowerCase() !== (editingMember.email || '').trim().toLowerCase();
+
+        if (emailChanged) {
+          const { error } = await updateMemberViaAdmin(editingMember.id, formData);
+          if (error) {
+            setErrorModal({
+              isOpen: true,
+              title: 'No se pudo cambiar el correo',
+              message: typeof error === 'string' ? error : 'Ocurrió un error al actualizar el correo del miembro.',
+            });
+            return; // dejar el modal abierto para corregir
+          }
+          // Si el usuario cambió su PROPIO correo, su sesión quedó con el email
+          // viejo en el token (y las sesiones fueron revocadas server-side): dejar
+          // un aviso para el Login y cerrar sesión para que vuelva a entrar con el
+          // correo nuevo, limpio.
+          if (isSelf) {
+            try { sessionStorage.setItem('emailChangedNotice', newEmail.toLowerCase()); } catch { /* no crítico */ }
+            handleCloseModal();
+            await useAuthStore.getState().logout();
+            return;
+          }
+        } else {
+          // Update member in DB and appStore
+          await updateMember(editingMember.id, formData);
+        }
+
+        // CRITICAL: If the edited member is the CURRENT LOGGED-IN USER,
+        // refresh authStore.profile so all pages instantly see the new role/permissions
+        if (isSelf) {
+          await useAuthStore.getState().refreshProfile();
+        }
+
+        handleCloseModal();
+      } else {
+        // Creating a new member - show password modal after creation
+        const result = await addMember(formData);
+        if (result) {
+          setCreatedMemberData({
+            name: formData.name,
+            email: formData.email,
+            password: result.generatedPassword || formData.password
+          });
+          setShowPasswordModal(true);
+        }
+        handleCloseModal();
       }
-
-      handleCloseModal();
-    } else {
-      // Creating a new member - show password modal after creation
-      const result = await addMember(formData);
-      if (result) {
-        setCreatedMemberData({
-          name: formData.name,
-          email: formData.email,
-          password: result.generatedPassword || formData.password
-        });
-        setShowPasswordModal(true);
-      }
-      handleCloseModal();
+    } finally {
+      setIsSubmitting(false);
     }
   };
 
@@ -822,9 +873,9 @@ export const Miembros = () => {
             <Button variant="secondary" onClick={handleCloseModal}>Cancelar</Button>
             <Button
               onClick={handleSubmit}
-              disabled={!formData.name.trim() || (!editingMember && formData.email && !formData.password)}
+              disabled={isSubmitting || !formData.name.trim() || (!editingMember && formData.email && !formData.password)}
             >
-              {editingMember ? 'Guardar Cambios' : 'Agregar Miembro'}
+              {isSubmitting ? 'Guardando…' : (editingMember ? 'Guardar Cambios' : 'Agregar Miembro')}
             </Button>
           </>
         }

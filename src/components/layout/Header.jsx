@@ -123,8 +123,10 @@ export const Header = () => {
   // The authStore.profile might not have the correct role, so we MUST check members table
   const currentUserMember = useMemo(() => {
     if (user?.email) {
-      // Find the member by email in appStore - this is the source of truth
-      const member = members.find(m => m.email === user.email);
+      // Find the member by email in appStore - this is the source of truth.
+      // Case-insensitive: auth.users.email va en minúscula; evita perder la ficha
+      // por un desajuste de mayúsculas con members.email.
+      const member = members.find(m => (m.email || '').toLowerCase() === user.email.toLowerCase());
       if (member) return member;
     }
     return null;

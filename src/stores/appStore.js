@@ -192,7 +192,10 @@ const convertOrderFromDB = (o) => ({
 const convertMemberToDB = (m) => {
   const out = {
     name: m.name,
-    email: m.email,
+    // El email es también el login (auth.users) y la app matchea usuario↔ficha por
+    // email; GoTrue guarda auth.users.email SIEMPRE en minúscula, así que members.email
+    // debe quedar en minúscula o divergiría y rompería el match (ver admin-update-member).
+    email: m.email ? String(m.email).trim().toLowerCase() : m.email,
     phone: m.phone || null,
     pastor_area: m.pastor_area || null,
     leader_of: m.leader_of || null,
@@ -431,6 +434,34 @@ export const useAppStore = create((set, get) => ({
       console.error('Error updating member:', err);
       set({ error: err.message });
       return null;
+    }
+  },
+
+  // Ruta PRIVILEGIADA para editar un miembro cuando cambia el EMAIL. El email es
+  // a la vez login (auth.users), identidad de auth y contacto (members), y la app
+  // matchea usuario↔ficha por email (useCurrentMember/authStore/Header), así que
+  // cambiarlo solo en members lo desincroniza y ROMPE al usuario. La EF
+  // admin-update-member lo cambia por la Admin API (auth+identidad) + members y
+  // revoca sesiones. Devuelve { member } o { error } (string) para mostrar al usuario.
+  updateMemberViaAdmin: async (id, updates) => {
+    try {
+      const { data, error } = await callAdminFunction('admin-update-member', { memberId: id, updates });
+      if (error) return { error };
+      // Blindaje: si la EF respondiera 200 sin `member`, no reventar con un TypeError
+      // silencioso — devolver un error legible para que el modal lo muestre.
+      if (!data || !data.member) return { error: 'Respuesta inválida del servidor. Probá de nuevo.' };
+      const updatedData = convertMemberFromDB(data.member);
+      set((state) => ({ members: state.members.map(m => m.id === id ? updatedData : m) }));
+      try {
+        const cachedMembers = JSON.parse(localStorage.getItem('appMembers') || '[]');
+        localStorage.setItem('appMembers', JSON.stringify(cachedMembers.map(m => m.id === id ? updatedData : m)));
+      } catch (cacheErr) {
+        console.error('Cache update error:', cacheErr);
+      }
+      return { member: updatedData };
+    } catch (err) {
+      console.error('updateMemberViaAdmin error:', err);
+      return { error: err.message || 'Error al actualizar el miembro' };
     }
   },
 

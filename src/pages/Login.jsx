@@ -15,6 +15,7 @@ export const Login = () => {
   const [rememberMe, setRememberMe] = useState(false);
   const [showRegisterModal, setShowRegisterModal] = useState(false);
   const [showSuccessModal, setShowSuccessModal] = useState(false);
+  const [emailChangedNotice, setEmailChangedNotice] = useState(''); // aviso tras auto-cambio de correo
 
   const login = useAuthStore((state) => state.login);
   const loading = useAuthStore((state) => state.loading);
@@ -30,13 +31,26 @@ export const Login = () => {
     // Clear any leaked password from localStorage (legacy data)
     localStorage.removeItem('rememberedPassword');
 
+    // Si el usuario acaba de cambiar su PROPIO correo (se lo deslogueó a propósito),
+    // avisarle y prellenar el correo NUEVO para que no intente entrar con el viejo.
+    let noticedEmail = '';
+    try {
+      noticedEmail = sessionStorage.getItem('emailChangedNotice') || '';
+      if (noticedEmail) sessionStorage.removeItem('emailChangedNotice');
+    } catch { /* sessionStorage no disponible */ }
+    if (noticedEmail) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect
+      setEmail(noticedEmail);
+      setEmailChangedNotice(noticedEmail);
+      return; // el correo nuevo tiene prioridad sobre el "recordado"
+    }
+
     const savedEmail = localStorage.getItem('rememberedEmail');
     const savedRemember = localStorage.getItem('rememberMe') === 'true';
 
     if (savedRemember && savedEmail) {
       // Hydrating "remember me" form fields from localStorage at mount;
       // ok to setState here, no synchronous render data is available.
-      // eslint-disable-next-line react-hooks/set-state-in-effect
       setEmail(savedEmail);
       // Password should NEVER be stored - user must re-enter it
       setRememberMe(true);
@@ -113,6 +127,13 @@ export const Login = () => {
           <div className="gold-hairline absolute inset-x-0 top-0 h-px" aria-hidden="true" />
           <div className="gold-radial-glow pointer-events-none absolute -right-16 -top-16 h-40 w-40 rounded-full" aria-hidden="true" />
           <h2 className="relative text-xl font-semibold mb-6 text-center">Iniciar Sesión</h2>
+
+          {emailChangedNotice && (
+            <div className="relative mb-5 rounded-xl border border-gold-500/30 bg-gold-500/10 px-4 py-3 text-sm text-gold-200">
+              Actualizaste tu correo. Iniciá sesión con tu <span className="font-semibold">nuevo correo</span>
+              {' '}(<span className="font-medium break-all">{emailChangedNotice}</span>) y tu contraseña de siempre.
+            </div>
+          )}
 
           <form onSubmit={handleSubmit} className="space-y-4">
             <div className="relative">
