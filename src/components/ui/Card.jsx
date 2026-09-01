@@ -18,7 +18,7 @@ export const Card = ({
     <div
       className={`
         bg-neutral-900 border border-neutral-800 rounded-xl
-        ${hover ? 'hover:border-neutral-700 hover:bg-neutral-800/50 transition-all duration-200 cursor-pointer' : ''}
+        ${hover ? 'hover-relief hover:border-gold-500/30 hover:bg-neutral-800/50 cursor-pointer' : ''}
         ${paddingSizes[padding]}
         ${className}
       `}

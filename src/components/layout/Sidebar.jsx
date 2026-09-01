@@ -66,7 +66,7 @@ export const Sidebar = () => {
                 `relative flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-medium transition-all duration-200 ${
                   isActive
                     ? 'bg-gradient-to-r from-gold-500/[0.22] to-transparent text-gold-100 shadow-[inset_3px_0_0_0_#d4af37]'
-                    : 'text-gray-400 hover:text-white hover:bg-neutral-800/50'
+                    : 'hover-relief text-gray-400 hover:text-white hover:bg-neutral-800'
                 }`
               }
             >

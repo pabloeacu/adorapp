@@ -169,6 +169,16 @@ input:focus, textarea:focus, select:focus {
   font-family: 'Caveat', ui-rounded, cursive;
 }
 
+/* Relieve en hover — le da PROFUNDIDAD a cualquier fila/nav con ícono: una sombra
+   proyectada + un brillo superior interno (borde biselado) que hace que el elemento
+   "sobresalga" al pasar el mouse. Se combina con el resaltado de color existente. */
+.hover-relief {
+  transition: box-shadow 0.2s ease, background-color 0.2s ease, border-color 0.2s ease;
+}
+.hover-relief:hover {
+  box-shadow: 0 8px 22px -8px rgba(0, 0, 0, 0.75), inset 0 1px 0 0 rgba(255, 233, 168, 0.08);
+}
+
 input::placeholder, textarea::placeholder {
   color: var(--ador-muted);
 }
