@@ -4,7 +4,8 @@ import { useDocumentTitle } from '../hooks/useDocumentTitle';
 import {
   Plus, Search, Edit, Trash2, Clock,
   Eye, ExternalLink, Filter, X, GripVertical, Save,
-  LayoutGrid, List, FileDown, AlertTriangle, ChevronDown
+  LayoutGrid, List, FileDown, AlertTriangle, ChevronDown,
+  Type, FileText
 } from 'lucide-react';
 import { MusicNotes } from '@phosphor-icons/react';
 import { useAppStore, SONG_CATEGORIES, MUSICAL_KEYS, transposeSongStructure } from '../stores/appStore';
@@ -92,6 +93,15 @@ export const Repertorio = () => {
   const isLeader = userRole === 'leader';
 
   const [searchTerm, setSearchTerm] = useState('');
+  // Alcance de la búsqueda: 'basic' = solo título + artista (preciso, coincide con
+  // el placeholder); 'full' = suma la letra y los acordes. Se recuerda por usuario.
+  const [searchScope, setSearchScope] = useState(() => {
+    try { return localStorage.getItem('repertoireSearchScope') === 'full' ? 'full' : 'basic'; }
+    catch { return 'basic'; }
+  });
+  useEffect(() => {
+    try { localStorage.setItem('repertoireSearchScope', searchScope); } catch { /* no crítico */ }
+  }, [searchScope]);
   const [filterCategories, setFilterCategories] = useState([]); // Multiselect
   const [showUnused, setShowUnused] = useState(false);
   const [isModalOpen, setIsModalOpen] = useState(false);
@@ -165,22 +175,28 @@ export const Repertorio = () => {
 
   const unusedSongs = getUnusedSongs(4);
 
-  const filteredSongs = useMemo(() => {
+  const { list: filteredSongs, lyricMatchIds } = useMemo(() => {
     let result = songs;
+    // Canciones que entraron SOLO por la letra/acordes (no por título/artista):
+    // se les pinta la etiqueta "coincide en la letra" para que se entienda por qué salieron.
+    const lyricMatchIds = new Set();
 
     if (searchTerm) {
       // Diacritic-insensitive search: "ocean" → "Océanos", "humillacion" →
       // "Humillación". foldText lowercases + strips accents.
       const search = foldText(searchTerm);
       result = result.filter(s => {
+        // Siempre se busca en título y artista.
         if (foldText(s.title).includes(search) || foldText(s.artist).includes(search)) {
           return true;
         }
-        if (s.structure) {
-          return s.structure.some(section =>
+        // La letra y los acordes SOLO se buscan en el modo "full".
+        if (searchScope === 'full' && s.structure) {
+          const inLyrics = s.structure.some(section =>
             foldText(section.content).includes(search) ||
             foldText(section.chords).includes(search)
           );
+          if (inLyrics) { lyricMatchIds.add(s.id); return true; }
         }
         return false;
       });
@@ -199,8 +215,8 @@ export const Repertorio = () => {
       result = result.filter(s => unusedIds.has(s.id));
     }
 
-    return result;
-  }, [songs, searchTerm, filterCategories, showUnused, unusedSongs]);
+    return { list: result, lyricMatchIds };
+  }, [songs, searchTerm, searchScope, filterCategories, showUnused, unusedSongs]);
 
   // Toggle category in filter
   const toggleFilterCategory = (catId) => {
@@ -620,7 +636,7 @@ export const Repertorio = () => {
           <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-500" size={20} />
           <input
             type="text"
-            placeholder="Buscar por título o artista..."
+            placeholder={searchScope === 'full' ? 'Buscar en título, artista y letra…' : 'Buscar por título o artista…'}
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
             className="w-full pl-12 pr-4 py-3 bg-neutral-900 border border-neutral-800 rounded-xl focus:outline-none focus:ring-2 focus:ring-gold-500/40 focus:border-gold-500 transition-colors"
@@ -700,6 +716,40 @@ export const Repertorio = () => {
         </div>
       </div>
 
+      {/* Alcance de búsqueda: preciso (título + artista) vs completo (incluye letra
+          y acordes). El lado activo se pinta dorado; la preferencia se recuerda. */}
+      <div className="flex items-center gap-2 flex-wrap">
+        <span className="text-xs text-gray-500 shrink-0">Buscar en:</span>
+        <div className="inline-flex bg-neutral-900 border border-neutral-800 rounded-xl p-1" role="group" aria-label="Alcance de la búsqueda">
+          <button
+            type="button"
+            onClick={() => setSearchScope('basic')}
+            aria-pressed={searchScope === 'basic'}
+            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm font-medium transition-all ${
+              searchScope === 'basic'
+                ? 'bg-gold-gradient text-black shadow-[0_2px_10px_-3px_rgba(212,175,55,0.5)]'
+                : 'text-gray-400 hover:text-white'
+            }`}
+          >
+            <Type size={15} />
+            Título y artista
+          </button>
+          <button
+            type="button"
+            onClick={() => setSearchScope('full')}
+            aria-pressed={searchScope === 'full'}
+            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm font-medium transition-all ${
+              searchScope === 'full'
+                ? 'bg-gold-gradient text-black shadow-[0_2px_10px_-3px_rgba(212,175,55,0.5)]'
+                : 'text-gray-400 hover:text-white'
+            }`}
+          >
+            <FileText size={15} />
+            Todo · con letra
+          </button>
+        </div>
+      </div>
+
       {/* Active category filters display */}
       {filterCategories.length > 0 && (
         <div className="flex flex-wrap items-center gap-2">
@@ -734,6 +784,11 @@ export const Repertorio = () => {
                   <div className="min-w-0">
                     <h3 className="font-semibold truncate">{song.title}</h3>
                     <p className="text-sm text-gray-400 truncate">{song.artist}</p>
+                    {lyricMatchIds.has(song.id) && (
+                      <span className="mt-1 inline-flex items-center gap-1 text-[11px] font-medium text-gold-300 bg-gold-500/10 ring-1 ring-gold-500/20 rounded-md px-1.5 py-0.5">
+                        <FileText size={11} /> coincide en la letra
+                      </span>
+                    )}
                   </div>
                 </div>
                 <div className="flex flex-wrap items-center gap-1 justify-end">
@@ -846,6 +901,11 @@ export const Repertorio = () => {
                           <MusicNotes size={16} weight="duotone" className="text-gold-100" />
                         </div>
                         <span className="font-medium">{song.title}</span>
+                        {lyricMatchIds.has(song.id) && (
+                          <span className="inline-flex items-center gap-1 text-[10px] font-medium text-gold-300 bg-gold-500/10 ring-1 ring-gold-500/20 rounded px-1.5 py-0.5 whitespace-nowrap">
+                            <FileText size={10} /> en la letra
+                          </span>
+                        )}
                       </div>
                     </td>
                     <td className="px-4 py-3 text-sm text-gray-400">{song.artist || '-'}</td>
