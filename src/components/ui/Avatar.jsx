@@ -1,4 +1,5 @@
 import React from 'react';
+import { getInitials } from '../../lib/initials';
 
 export const Avatar = ({
   name,
@@ -11,15 +12,6 @@ export const Avatar = ({
     md: 'w-10 h-10 text-sm',
     lg: 'w-12 h-12 text-base',
     xl: 'w-16 h-16 text-lg',
-  };
-
-  const getInitials = (name) => {
-    if (!name) return '?';
-    const parts = name.split(' ');
-    if (parts.length >= 2) {
-      return `${parts[0][0]}${parts[1][0]}`.toUpperCase();
-    }
-    return name.slice(0, 2).toUpperCase();
   };
 
   // Iniciales sin foto: degradé dorado intenso con letras blancas (identidad premium).

@@ -188,10 +188,18 @@ const convertOrderFromDB = (o) => ({
 // every song touched by every saved order. See PR #20 commit message and
 // memory/project_state_20260615.md for the full incident report.
 
+// Normaliza un nombre/título para persistir: recorta extremos y colapsa
+// cualquier secuencia de espacios interna a uno solo. Evita datos sucios como
+// "Yessica  Santillán" (doble espacio) que rompían las iniciales del avatar
+// (parts[1] = '' → parts[1][0] = undefined → "YUNDEFINED"), y también el orden
+// alfabético/búsqueda cuando el título arranca con espacio (" Como En El Cielo").
+// Pura sobre un solo campo → segura respecto del merge anti-DATA-LOSS.
+const normalizeName = (s) => (s ?? '').toString().trim().replace(/\s+/g, ' ');
+
 // Convert camelCase to snake_case for Supabase
 const convertMemberToDB = (m) => {
   const out = {
-    name: m.name,
+    name: normalizeName(m.name),
     // El email es también el login (auth.users) y la app matchea usuario↔ficha por
     // email; GoTrue guarda auth.users.email SIEMPRE en minúscula, así que members.email
     // debe quedar en minúscula o divergiría y rompería el match (ver admin-update-member).
@@ -215,7 +223,7 @@ const convertMemberToDB = (m) => {
 };
 
 const convertBandToDB = (b) => ({
-  name: b.name,
+  name: normalizeName(b.name),
   meeting_type: b.meetingType || 'culto_general',
   meeting_day: b.meetingDay || null,
   meeting_time: b.meetingTime || '20:00',
@@ -224,7 +232,7 @@ const convertBandToDB = (b) => ({
 });
 
 const convertSongToDB = (s) => ({
-  title: s.title,
+  title: normalizeName(s.title),
   artist: s.artist || null,
   original_key: s.originalKey || s.key || 'C',
   key: s.key || s.originalKey || 'C',
