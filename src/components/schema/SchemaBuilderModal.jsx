@@ -6,7 +6,7 @@ import {
   arrayMove, SortableContext, sortableKeyboardCoordinates, verticalListSortingStrategy, useSortable,
 } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
-import { GripVertical, X, Trash2, Music2, Check, MessageSquarePlus, Download } from 'lucide-react';
+import { GripVertical, X, Trash2, Music2, Check, MessageSquarePlus, Download, Clock } from 'lucide-react';
 import { useAppStore } from '../../stores/appStore';
 import { useCurrentRole, useCurrentMember } from '../../hooks/useCurrentMember';
 import { Modal } from '../ui/Modal';
@@ -15,7 +15,7 @@ import { Badge } from '../ui/Badge';
 import { SelectMenu } from '../ui/SelectMenu';
 import { SuccessModal, ErrorModal } from '../ui/ConfirmModal';
 import {
-  SCHEMA_SECTION_TYPES, sectionMeta, nextSchemaLocalId, sectionDurationMin,
+  SCHEMA_SECTION_TYPES, sectionMeta, nextSchemaLocalId, sectionDurationMin, minToDurationLabel,
 } from '../../lib/serviceSchema';
 
 function SortableRow({ id, children }) {
@@ -192,6 +192,18 @@ export const SchemaBuilderModal = ({ order = null, isOpen, onClose, mode = 'sche
               Todavía no agregaste secciones. Empezá eligiendo una abajo.
             </div>
           ) : (
+            <div className="space-y-2">
+              {/* Resumen: cantidad de secciones + duración total (suma en vivo). */}
+              <div className="flex items-center justify-between px-1">
+                <span className="text-[11px] text-neutral-500">
+                  {sections.length === 1 ? '1 sección' : `${sections.length} secciones`}
+                </span>
+                {sections.reduce((acc, s) => acc + (sectionDurationMin(s) || 0), 0) > 0 && (
+                  <span className="inline-flex items-center gap-1 text-[11px] font-medium text-gold-200 bg-gold-500/10 border border-gold-500/30 rounded-full px-2.5 py-0.5">
+                    <Clock size={11} /> Total: {minToDurationLabel(sections.reduce((acc, s) => acc + (sectionDurationMin(s) || 0), 0))}
+                  </span>
+                )}
+              </div>
             <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={onDragEnd}>
               <SortableContext items={sections.map((s) => s._localId)} strategy={verticalListSortingStrategy}>
                 <div className="space-y-1.5 max-h-[48vh] overflow-y-auto pr-1">
@@ -291,6 +303,7 @@ export const SchemaBuilderModal = ({ order = null, isOpen, onClose, mode = 'sche
                 </div>
               </SortableContext>
             </DndContext>
+            </div>
           )}
 
           <SelectMenu value="" onChange={addSection} placeholder="+ Agregar sección…"

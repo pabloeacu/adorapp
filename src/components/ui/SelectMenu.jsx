@@ -11,6 +11,7 @@ export const SelectMenu = ({ value, onChange, options = [], placeholder = 'Eleg�
   const [open, setOpen] = useState(false);
   const [rect, setRect] = useState(null);
   const btnRef = useRef(null);
+  const panelRef = useRef(null);
   const selected = options.find((o) => o.value === value);
 
   const openMenu = () => {
@@ -20,13 +21,19 @@ export const SelectMenu = ({ value, onChange, options = [], placeholder = 'Eleg�
     setOpen(true);
   };
 
-  // Cerrar ante scroll/resize (la posición fija quedaría desalineada).
+  // Cerrar ante scroll/resize (la posición fija quedaría desalineada), PERO no
+  // cuando el scroll ocurre DENTRO del propio panel (lista de opciones con
+  // overflow) — ahí el usuario está justamente recorriendo las opciones.
   useEffect(() => {
     if (!open) return;
-    const close = () => setOpen(false);
-    window.addEventListener('scroll', close, true);
-    window.addEventListener('resize', close);
-    return () => { window.removeEventListener('scroll', close, true); window.removeEventListener('resize', close); };
+    const onScroll = (e) => {
+      if (panelRef.current && e.target && panelRef.current.contains(e.target)) return;
+      setOpen(false);
+    };
+    const onResize = () => setOpen(false);
+    window.addEventListener('scroll', onScroll, true);
+    window.addEventListener('resize', onResize);
+    return () => { window.removeEventListener('scroll', onScroll, true); window.removeEventListener('resize', onResize); };
   }, [open]);
 
   const spaceBelow = rect ? window.innerHeight - rect.bottom : 0;
@@ -54,7 +61,8 @@ export const SelectMenu = ({ value, onChange, options = [], placeholder = 'Eleg�
         <>
           <div className="fixed inset-0 z-[300]" onClick={() => setOpen(false)} />
           <div
-            className="fixed z-[301] bg-neutral-900 border border-neutral-700 rounded-xl shadow-2xl max-h-60 overflow-y-auto p-1.5"
+            ref={panelRef}
+            className="fixed z-[301] bg-neutral-900 border border-neutral-700 rounded-xl shadow-2xl max-h-60 overflow-y-auto overscroll-contain p-1.5"
             style={{ left: rect.left, width: rect.width, ...(up ? { bottom: window.innerHeight - rect.top + 6 } : { top: rect.bottom + 6 }) }}
           >
             {options.length === 0 && <div className="px-3 py-2 text-sm text-gray-500">Sin opciones</div>}
