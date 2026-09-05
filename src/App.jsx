@@ -24,6 +24,7 @@ const Miembros = lazyPage(() => import('./pages/Miembros'), 'Miembros');
 const Solicitudes = lazyPage(() => import('./pages/Solicitudes'), 'Solicitudes');
 const Comunicaciones = lazyPage(() => import('./pages/Comunicaciones'), 'Comunicaciones');
 const Practica = lazyPage(() => import('./pages/Practica'), 'Practica');
+const IniciarServicio = lazyPage(() => import('./pages/IniciarServicio'), 'IniciarServicio');
 
 const RouteFallback = () => <PageLoader />;
 
@@ -109,6 +110,9 @@ function App() {
         <Suspense fallback={<RouteFallback />}>
           <Routes>
             <Route path="/login" element={<Login />} />
+            {/* Presentador "Iniciar servicio": pantalla completa, FUERA del Layout
+                (sin barra lateral/header). Trae su propia guarda de sesión. */}
+            <Route path="/servicio/:orderId" element={<IniciarServicio />} />
             <Route path="/" element={<Layout />}>
               <Route index element={<Dashboard />} />
               <Route path="ordenes" element={<Ordenes />} />

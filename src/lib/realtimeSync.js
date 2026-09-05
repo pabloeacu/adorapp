@@ -22,7 +22,7 @@ let channel = null;
 let visibilityHandler = null;
 let lastStatus = null;
 
-const TABLES = ['members', 'bands', 'songs', 'orders', 'band_temporary_members', 'collaboration_requests', 'collaboration_participants'];
+const TABLES = ['members', 'bands', 'songs', 'orders', 'band_temporary_members', 'collaboration_requests', 'collaboration_participants', 'service_schemas'];
 
 function attach() {
   if (channel) return channel;
