@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { useDocumentTitle } from '../hooks/useDocumentTitle';
 import {
   Plus, Calendar, Clock, Edit, Trash2,
-  Check, ChevronDown, AlertTriangle, UserPlus, X
+  Check, ChevronDown, AlertTriangle, UserPlus, X, Search
 } from 'lucide-react';
 import { MicrophoneStage, UsersThree } from '@phosphor-icons/react';
 import { useAppStore, MEETING_TYPES } from '../stores/appStore';
@@ -69,14 +69,17 @@ export const Bandas = () => {
   const [addModal, setAddModal] = useState({ isOpen: false, band: null });
   const [addForm, setAddForm] = useState({ memberId: '', isTemporary: false, days: 7 });
   const [addSubmitting, setAddSubmitting] = useState(false);
+  const [addSearch, setAddSearch] = useState(''); // buscador por nombre en el selector
 
   const openAddModal = (band) => {
     setAddForm({ memberId: '', isTemporary: false, days: 7 });
+    setAddSearch('');
     setAddModal({ isOpen: true, band });
   };
   const closeAddModal = () => {
     setAddModal({ isOpen: false, band: null });
     setAddForm({ memberId: '', isTemporary: false, days: 7 });
+    setAddSearch('');
   };
 
   const handleAddSubmit = async () => {
@@ -558,12 +561,30 @@ export const Bandas = () => {
             <label className="text-xs text-gray-400 font-medium uppercase tracking-wide block mb-2">Persona</label>
             {(() => {
               const effective = addModal.band ? getEffectiveBandMemberIds(addModal.band.id) : new Set();
-              const candidates = members.filter(m => m.active && !effective.has(m.id));
-              if (candidates.length === 0) {
+              const allCandidates = members.filter(m => m.active && !effective.has(m.id));
+              if (allCandidates.length === 0) {
                 return <p className="text-sm text-gray-500">Todos los miembros activos ya integran esta banda.</p>;
               }
+              // Filtro por nombre, insensible a mayúsculas y acentos (con muchos miembros, sobre todo en móvil).
+              const norm = (s) => (s || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase();
+              const q = norm(addSearch.trim());
+              const candidates = q ? allCandidates.filter(m => norm(m.name).includes(q)) : allCandidates;
               return (
-                <div className="grid grid-cols-1 gap-2 max-h-56 overflow-y-auto">
+                <>
+                  <div className="relative mb-2">
+                    <Search size={15} className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-gray-500" />
+                    <input
+                      type="text"
+                      value={addSearch}
+                      onChange={(e) => setAddSearch(e.target.value)}
+                      placeholder="Buscar por nombre…"
+                      className="w-full pl-9 pr-3"
+                    />
+                  </div>
+                  {candidates.length === 0 ? (
+                    <p className="py-2 text-sm text-gray-500">Nadie coincide con “{addSearch.trim()}”.</p>
+                  ) : (
+                  <div className="grid grid-cols-1 gap-2 max-h-56 overflow-y-auto">
                   {candidates.map((m) => (
                     <button
                       key={m.id}
@@ -583,7 +604,9 @@ export const Bandas = () => {
                       )}
                     </button>
                   ))}
-                </div>
+                  </div>
+                  )}
+                </>
               );
             })()}
           </div>
