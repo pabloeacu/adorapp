@@ -9,6 +9,8 @@ import { Navigate, Outlet } from 'react-router-dom';
 import { useAuthStore } from '../../stores/authStore';
 import { useCurrentMember } from '../../hooks/useCurrentMember';
 import { startRealtimeSync, stopRealtimeSync } from '../../lib/realtimeSync';
+import { supabase } from '../../lib/supabase';
+import { isInstalled } from '../../lib/installPrompt';
 
 export const Layout = () => {
   const user = useAuthStore((state) => state.user);
@@ -23,6 +25,33 @@ export const Layout = () => {
     startRealtimeSync();
     return () => stopRealtimeSync();
   }, [user]);
+
+  // Registra la actividad del miembro para la ficha del pastor: "última conexión"
+  // (cada apertura de la app) y "app instalada" (si corre en modo standalone).
+  // Va por la RPC record_member_activity (SECURITY DEFINER): actualiza SOLO la
+  // propia fila en member_activity (set-once del app_installed_at server-side),
+  // sin tocar members (así no contamina su audit ni churnea updated_at).
+  // Throttled a 1 vez por día por miembro. isInstalled() se re-evalúa cada vez,
+  // así que si un día abren la app ya instalada, ese día se registra.
+  useEffect(() => {
+    const memberId = currentMember?.id;
+    if (!memberId) return;
+    let cancelled = false;
+    (async () => {
+      try {
+        const key = `adorapp_activity_${memberId}`;
+        const today = new Date().toISOString().slice(0, 10);
+        let last = null;
+        try { last = localStorage.getItem(key); } catch { /* bloqueado → registrar igual */ }
+        if (last === today) return; // ya registrado hoy
+        const { error } = await supabase.rpc('record_member_activity', { p_installed: isInstalled() });
+        if (!cancelled && !error) {
+          try { localStorage.setItem(key, today); } catch { /* no crítico */ }
+        }
+      } catch { /* no crítico: la actividad no debe romper la app */ }
+    })();
+    return () => { cancelled = true; };
+  }, [currentMember?.id]);
 
   if (!user) {
     return <Navigate to="/login" replace />;
