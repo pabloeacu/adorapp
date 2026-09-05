@@ -15,6 +15,7 @@ import { Button } from '../components/ui/Button';
 import { Modal } from '../components/ui/Modal';
 import { EmptyState } from '../components/ui/EmptyState';
 import { ConfirmModal, SuccessModal, ErrorModal } from '../components/ui/ConfirmModal';
+import { compareBandsByCalendar, dayLabels, dayPluralLabels } from '../lib/days';
 
 // Helper to format dates WITHOUT timezone shift
 const formatDateLocal = (dateStr) => {
@@ -33,7 +34,7 @@ const formatDateLocal = (dateStr) => {
 export const Solicitudes = () => {
   useDocumentTitle('Solicitudes');
   const { profile } = useAuthStore();
-  const { initialize } = useAppStore();
+  const { initialize, bands, addPermanentBandMember } = useAppStore();
   const isPastor = profile?.role === 'pastor';
 
   const [searchTerm, setSearchTerm] = useState('');
@@ -50,6 +51,11 @@ export const Solicitudes = () => {
   const [generatedPassword, setGeneratedPassword] = useState('');
   const [createdMember, setCreatedMember] = useState(null);
   const [showPasswordReveal, setShowPasswordReveal] = useState(false);
+  // Asistente opcional post-aprobación: sumar al nuevo miembro a una o más bandas.
+  // Es un atajo de "Agregar miembro (permanente)" de Bandas; aparece una sola vez.
+  const [assistantMember, setAssistantMember] = useState(null); // { id, name, instruments }
+  const [assistantBands, setAssistantBands] = useState([]);      // band ids elegidos
+  const [assistantSubmitting, setAssistantSubmitting] = useState(false);
 
   // Confirmation modals
   const [confirmModal, setConfirmModal] = useState({
@@ -145,7 +151,7 @@ export const Solicitudes = () => {
     const approvedEmail = selectedRequest.email;
     const approvedPassword = generatedPassword;
 
-    const { error } = await callAdminFunction('admin-approve-registration', {
+    const { data, error } = await callAdminFunction('admin-approve-registration', {
       requestId: selectedRequest.id,
       role: selectedRole,
       password: generatedPassword,
@@ -167,11 +173,61 @@ export const Solicitudes = () => {
     setConfirmModal({ ...confirmModal, isOpen: false, loading: false });
 
     // Show the credentials modal so the pastor can copy and share them
-    // through a secure channel. Once it closes, the password is gone.
-    setCreatedMember({ name: approvedName, email: approvedEmail, password: approvedPassword });
+    // through a secure channel. Once it closes, the password is gone. Guardamos
+    // también el id + instrumentos del nuevo miembro (la EF los devuelve) para
+    // el asistente de bandas que aparece al cerrar este aviso.
+    const newMember = data?.member || null;
+    setCreatedMember({
+      name: approvedName,
+      email: approvedEmail,
+      password: approvedPassword,
+      id: newMember?.id || null,
+      instruments: newMember?.instruments || [],
+    });
     setShowPasswordReveal(true);
 
     await initialize();
+  };
+
+  // Al cerrar el aviso de credenciales, ofrecer (una sola vez) sumar al nuevo
+  // miembro a una o más bandas. Es opcional y no condicionante: si lo salta, lo
+  // puede hacer cuando quiera desde Bandas.
+  const closeCredentialsAndOfferBands = () => {
+    setShowPasswordReveal(false);
+    const m = createdMember;
+    setCreatedMember(null);
+    if (m?.id && bands.some(b => b.active)) {
+      setAssistantMember({ id: m.id, name: m.name, instruments: m.instruments || [] });
+      setAssistantBands([]);
+    }
+  };
+
+  const toggleAssistantBand = (bandId) => {
+    setAssistantBands(prev => prev.includes(bandId) ? prev.filter(id => id !== bandId) : [...prev, bandId]);
+  };
+
+  // Suma al nuevo miembro a las bandas elegidas reutilizando el MISMO motor que
+  // "Agregar miembro (permanente)" de Bandas (addPermanentBandMember). Cero backend nuevo.
+  const handleAssistantAdd = async () => {
+    if (!assistantMember?.id || assistantBands.length === 0 || assistantSubmitting) return;
+    setAssistantSubmitting(true);
+    let ok = 0;
+    const failed = [];
+    for (const bandId of assistantBands) {
+      const res = await addPermanentBandMember(bandId, assistantMember.id);
+      if (res?.ok) ok += 1; else failed.push(bandId);
+    }
+    setAssistantSubmitting(false);
+    const who = assistantMember.name;
+    setAssistantMember(null);
+    setAssistantBands([]);
+    if (failed.length === 0) {
+      setSuccessModal({ isOpen: true, title: 'Listo', message: `Sumaste a ${who} a ${ok} ${ok === 1 ? 'banda' : 'bandas'}.` });
+    } else if (ok > 0) {
+      setSuccessModal({ isOpen: true, title: 'Casi todo', message: `Sumaste a ${who} a ${ok} ${ok === 1 ? 'banda' : 'bandas'}. En ${failed.length} no se pudo — probá desde Bandas.` });
+    } else {
+      setErrorModal({ isOpen: true, title: 'No se pudo agregar', message: `No se pudo sumar a ${who} a las bandas. Probá desde la pantalla de Bandas.` });
+    }
   };
 
   const handleReject = (request) => {
@@ -590,7 +646,7 @@ export const Solicitudes = () => {
       {/* Credentials Reveal Modal — shown once after a successful approval */}
       <Modal
         isOpen={showPasswordReveal}
-        onClose={() => { setShowPasswordReveal(false); setCreatedMember(null); }}
+        onClose={closeCredentialsAndOfferBands}
         title="Solicitud Aprobada"
         size="md"
       >
@@ -632,9 +688,61 @@ export const Solicitudes = () => {
             <strong>Importante:</strong> compartí la contraseña por un canal seguro. Después de cerrar este aviso ya no la vas a poder ver de nuevo.
           </div>
 
-          <Button onClick={() => { setShowPasswordReveal(false); setCreatedMember(null); }} className="w-full">
+          <Button onClick={closeCredentialsAndOfferBands} className="w-full">
             Entendido
           </Button>
+        </div>
+      </Modal>
+
+      {/* Asistente (opcional, una sola vez): sumar al nuevo miembro a bandas */}
+      <Modal
+        isOpen={!!assistantMember}
+        onClose={() => { setAssistantMember(null); setAssistantBands([]); }}
+        title="¿Lo sumamos a una banda?"
+        size="md"
+        footer={
+          <>
+            <Button variant="secondary" onClick={() => { setAssistantMember(null); setAssistantBands([]); }} disabled={assistantSubmitting}>
+              Ahora no
+            </Button>
+            <Button onClick={handleAssistantAdd} disabled={assistantBands.length === 0 || assistantSubmitting}>
+              {assistantSubmitting ? 'Agregando…' : (assistantBands.length > 0 ? `Agregar (${assistantBands.length})` : 'Agregar')}
+            </Button>
+          </>
+        }
+      >
+        <div className="space-y-4">
+          <p className="text-sm text-gray-400">
+            <span className="font-medium text-white">{assistantMember?.name}</span> ya tiene su cuenta. Si querés, sumalo ahora a las bandas donde va a tocar. Podés hacerlo también más tarde desde Bandas.
+          </p>
+          {assistantMember?.instruments?.length > 0 && (
+            <p className="text-xs text-gray-500">
+              Instrumentos que declaró: {assistantMember.instruments.join(', ')}
+            </p>
+          )}
+          <div className="grid grid-cols-1 gap-2 max-h-64 overflow-y-auto">
+            {bands.filter(b => b.active).sort(compareBandsByCalendar).map((band) => {
+              const checked = assistantBands.includes(band.id);
+              return (
+                <button
+                  key={band.id}
+                  type="button"
+                  onClick={() => toggleAssistantBand(band.id)}
+                  className={`flex items-center gap-3 p-3 rounded-xl text-left transition-all border-2 ${checked ? 'border-gold-500/60 bg-gold-500/10' : 'border-neutral-800 hover:border-neutral-700'}`}
+                >
+                  <div className="flex-1 min-w-0">
+                    <p className="font-medium text-sm truncate">{band.name}</p>
+                    <p className="text-xs text-gray-500 truncate">
+                      {(dayPluralLabels[band.meetingDay] || dayLabels[band.meetingDay] || '')}{band.meetingTime ? ` · ${band.meetingTime}` : ''}
+                    </p>
+                  </div>
+                  <div className={`w-5 h-5 rounded flex items-center justify-center shrink-0 ${checked ? 'bg-gold-gradient' : 'border-2 border-gray-500'}`}>
+                    {checked && <Check size={12} className="text-black" />}
+                  </div>
+                </button>
+              );
+            })}
+          </div>
         </div>
       </Modal>
 
