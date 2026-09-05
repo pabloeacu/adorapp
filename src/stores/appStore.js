@@ -141,6 +141,19 @@ const convertBandFromDB = (b) => ({
   updatedAt: b.updated_at,
 });
 
+// Temporal de banda (tabla band_temporary_members). Los permanentes siguen en
+// bands.members uuid[]; los temporales viven acá con su ventana (expires_at).
+// "Vigente" = expires_at > now(). Ver docs/PLAN_membresias_bandas.md.
+const convertBandTemporaryMemberFromDB = (t) => ({
+  id: t.id,
+  bandId: t.band_id,
+  memberId: t.member_id,
+  addedBy: t.added_by,
+  startsAt: t.starts_at,
+  expiresAt: t.expires_at,
+  createdAt: t.created_at,
+});
+
 const convertSongFromDB = (s) => ({
   id: s.id,
   title: s.title,
@@ -297,6 +310,7 @@ export const useAppStore = create((set, get) => ({
   bands: [],
   songs: [],
   orders: [],
+  bandTemporaryMembers: [], // temporales de banda (permanentes siguen en bands.members)
   loading: false,
   error: null,
 
@@ -305,11 +319,12 @@ export const useAppStore = create((set, get) => ({
     set({ loading: true, error: null });
 
     try {
-      const [membersRes, bandsRes, songsRes, ordersRes] = await Promise.all([
+      const [membersRes, bandsRes, songsRes, ordersRes, tempRes] = await Promise.all([
         supabase.from('members').select('*').order('name'),
         supabase.from('bands').select('*').order('name'),
         supabase.from('songs').select('*').order('title'),
         supabase.from('orders').select('*').order('date', { ascending: false }),
+        supabase.from('band_temporary_members').select('*'),
       ]);
 
       if (membersRes.error) throw membersRes.error;
@@ -321,18 +336,24 @@ export const useAppStore = create((set, get) => ({
       const bands = bandsRes.data.map(convertBandFromDB);
       const songs = songsRes.data.map(convertSongFromDB);
       const orders = ordersRes.data.map(convertOrderFromDB);
+      // Temporales: TOLERANTE. Si falla (tabla no desplegada aún, permiso), NO
+      // rompe la carga del núcleo — el resto de la app sigue funcionando igual.
+      if (tempRes.error) console.warn('band_temporary_members no disponible:', tempRes.error.message);
+      const bandTemporaryMembers = tempRes.error ? [] : (tempRes.data || []).map(convertBandTemporaryMemberFromDB);
 
       // Persist to localStorage for survival across page refreshes
       localStorage.setItem('appMembers', JSON.stringify(members));
       localStorage.setItem('appBands', JSON.stringify(bands));
       localStorage.setItem('appSongs', JSON.stringify(songs));
       localStorage.setItem('appOrders', JSON.stringify(orders));
+      try { localStorage.setItem('appBandTempMembers', JSON.stringify(bandTemporaryMembers)); } catch { /* non-fatal */ }
 
       set({
         members,
         bands,
         songs,
         orders,
+        bandTemporaryMembers,
         loading: false,
       });
     } catch (err) {
@@ -343,6 +364,7 @@ export const useAppStore = create((set, get) => ({
         const cachedBands = JSON.parse(localStorage.getItem('appBands') || '[]');
         const cachedSongs = JSON.parse(localStorage.getItem('appSongs') || '[]');
         const cachedOrders = JSON.parse(localStorage.getItem('appOrders') || '[]');
+        const cachedTemp = JSON.parse(localStorage.getItem('appBandTempMembers') || '[]');
 
         if (cachedMembers.length > 0 || cachedBands.length > 0 || cachedSongs.length > 0) {
           console.log('📦 Loading from localStorage cache...');
@@ -351,6 +373,7 @@ export const useAppStore = create((set, get) => ({
             bands: cachedBands,
             songs: cachedSongs,
             orders: cachedOrders,
+            bandTemporaryMembers: cachedTemp,
             loading: false,
           });
           return;
@@ -598,6 +621,97 @@ export const useAppStore = create((set, get) => ({
       console.error('Error deleting band:', err);
       set({ error: err.message });
       return false;
+    }
+  },
+
+  // ── Miembros de banda agregados por líderes/pastor (docs/PLAN_membresias_bandas) ──
+  // Devuelven { ok } | { error } (string legible) para que la UI ramifique
+  // (patrón anti fire-and-forget, landmine #32).
+
+  // Agregar PERMANENTE: append a bands.members. Update DIRIGIDO solo a `members`
+  // (NO convertBandToDB): no puede perder datos ni tropezar el trigger
+  // append-only del líder (los demás campos quedan idénticos → NEW = OLD).
+  addPermanentBandMember: async (bandId, memberId) => {
+    try {
+      const band = get().bands.find(b => b.id === bandId);
+      if (!band) return { error: 'La banda no existe.' };
+      if ((band.members || []).includes(memberId)) return { ok: true }; // ya es permanente
+      const nextMembers = [...(band.members || []), memberId];
+      const { data, error } = await supabase
+        .from('bands')
+        .update({ members: nextMembers })
+        .eq('id', bandId)
+        .select()
+        .single();
+      if (error) return { error: error.message };
+      const updated = convertBandFromDB(data);
+      set((state) => ({ bands: state.bands.map(b => b.id === bandId ? updated : b) }));
+      try {
+        const cached = JSON.parse(localStorage.getItem('appBands') || '[]');
+        localStorage.setItem('appBands', JSON.stringify(cached.map(b => b.id === bandId ? updated : b)));
+      } catch { /* non-fatal */ }
+      return { ok: true };
+    } catch (err) {
+      console.error('addPermanentBandMember error:', err);
+      return { error: err.message || 'No se pudo agregar el integrante.' };
+    }
+  },
+
+  // Agregar TEMPORAL: fila en band_temporary_members. starts_at y expires_at se
+  // derivan del MISMO instante de cliente → el CHECK (1–90 días) se cumple
+  // determinísticamente sin depender del reloj del servidor. `addedBy` debe ser
+  // el member id del usuario actual (RLS lo verifica: no se puede firmar por otro).
+  addTemporaryBandMember: async ({ bandId, memberId, days, addedBy }) => {
+    try {
+      const n = Number(days);
+      if (!Number.isInteger(n) || n < 1 || n > 90) return { error: 'La cantidad de días debe ser entre 1 y 90.' };
+      if (!addedBy) return { error: 'No pudimos identificar quién agrega. Recargá la página e intentá de nuevo.' };
+      const startsAt = new Date();
+      const expiresAt = new Date(startsAt.getTime() + n * 24 * 60 * 60 * 1000);
+      const { data, error } = await supabase
+        .from('band_temporary_members')
+        .insert({
+          band_id: bandId,
+          member_id: memberId,
+          added_by: addedBy,
+          starts_at: startsAt.toISOString(),
+          expires_at: expiresAt.toISOString(),
+        })
+        .select()
+        .single();
+      if (error) return { error: error.message };
+      const row = convertBandTemporaryMemberFromDB(data);
+      set((state) => ({ bandTemporaryMembers: [row, ...state.bandTemporaryMembers] }));
+      try {
+        const cached = JSON.parse(localStorage.getItem('appBandTempMembers') || '[]');
+        localStorage.setItem('appBandTempMembers', JSON.stringify([row, ...cached]));
+      } catch { /* non-fatal */ }
+      return { ok: true, temporary: row };
+    } catch (err) {
+      console.error('addTemporaryBandMember error:', err);
+      return { error: err.message || 'No se pudo agregar el integrante temporal.' };
+    }
+  },
+
+  // Quitar TEMPORAL (solo pastor; la RLS lo garantiza). count:'exact' detecta el
+  // caso RLS-bloqueado (0 filas sin error) para no mentirle al usuario.
+  removeTemporaryBandMember: async (id) => {
+    try {
+      const { error, count } = await supabase
+        .from('band_temporary_members')
+        .delete({ count: 'exact' })
+        .eq('id', id);
+      if (error) return { error: error.message };
+      if (!count) return { error: 'Solo el pastor puede quitar integrantes temporales.' };
+      set((state) => ({ bandTemporaryMembers: state.bandTemporaryMembers.filter(t => t.id !== id) }));
+      try {
+        const cached = JSON.parse(localStorage.getItem('appBandTempMembers') || '[]');
+        localStorage.setItem('appBandTempMembers', JSON.stringify(cached.filter(t => t.id !== id)));
+      } catch { /* non-fatal */ }
+      return { ok: true };
+    } catch (err) {
+      console.error('removeTemporaryBandMember error:', err);
+      return { error: err.message || 'No se pudo quitar el integrante temporal.' };
     }
   },
 
@@ -913,11 +1027,48 @@ export const useAppStore = create((set, get) => ({
   getBandById: (id) => get().bands.find(b => b.id === id),
   getSongById: (id) => get().songs.find(s => s.id === id),
 
-  // Get members by band
+  // IDs de miembros EFECTIVOS de una banda = permanentes (bands.members) ∪
+  // temporales VIGENTES (expires_at > ahora). Espeja la definición SQL
+  // band_effective_member_ids(). Sin filtro de "active" (igual que el SQL): los
+  // consumidores filtran actividad donde corresponda. Se re-evalúa en cada
+  // llamada con Date.now() (sin timers) — un temporal vencido deja de contar.
+  getEffectiveBandMemberIds: (bandId) => {
+    const band = get().bands.find(b => b.id === bandId);
+    const ids = new Set(band?.members || []);
+    const now = Date.now();
+    for (const t of get().bandTemporaryMembers) {
+      if (t.bandId === bandId && new Date(t.expiresAt).getTime() > now) ids.add(t.memberId);
+    }
+    return ids;
+  },
+
+  // Miembros de la banda (objetos, activos) para mostrar: permanentes ∪
+  // temporales vigentes. Los temporales llevan { temporary: true, expiresAt }
+  // para el badge "Temporal · vence DD/MM". El permanente gana si alguien
+  // figura en ambos (sin badge).
   getBandMembers: (bandId) => {
     const band = get().bands.find(b => b.id === bandId);
     if (!band) return [];
-    return get().members.filter(m => band.members.includes(m.id) && m.active);
+    const permanentIds = new Set(band.members || []);
+    const now = Date.now();
+    // memberId -> expiresAt más lejano entre sus temporales vigentes (no permanentes)
+    const tempExpiry = new Map();
+    for (const t of get().bandTemporaryMembers) {
+      if (t.bandId !== bandId) continue;
+      if (permanentIds.has(t.memberId)) continue;
+      if (new Date(t.expiresAt).getTime() <= now) continue;
+      const prev = tempExpiry.get(t.memberId);
+      if (!prev || new Date(t.expiresAt).getTime() > new Date(prev).getTime()) {
+        tempExpiry.set(t.memberId, t.expiresAt);
+      }
+    }
+    const result = [];
+    for (const m of get().members) {
+      if (!m.active) continue;
+      if (permanentIds.has(m.id)) result.push(m);
+      else if (tempExpiry.has(m.id)) result.push({ ...m, temporary: true, expiresAt: tempExpiry.get(m.id) });
+    }
+    return result;
   },
 
   // Get song with transposed key
@@ -978,6 +1129,7 @@ export const useAppStore = create((set, get) => ({
       bands:   { key: 'bands',   from: convertBandFromDB,   lsKey: 'appBands'   },
       songs:   { key: 'songs',   from: convertSongFromDB,   lsKey: 'appSongs'   },
       orders:  { key: 'orders',  from: convertOrderFromDB,  lsKey: 'appOrders'  },
+      band_temporary_members: { key: 'bandTemporaryMembers', from: convertBandTemporaryMemberFromDB, lsKey: 'appBandTempMembers' },
     };
     const spec = tableSpec[table];
     if (!spec) return;
@@ -1011,6 +1163,7 @@ export const useAppStore = create((set, get) => ({
       localStorage.removeItem('appBands');
       localStorage.removeItem('appSongs');
       localStorage.removeItem('appOrders');
+      localStorage.removeItem('appBandTempMembers');
     } catch {
       // localStorage may be unavailable in some embedded contexts; non-fatal.
     }
@@ -1019,6 +1172,7 @@ export const useAppStore = create((set, get) => ({
       bands: [],
       songs: [],
       orders: [],
+      bandTemporaryMembers: [],
       loading: false,
       error: null,
     });

@@ -39,7 +39,7 @@ const EDITABLE_FIELDS = [
 export const Comunicaciones = () => {
   useDocumentTitle('Comunicaciones');
   const { profile } = useAuthStore();
-  const { bands, members } = useAppStore();
+  const { bands, members, bandTemporaryMembers, getEffectiveBandMemberIds } = useAppStore();
   const isPastor = profile?.role === 'pastor';
 
   // Form state
@@ -248,22 +248,19 @@ export const Comunicaciones = () => {
     [bands]
   );
 
-  // Get members by selected bands (from band's members array)
+  // Get members by selected bands (efectivos = permanentes ∪ temporales vigentes)
   const membersInSelectedBands = useMemo(() => {
     if (selectedBands.length === 0) return [];
 
-    // Get all member IDs from selected bands
+    // Union de IDs efectivos de todas las bandas elegidas.
     const bandMemberIds = new Set();
     selectedBands.forEach(bandId => {
-      const band = bands.find(b => b.id === bandId);
-      if (band?.members) {
-        band.members.forEach(memberId => bandMemberIds.add(memberId));
-      }
+      getEffectiveBandMemberIds(bandId).forEach(id => bandMemberIds.add(id));
     });
 
     // Filter active members that are in those bands AND have user accounts
     return membersWithAccounts.filter(m => bandMemberIds.has(m.id));
-  }, [selectedBands, bands, membersWithAccounts]);
+  }, [selectedBands, bands, bandTemporaryMembers, membersWithAccounts, getEffectiveBandMemberIds]);
 
   // Toggle band selection
   const toggleBand = (bandId) => {
@@ -909,7 +906,7 @@ export const Comunicaciones = () => {
                     <div className="flex-1 text-left">
                       <p className="text-white font-medium">{band.name}</p>
                       <p className="text-xs text-gray-400">
-                        {membersWithAccounts.filter(m => band.members?.includes(m.id)).length} miembros con cuenta
+                        {membersWithAccounts.filter(m => getEffectiveBandMemberIds(band.id).has(m.id)).length} miembros con cuenta
                       </p>
                     </div>
                   </button>

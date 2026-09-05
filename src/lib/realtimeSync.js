@@ -1,4 +1,5 @@
-// Realtime sync for the four core tables: members, bands, songs, orders.
+// Realtime sync for the core tables: members, bands, songs, orders, and
+// band_temporary_members (temporales de banda — permanentes viven en bands.members).
 //
 // Why this exists: without it, a change made by another user (a pastor adds
 // a song, a leader edits an order, etc.) only shows up the next time the
@@ -21,7 +22,7 @@ let channel = null;
 let visibilityHandler = null;
 let lastStatus = null;
 
-const TABLES = ['members', 'bands', 'songs', 'orders'];
+const TABLES = ['members', 'bands', 'songs', 'orders', 'band_temporary_members'];
 
 function attach() {
   if (channel) return channel;
