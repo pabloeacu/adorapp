@@ -84,18 +84,27 @@ export const IniciarServicio = () => {
 
   // ---- Autoscroll (solo pasos de canción) ----
   const scrollRef = useRef(null);
+  const scrollAccRef = useRef(0); // posición real (float), fuente de la verdad
   const [autoScroll, setAutoScroll] = useState(false);
-  const [speed, setSpeed] = useState(() => { try { return Number(localStorage.getItem('adorapp_presenter_speed')) || 24; } catch { return 24; } });
+  const [speed, setSpeed] = useState(() => { try { const v = Number(localStorage.getItem('adorapp_presenter_speed')); return v > 0 ? v : 40; } catch { return 40; } });
   useEffect(() => { try { localStorage.setItem('adorapp_presenter_speed', String(speed)); } catch { /* non-fatal */ } }, [speed]);
   useEffect(() => { setAutoScroll(false); if (scrollRef.current) scrollRef.current.scrollTop = 0; }, [stepIdx]);
   useEffect(() => {
     if (!autoScroll) return;
+    const el0 = scrollRef.current;
+    if (!el0) return;
+    // `scrollTop` se redondea a entero al releerlo, así que `scrollTop += speed*dt`
+    // PERDÍA la fracción a baja velocidad (<1px/frame) y no avanzaba: solo el máximo
+    // reaccionaba. Acumulamos la posición real en un ref float y se la asignamos cada
+    // frame → la velocidad gradúa de forma pareja en todo el rango del slider.
+    scrollAccRef.current = el0.scrollTop;
     let raf; let last = performance.now();
     const tick = (now) => {
-      const dt = Math.min(0.1, (now - last) / 1000); last = now;
+      const dt = Math.min(0.05, (now - last) / 1000); last = now;
       const el = scrollRef.current;
       if (el) {
-        el.scrollTop += speed * dt;
+        scrollAccRef.current += speed * dt;
+        el.scrollTop = scrollAccRef.current;
         if (el.scrollTop + el.clientHeight >= el.scrollHeight - 1) { setAutoScroll(false); return; }
       }
       raf = requestAnimationFrame(tick);
@@ -155,12 +164,27 @@ export const IniciarServicio = () => {
         </div>
       );
     }
-    // Sección no-canción: título grande + observación o frase por defecto.
+    // Sección no-canción: presentación premium — flecha manuscrita dorada + "ahora"
+    // (Caveat) que APUNTAN a la sección actual, nombre flanqueado por líneas doradas,
+    // y la frase/observación en grande.
     const meta = sectionMeta(curSection.type);
+    const label = sectionDisplayLabel(curSection, meta);
     const text = (curSection.note && curSection.note.trim()) ? curSection.note.trim() : meta.phrase;
     return (
       <div className="flex flex-col items-center justify-center h-full text-center gap-4">
-        <p className="text-gold-300/80 text-sm uppercase tracking-widest">{sectionDisplayLabel(curSection, meta)}</p>
+        <div className="flex flex-col items-center gap-0.5">
+          <span className="font-hand text-[22px] font-bold leading-none text-gold-300 rotate-2">ahora</span>
+          <svg viewBox="0 0 40 36" className="h-9 w-11 text-gold-400" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+            {/* rulo hecho a mano que BAJA y apunta a la sección de abajo */}
+            <path d="M20 2 C 33 10, 7 16, 20 31" />
+            <path d="M13 25 L20 32 L27 25" />
+          </svg>
+        </div>
+        <div className="flex items-center gap-3 sm:gap-4">
+          <span className="h-px w-10 sm:w-20 bg-gradient-to-r from-transparent to-gold-500/70" aria-hidden="true" />
+          <p className="text-gold-200 text-sm sm:text-lg uppercase tracking-[0.22em] font-semibold whitespace-nowrap">{label}</p>
+          <span className="h-px w-10 sm:w-20 bg-gradient-to-l from-transparent to-gold-500/70" aria-hidden="true" />
+        </div>
         <p className="text-2xl sm:text-4xl font-semibold text-white max-w-2xl leading-snug text-balance">{text || meta.label}</p>
       </div>
     );
@@ -204,7 +228,7 @@ export const IniciarServicio = () => {
                 autoScroll ? 'bg-gold-500/20 border-gold-500/50 text-gold-200' : 'bg-neutral-900 border-neutral-700 text-neutral-300'}`}>
               <Gauge size={15} /> {autoScroll ? 'Autoscroll ON' : 'Autoscroll'}
             </button>
-            <input type="range" min="6" max="90" value={speed} onChange={(e) => setSpeed(Number(e.target.value))}
+            <input type="range" min="12" max="120" step="1" value={speed} onChange={(e) => setSpeed(Number(e.target.value))}
               className="flex-1 max-w-[220px] accent-gold-500" aria-label="Velocidad de autoscroll" />
           </div>
         )}
