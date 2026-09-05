@@ -42,30 +42,25 @@ export const minToHhmm = (min) => {
   return `${String(Math.floor(m / 60)).padStart(2, '0')}:${String(m % 60).padStart(2, '0')}`;
 };
 
-// Calcula, para cada sección, su ventana efectiva {startMin, endMin, durationMin}
-// según su modo de tiempo. 'startend' fija inicio+fin; 'duration' encadena
-// (inicio = fin de la sección anterior CON fin conocido, o el arranque del servicio);
-// 'none' no aporta tiempo (no rompe la cadena, se saltea). `serviceStartHhmm` es
-// la hora del orden (arranque por defecto). Devuelve un array paralelo a sections.
-export const computeSchemaTimeline = (sections, serviceStartHhmm) => {
-  let cursor = hhmmToMin(serviceStartHhmm); // puede ser null
-  return (sections || []).map((s) => {
-    const mode = s.timeMode || 'none';
-    if (mode === 'startend') {
-      const startMin = hhmmToMin(s.startTime);
-      const endMin = hhmmToMin(s.endTime);
-      if (endMin != null) cursor = endMin;
-      const durationMin = startMin != null && endMin != null && endMin >= startMin ? endMin - startMin : null;
-      return { startMin, endMin, durationMin };
-    }
-    if (mode === 'duration') {
-      const dur = Number(s.durationMin);
-      const valid = Number.isFinite(dur) && dur > 0;
-      const startMin = cursor;
-      const endMin = valid && startMin != null ? startMin + dur : null;
-      if (endMin != null) cursor = endMin;
-      return { startMin, endMin, durationMin: valid ? dur : null };
-    }
-    return { startMin: null, endMin: null, durationMin: null }; // 'none'
-  });
+// Minutos de una sección para la cuenta regresiva. Dos modos, independientes:
+//   'duration' → el número de minutos tal cual (NO calcula inicio/fin).
+//   'horario'  → inicio + fin; la duración = fin − inicio.
+//   'none'     → sin tiempo (sin cuenta).
+export const sectionDurationMin = (s) => {
+  if (!s) return null;
+  const mode = s.timeMode || 'none';
+  if (mode === 'duration') {
+    const d = Number(s.durationMin);
+    return Number.isFinite(d) && d > 0 ? d : null;
+  }
+  if (mode === 'horario') {
+    const a = hhmmToMin(s.startTime);
+    const b = hhmmToMin(s.endTime);
+    return a != null && b != null && b > a ? b - a : null;
+  }
+  return null;
 };
+
+// Etiqueta visible de la sección: alias si lo pusieron, si no el nombre del tipo.
+export const sectionDisplayLabel = (s, meta) =>
+  (s?.alias && s.alias.trim()) ? s.alias.trim() : (meta?.label || 'Sección');

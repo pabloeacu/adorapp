@@ -1,37 +1,62 @@
-import React, { useState } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
+import { createPortal } from 'react-dom';
 import { ChevronDown, Check } from 'lucide-react';
 
-// Desplegable propio de la plataforma (mismo look que el de categorías del
-// Repertorio): botón + panel flotante oscuro con opciones doradas al elegir.
-// Reemplaza al <select> nativo (que abre la lista genérica del sistema operativo).
-// options: [{ value, label }]. `up` abre el panel hacia arriba (para campos
-// cerca del borde inferior de un modal con scroll, así no queda tapado).
-export const SelectMenu = ({ value, onChange, options = [], placeholder = 'Elegí…', disabled = false, icon: Icon, up = false }) => {
+// Desplegable propio de la plataforma (mismo look que el del Repertorio): botón +
+// panel flotante oscuro con la opción elegida en dorado. El panel se renderiza por
+// PORTAL con posición fija → NUNCA lo tapa el overflow de un modal (antes se
+// cortaba). Se abre hacia abajo o hacia arriba según el espacio disponible.
+// options: [{ value, label }].
+export const SelectMenu = ({ value, onChange, options = [], placeholder = 'Elegí…', disabled = false, icon: Icon, className = '' }) => {
   const [open, setOpen] = useState(false);
+  const [rect, setRect] = useState(null);
+  const btnRef = useRef(null);
   const selected = options.find((o) => o.value === value);
+
+  const openMenu = () => {
+    if (disabled) return;
+    const r = btnRef.current?.getBoundingClientRect();
+    if (r) setRect({ left: r.left, top: r.top, bottom: r.bottom, width: r.width });
+    setOpen(true);
+  };
+
+  // Cerrar ante scroll/resize (la posición fija quedaría desalineada).
+  useEffect(() => {
+    if (!open) return;
+    const close = () => setOpen(false);
+    window.addEventListener('scroll', close, true);
+    window.addEventListener('resize', close);
+    return () => { window.removeEventListener('scroll', close, true); window.removeEventListener('resize', close); };
+  }, [open]);
+
+  const spaceBelow = rect ? window.innerHeight - rect.bottom : 0;
+  const up = rect && spaceBelow < 260 && rect.top > spaceBelow;
+
   return (
-    <div className="relative">
+    <div className={`relative ${className}`}>
       <button
+        ref={btnRef}
         type="button"
         disabled={disabled}
-        onClick={() => !disabled && setOpen((o) => !o)}
-        className={`w-full flex items-center justify-between gap-2 px-4 py-3 bg-neutral-900 border rounded-xl transition-colors disabled:opacity-50 disabled:cursor-not-allowed ${
-          value ? 'border-gold-500/60 text-white' : 'border-neutral-800 text-gray-400 hover:text-white'
+        onClick={() => (open ? setOpen(false) : openMenu())}
+        className={`w-full flex items-center justify-between gap-2 px-4 py-2.5 bg-neutral-900 border rounded-xl transition-colors disabled:opacity-50 disabled:cursor-not-allowed ${
+          value ? 'border-gold-500/60 text-white' : 'border-neutral-700 text-gray-400 hover:text-white'
         }`}
       >
         <span className="flex items-center gap-2 min-w-0">
-          {Icon && <Icon size={18} className="shrink-0 text-gold-300/80" />}
-          <span className="truncate text-sm sm:text-base">{selected ? selected.label : placeholder}</span>
+          {Icon && <Icon size={16} className="shrink-0 text-gold-300/80" />}
+          <span className="truncate text-sm">{selected ? selected.label : placeholder}</span>
         </span>
         <ChevronDown size={16} className={`shrink-0 transition-transform ${open ? 'rotate-180' : ''}`} />
       </button>
 
-      {open && !disabled && (
+      {open && rect && createPortal(
         <>
-          <div className="fixed inset-0 z-40" onClick={() => setOpen(false)} />
-          <div className={`absolute left-0 right-0 z-50 bg-neutral-900 border border-neutral-700 rounded-xl shadow-xl max-h-56 overflow-y-auto p-1.5 ${
-            up ? 'bottom-full mb-2' : 'top-full mt-2'
-          }`}>
+          <div className="fixed inset-0 z-[300]" onClick={() => setOpen(false)} />
+          <div
+            className="fixed z-[301] bg-neutral-900 border border-neutral-700 rounded-xl shadow-2xl max-h-60 overflow-y-auto p-1.5"
+            style={{ left: rect.left, width: rect.width, ...(up ? { bottom: window.innerHeight - rect.top + 6 } : { top: rect.bottom + 6 }) }}
+          >
             {options.length === 0 && <div className="px-3 py-2 text-sm text-gray-500">Sin opciones</div>}
             {options.map((o) => {
               const on = o.value === value;
@@ -50,7 +75,8 @@ export const SelectMenu = ({ value, onChange, options = [], placeholder = 'Eleg�
               );
             })}
           </div>
-        </>
+        </>,
+        document.body,
       )}
     </div>
   );

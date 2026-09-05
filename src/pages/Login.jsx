@@ -111,11 +111,13 @@ export const Login = () => {
             className="w-28 mx-auto mb-4 object-contain"
           />
 
-          {/* Logo AdorAPP */}
+          {/* Logo AdorAPP — mix-blend-lighten disuelve el recuadro negro del PNG
+              sobre el fondo oscuro/dorado (mismo criterio que el resto de logos
+              PNG sobre dark; ver CLAUDE.md · Estética). */}
           <img
             src="/adorapp-logo.png"
             alt="AdorAPP"
-            className="w-52 mx-auto object-contain"
+            className="w-52 mx-auto object-contain mix-blend-lighten"
           />
 
           {/* Tagline */}
