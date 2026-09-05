@@ -154,6 +154,31 @@ const convertBandTemporaryMemberFromDB = (t) => ({
   createdAt: t.created_at,
 });
 
+// "Solicitar colaboración" (tablas collaboration_requests / collaboration_participants).
+// Solo lectura desde el cliente (RLS acota qué filas ve cada uno); toda escritura
+// pasa por la Edge Function collab. Ver supabase/migrations/20260905_collaboration_*.
+const convertCollabRequestFromDB = (r) => ({
+  id: r.id,
+  bandId: r.band_id,
+  orderId: r.order_id,
+  categories: r.categories || [],
+  requestedBy: r.requested_by,
+  status: r.status,
+  coveredMemberId: r.covered_member_id,
+  coveredAt: r.covered_at,
+  createdAt: r.created_at,
+  updatedAt: r.updated_at,
+});
+const convertCollabParticipantFromDB = (p) => ({
+  id: p.id,
+  requestId: p.request_id,
+  memberId: p.member_id,
+  status: p.status,
+  offeredAt: p.offered_at,
+  createdAt: p.created_at,
+  updatedAt: p.updated_at,
+});
+
 const convertSongFromDB = (s) => ({
   id: s.id,
   title: s.title,
@@ -311,6 +336,8 @@ export const useAppStore = create((set, get) => ({
   songs: [],
   orders: [],
   bandTemporaryMembers: [], // temporales de banda (permanentes siguen en bands.members)
+  collaborationRequests: [],     // "Solicitar colaboración" (RLS acota lo que ve cada uno)
+  collaborationParticipants: [], // participación propia + (para el que pidió) sus voluntarios
   loading: false,
   error: null,
 
@@ -319,12 +346,14 @@ export const useAppStore = create((set, get) => ({
     set({ loading: true, error: null });
 
     try {
-      const [membersRes, bandsRes, songsRes, ordersRes, tempRes] = await Promise.all([
+      const [membersRes, bandsRes, songsRes, ordersRes, tempRes, collabReqRes, collabPartRes] = await Promise.all([
         supabase.from('members').select('*').order('name'),
         supabase.from('bands').select('*').order('name'),
         supabase.from('songs').select('*').order('title'),
         supabase.from('orders').select('*').order('date', { ascending: false }),
         supabase.from('band_temporary_members').select('*'),
+        supabase.from('collaboration_requests').select('*'),
+        supabase.from('collaboration_participants').select('*'),
       ]);
 
       if (membersRes.error) throw membersRes.error;
@@ -340,6 +369,11 @@ export const useAppStore = create((set, get) => ({
       // rompe la carga del núcleo — el resto de la app sigue funcionando igual.
       if (tempRes.error) console.warn('band_temporary_members no disponible:', tempRes.error.message);
       const bandTemporaryMembers = tempRes.error ? [] : (tempRes.data || []).map(convertBandTemporaryMemberFromDB);
+      // Colaboración: TOLERANTE igual (tabla nueva). El cliente solo lee lo que la RLS le deja.
+      if (collabReqRes.error) console.warn('collaboration_requests no disponible:', collabReqRes.error.message);
+      if (collabPartRes.error) console.warn('collaboration_participants no disponible:', collabPartRes.error.message);
+      const collaborationRequests = collabReqRes.error ? [] : (collabReqRes.data || []).map(convertCollabRequestFromDB);
+      const collaborationParticipants = collabPartRes.error ? [] : (collabPartRes.data || []).map(convertCollabParticipantFromDB);
 
       // Persist to localStorage for survival across page refreshes
       localStorage.setItem('appMembers', JSON.stringify(members));
@@ -347,6 +381,8 @@ export const useAppStore = create((set, get) => ({
       localStorage.setItem('appSongs', JSON.stringify(songs));
       localStorage.setItem('appOrders', JSON.stringify(orders));
       try { localStorage.setItem('appBandTempMembers', JSON.stringify(bandTemporaryMembers)); } catch { /* non-fatal */ }
+      try { localStorage.setItem('appCollabRequests', JSON.stringify(collaborationRequests)); } catch { /* non-fatal */ }
+      try { localStorage.setItem('appCollabParticipants', JSON.stringify(collaborationParticipants)); } catch { /* non-fatal */ }
 
       set({
         members,
@@ -354,6 +390,8 @@ export const useAppStore = create((set, get) => ({
         songs,
         orders,
         bandTemporaryMembers,
+        collaborationRequests,
+        collaborationParticipants,
         loading: false,
       });
     } catch (err) {
@@ -365,6 +403,8 @@ export const useAppStore = create((set, get) => ({
         const cachedSongs = JSON.parse(localStorage.getItem('appSongs') || '[]');
         const cachedOrders = JSON.parse(localStorage.getItem('appOrders') || '[]');
         const cachedTemp = JSON.parse(localStorage.getItem('appBandTempMembers') || '[]');
+        const cachedCollabReq = JSON.parse(localStorage.getItem('appCollabRequests') || '[]');
+        const cachedCollabPart = JSON.parse(localStorage.getItem('appCollabParticipants') || '[]');
 
         if (cachedMembers.length > 0 || cachedBands.length > 0 || cachedSongs.length > 0) {
           console.log('📦 Loading from localStorage cache...');
@@ -374,6 +414,8 @@ export const useAppStore = create((set, get) => ({
             songs: cachedSongs,
             orders: cachedOrders,
             bandTemporaryMembers: cachedTemp,
+            collaborationRequests: cachedCollabReq,
+            collaborationParticipants: cachedCollabPart,
             loading: false,
           });
           return;
@@ -1130,6 +1172,8 @@ export const useAppStore = create((set, get) => ({
       songs:   { key: 'songs',   from: convertSongFromDB,   lsKey: 'appSongs'   },
       orders:  { key: 'orders',  from: convertOrderFromDB,  lsKey: 'appOrders'  },
       band_temporary_members: { key: 'bandTemporaryMembers', from: convertBandTemporaryMemberFromDB, lsKey: 'appBandTempMembers' },
+      collaboration_requests: { key: 'collaborationRequests', from: convertCollabRequestFromDB, lsKey: 'appCollabRequests' },
+      collaboration_participants: { key: 'collaborationParticipants', from: convertCollabParticipantFromDB, lsKey: 'appCollabParticipants' },
     };
     const spec = tableSpec[table];
     if (!spec) return;
@@ -1164,6 +1208,8 @@ export const useAppStore = create((set, get) => ({
       localStorage.removeItem('appSongs');
       localStorage.removeItem('appOrders');
       localStorage.removeItem('appBandTempMembers');
+      localStorage.removeItem('appCollabRequests');
+      localStorage.removeItem('appCollabParticipants');
     } catch {
       // localStorage may be unavailable in some embedded contexts; non-fatal.
     }
@@ -1173,9 +1219,65 @@ export const useAppStore = create((set, get) => ({
       songs: [],
       orders: [],
       bandTemporaryMembers: [],
+      collaborationRequests: [],
+      collaborationParticipants: [],
       loading: false,
       error: null,
     });
+  },
+
+  // ---------- "Solicitar colaboración" — envoltorios de la Edge Function collab ----------
+  // Toda escritura pasa por el server (service_role). Devuelven { ok, ... } o { error }.
+  requestCollaboration: async ({ bandId, orderId, categories }) => {
+    const { data, error } = await callAdminFunction('collab', { action: 'create', bandId, orderId, categories });
+    if (error) return { error };
+    return { ok: true, ...(data || {}) };
+  },
+  offerCollaboration: async (requestId) => {
+    const { data, error } = await callAdminFunction('collab', { action: 'offer', requestId });
+    if (error) return { error };
+    return { ok: true, ...(data || {}) };
+  },
+  coverCollaboration: async ({ requestId, memberId, days }) => {
+    const { data, error } = await callAdminFunction('collab', { action: 'cover', requestId, memberId, days });
+    if (error) return { error };
+    return { ok: true, ...(data || {}) };
+  },
+  cancelCollaboration: async (requestId) => {
+    const { data, error } = await callAdminFunction('collab', { action: 'cancel', requestId });
+    if (error) return { error };
+    return { ok: true, ...(data || {}) };
+  },
+
+  // Deriva los banners de colaboración para un miembro, a partir de lo que la RLS
+  // ya le dejó ver (collaborationRequests/Participants). Puro, sin red.
+  getCollaborationFeed: (memberId) => {
+    if (!memberId) return { invited: [], offered: [], managing: [], results: [] };
+    const reqs = get().collaborationRequests || [];
+    const parts = get().collaborationParticipants || [];
+    const myPart = new Map(); // requestId -> my participant
+    for (const p of parts) if (p.memberId === memberId) myPart.set(p.requestId, p);
+    const offersByReq = new Map(); // requestId -> count of 'offered'
+    for (const p of parts) if (p.status === 'offered') offersByReq.set(p.requestId, (offersByReq.get(p.requestId) || 0) + 1);
+
+    const invited = [], offered = [], managing = [], results = [];
+    for (const r of reqs) {
+      const mine = myPart.get(r.id);
+      if (r.status === 'open') {
+        if (mine && mine.status === 'invited') invited.push(r);
+        else if (mine && mine.status === 'offered') offered.push(r);
+        if (r.requestedBy === memberId && (offersByReq.get(r.id) || 0) > 0) managing.push(r);
+      } else if (r.status === 'covered' && mine && (mine.status === 'accepted' || mine.status === 'declined')) {
+        results.push({ request: r, outcome: mine.status });
+      }
+    }
+    return { invited, offered, managing, results };
+  },
+
+  // Voluntarios (participantes 'offered') de una solicitud propia, para el modal de gestión.
+  getCollaborationVolunteers: (requestId) => {
+    const parts = get().collaborationParticipants || [];
+    return parts.filter((p) => p.requestId === requestId && p.status === 'offered');
   },
 }));
 
