@@ -16,6 +16,7 @@ import { EmptyState } from '../components/ui/EmptyState';
 import { Modal } from '../components/ui/Modal';
 import { Input } from '../components/ui/Input';
 import { ConfirmModal, SuccessModal, ErrorModal } from '../components/ui/ConfirmModal';
+import { RequestCollaborationButton } from '../components/dashboard/RequestCollaborationButton';
 
 import { dayLabels, dayPluralLabels, compareBandsByCalendar } from '../lib/days';
 
@@ -251,11 +252,14 @@ export const Bandas = () => {
             {activeBands.length} bandas activas
           </p>
         </div>
-        {/* Pastors and Leaders can create bands */}
+        {/* Pastors and Leaders can create bands + request a substitute for a service */}
         {(isPastor || isLeader) && (
-          <Button icon={Plus} onClick={() => handleOpenModal()}>
-            Crear Banda
-          </Button>
+          <div className="flex flex-wrap items-center gap-2">
+            <RequestCollaborationButton />
+            <Button icon={Plus} onClick={() => handleOpenModal()}>
+              Crear Banda
+            </Button>
+          </div>
         )}
       </div>
 

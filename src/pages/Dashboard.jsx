@@ -31,7 +31,6 @@ import { SilentBoundary } from '../components/ui/SilentBoundary';
 import { GreetingHeader } from '../components/dashboard/GreetingHeader';
 import { PrepBanner } from '../components/dashboard/PrepBanner';
 import { ServiceFeedbackPrompt } from '../components/dashboard/ServiceFeedbackPrompt';
-import { RequestCollaborationButton } from '../components/dashboard/RequestCollaborationButton';
 import { CollaborationBanner } from '../components/dashboard/CollaborationBanner';
 
 const getInstrumentIcon = (instrument) => {
@@ -111,13 +110,9 @@ export const Dashboard = () => {
         <ServiceFeedbackPrompt member={member} role={role} />
       </SilentBoundary>
 
-      {/* Solicitar colaboración — botón sólo pastor/líder (se auto-oculta si no lo es). */}
-      <SilentBoundary>
-        <RequestCollaborationButton />
-      </SilentBoundary>
-
       {/* Colaboración — banners CONDICIONALES: invitado (ofrecerse), ofrecido (esperando),
-          el que pidió (gestionar y cubrir) y resultado. Se auto-ocultan si no hay nada. */}
+          el que pidió (gestionar y cubrir) y resultado. Se auto-ocultan si no hay nada.
+          (El botón "Solicitar colaboración" vive en la sección Bandas.) */}
       <SilentBoundary>
         <CollaborationBanner />
       </SilentBoundary>

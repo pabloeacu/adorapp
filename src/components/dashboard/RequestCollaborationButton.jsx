@@ -1,9 +1,10 @@
 import React, { useState, useMemo } from 'react';
-import { HelpingHand, Check } from 'lucide-react';
+import { Megaphone, Check } from 'lucide-react';
 import { useAppStore, INSTRUMENTS, MEETING_TYPES } from '../../stores/appStore';
 import { useCurrentRole } from '../../hooks/useCurrentMember';
 import { Button } from '../ui/Button';
 import { Modal } from '../ui/Modal';
+import { SelectMenu } from '../ui/SelectMenu';
 import { SuccessModal, ErrorModal } from '../ui/ConfirmModal';
 
 const fmtOrderLabel = (order, bands) => {
@@ -71,7 +72,8 @@ export const RequestCollaborationButton = () => {
 
   return (
     <>
-      <Button variant="secondary" icon={HelpingHand} onClick={openModal} className="w-full sm:w-auto">
+      <Button variant="secondary" icon={Megaphone} onClick={openModal}
+        className="!bg-black !text-gold-300 !border !border-gold-500/60 hover:!bg-gold-500/10 hover:!text-gold-100">
         Solicitar colaboración
       </Button>
 
@@ -92,11 +94,9 @@ export const RequestCollaborationButton = () => {
 
           <div>
             <label className="block text-sm font-medium text-neutral-300 mb-1.5">Banda</label>
-            <select value={bandId} onChange={(e) => { setBandId(e.target.value); setOrderId(''); }}
-              className="w-full bg-neutral-800 border border-neutral-700 rounded-lg px-3 text-white">
-              <option value="">Elegí una banda…</option>
-              {activeBands.map((b) => <option key={b.id} value={b.id}>{b.name}</option>)}
-            </select>
+            <SelectMenu value={bandId} onChange={(v) => { setBandId(v); setOrderId(''); }}
+              placeholder="Elegí una banda…"
+              options={activeBands.map((b) => ({ value: b.id, label: b.name }))} />
           </div>
 
           <div>
@@ -118,11 +118,9 @@ export const RequestCollaborationButton = () => {
 
           <div>
             <label className="block text-sm font-medium text-neutral-300 mb-1.5">¿Para qué servicio?</label>
-            <select value={orderId} onChange={(e) => setOrderId(e.target.value)} disabled={!bandId}
-              className="w-full bg-neutral-800 border border-neutral-700 rounded-lg px-3 text-white disabled:opacity-50">
-              <option value="">Elegí un orden programado…</option>
-              {scheduledOrders.map((o) => <option key={o.id} value={o.id}>{fmtOrderLabel(o, bands)}</option>)}
-            </select>
+            <SelectMenu value={orderId} onChange={setOrderId} disabled={!bandId} up
+              placeholder="Elegí un orden programado…"
+              options={scheduledOrders.map((o) => ({ value: o.id, label: fmtOrderLabel(o, bands) }))} />
             {!bandId && <p className="mt-1.5 text-xs text-neutral-500">Elegí primero una banda.</p>}
             {bandId && scheduledOrders.length === 0 && (
               <p className="mt-1.5 text-xs text-neutral-500">Esta banda no tiene órdenes programados. Creá uno en Órdenes primero.</p>
