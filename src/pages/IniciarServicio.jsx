@@ -5,7 +5,7 @@ import { useAppStore, transposeSongStructure } from '../stores/appStore';
 import { useAuthStore } from '../stores/authStore';
 import { GoldWave } from '../components/ui/GoldWave';
 import { PageLoader } from '../components/ui/PageLoader';
-import { sectionMeta, computeSchemaTimeline } from '../lib/serviceSchema';
+import { sectionMeta, sectionDurationMin, sectionDisplayLabel } from '../lib/serviceSchema';
 
 const fmtClock = (secs) => {
   if (secs == null) return null;
@@ -38,7 +38,6 @@ export const IniciarServicio = () => {
   const order = orders.find((o) => o.id === orderId);
   const schema = getServiceSchema(orderId);
   const sections = schema?.sections || [];
-  const timeline = useMemo(() => computeSchemaTimeline(sections, order?.time), [sections, order?.time]);
 
   // Pasos planos: una sección normal = 1 paso; "Adoración" con N canciones = N pasos
   // (una canción por vez). Cada paso conoce su índice de sección (para la cuenta).
@@ -71,10 +70,10 @@ export const IniciarServicio = () => {
 
   // Reset de la cuenta al cambiar de SECCIÓN (no entre canciones de la misma sección).
   useEffect(() => {
-    const dur = timeline[curSectionIdx]?.durationMin;
+    const dur = sectionDurationMin(sections[curSectionIdx]);
     setRemaining(dur ? dur * 60 : null);
     setRunning(false);
-  }, [curSectionIdx, timeline]);
+  }, [curSectionIdx, sections]);
 
   // Tick de la cuenta (deja pasar a negativo = tiempo excedido, en rojo).
   useEffect(() => {
@@ -138,7 +137,7 @@ export const IniciarServicio = () => {
       return (
         <div className="flex flex-col h-full min-h-0">
           <div className="shrink-0 mb-3">
-            <p className="text-gold-300/80 text-xs uppercase tracking-widest">Adoración · canción {step.songPos} de {step.songTotal}</p>
+            <p className="text-gold-300/80 text-xs uppercase tracking-widest">{sectionDisplayLabel(curSection, sectionMeta(curSection?.type))} · canción {step.songPos} de {step.songTotal}</p>
             <h2 className="text-2xl sm:text-3xl font-bold text-white">{song?.title || 'Canción'}</h2>
             {orderKey && <p className="text-sm text-gold-300 mt-0.5">Tono: {orderKey}</p>}
           </div>
@@ -161,7 +160,7 @@ export const IniciarServicio = () => {
     const text = (curSection.note && curSection.note.trim()) ? curSection.note.trim() : meta.phrase;
     return (
       <div className="flex flex-col items-center justify-center h-full text-center gap-4">
-        <p className="text-gold-300/80 text-sm uppercase tracking-widest">{meta.label}</p>
+        <p className="text-gold-300/80 text-sm uppercase tracking-widest">{sectionDisplayLabel(curSection, meta)}</p>
         <p className="text-2xl sm:text-4xl font-semibold text-white max-w-2xl leading-snug text-balance">{text || meta.label}</p>
       </div>
     );
@@ -221,7 +220,7 @@ export const IniciarServicio = () => {
                   className="rounded-full p-3 bg-neutral-900 border border-neutral-700 text-gold-200 hover:border-gold-500/50">
                   {running ? <Pause size={20} /> : <Play size={20} />}
                 </button>
-                <button onClick={() => { const dur = timeline[curSectionIdx]?.durationMin; setRemaining(dur ? dur * 60 : null); setRunning(false); }}
+                <button onClick={() => { const dur = sectionDurationMin(sections[curSectionIdx]); setRemaining(dur ? dur * 60 : null); setRunning(false); }}
                   aria-label="Reiniciar cuenta" className="rounded-full p-3 bg-neutral-900 border border-neutral-700 text-neutral-300 hover:text-white">
                   <Square size={18} />
                 </button>

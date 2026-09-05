@@ -30,6 +30,7 @@ import { OrderHistoryTimeline } from '../components/OrderHistoryTimeline';
 import { OrderCalendar } from '../components/OrderCalendar';
 import { RepertoireInsightsModal } from '../components/RepertoireInsightsModal';
 import { SchemaBuilderModal } from '../components/schema/SchemaBuilderModal';
+import { TemplateManagerModal } from '../components/schema/TemplateManagerModal';
 import { suggestDirectorForSong } from '../lib/orders';
 import {
   DndContext,
@@ -88,6 +89,7 @@ export const Ordenes = () => {
   const isLeader = userRole === 'leader';
 
   const [schemaModal, setSchemaModal] = useState({ isOpen: false, order: null });
+  const [showTemplates, setShowTemplates] = useState(false);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [showInsights, setShowInsights] = useState(false); // Radiografía del repertorio (solo lectura)
   const [editingOrder, setEditingOrder] = useState(null);
@@ -1000,6 +1002,11 @@ export const Ordenes = () => {
           </div>
           {(isPastor || isLeader) && (
             <div className="flex flex-wrap items-center gap-2">
+              {isPastor && (
+                <Button variant="secondary" icon={ListChecks} onClick={() => setShowTemplates(true)}>
+                  Plantillas
+                </Button>
+              )}
               <Button variant="secondary" icon={Activity} onClick={() => setShowInsights(true)}>
                 Radiografía
               </Button>
@@ -1832,6 +1839,10 @@ export const Ordenes = () => {
           isOpen={schemaModal.isOpen}
           onClose={() => setSchemaModal({ isOpen: false, order: null })}
         />
+      )}
+
+      {isPastor && (
+        <TemplateManagerModal isOpen={showTemplates} onClose={() => setShowTemplates(false)} />
       )}
     </div>
   );
