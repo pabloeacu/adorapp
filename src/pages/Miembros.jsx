@@ -4,7 +4,8 @@ import { useSearchParams } from 'react-router-dom';
 import {
   Plus, Search, Mail, Phone, Shield, Edit, Trash2,
   Check, X, Filter, Key,
-  LayoutGrid, List, AlertTriangle, UserX, Cross, Users2, Calendar
+  LayoutGrid, List, AlertTriangle, UserX, Cross, Users2, Calendar,
+  Clock, Smartphone, Bell, BellOff
 } from 'lucide-react';
 import { UsersThree, UserPlus } from '@phosphor-icons/react';
 import { useAppStore, MEMBER_ROLES, INSTRUMENTS } from '../stores/appStore';
@@ -20,6 +21,7 @@ import { Modal } from '../components/ui/Modal';
 import { Input } from '../components/ui/Input';
 import { ConfirmModal, SuccessModal, ErrorModal } from '../components/ui/ConfirmModal';
 import { toCSV, downloadCSV } from '../lib/csv';
+import { supabase } from '../lib/supabase';
 
 // Helper to format dates WITHOUT timezone shift (for birthdates and stored dates)
 const formatDateLocal = (dateStr) => {
@@ -33,6 +35,21 @@ const formatDateLocal = (dateStr) => {
     month: 'short',
     day: 'numeric'
   });
+};
+
+// Última conexión → { fecha: dd/mm/yy (ART), rel: "hoy"/"ayer"/"hace N días", days }.
+// El "hace N días" ayuda al pastor a ver quién lleva tiempo sin conectarse.
+const fmtLastSeen = (iso) => {
+  if (!iso) return null;
+  const d = new Date(iso);
+  if (isNaN(d.getTime())) return null;
+  const TZ = 'America/Argentina/Buenos_Aires';
+  const fecha = d.toLocaleDateString('es-AR', { timeZone: TZ, day: '2-digit', month: '2-digit', year: '2-digit' });
+  const artToday = new Date().toLocaleDateString('en-CA', { timeZone: TZ }); // YYYY-MM-DD
+  const artSeen = d.toLocaleDateString('en-CA', { timeZone: TZ });
+  const days = Math.max(0, Math.round((Date.parse(artToday) - Date.parse(artSeen)) / 86400000));
+  const rel = days === 0 ? 'hoy' : days === 1 ? 'ayer' : `hace ${days} días`;
+  return { fecha, rel, days };
 };
 
 const roleConfig = {
@@ -62,6 +79,28 @@ export const Miembros = () => {
   const [sortBy, setSortBy] = useState('name_asc');
   const [viewMode, setViewMode] = useState('cards'); // 'cards' or 'table'
   const [isSubmitting, setIsSubmitting] = useState(false); // bloquea el botón Guardar en vuelo
+
+  // Actividad por miembro (última conexión / app instalada / notificaciones),
+  // desde member_activity (RLS solo-pastor). Mapa member_id -> datos.
+  const [activityMap, setActivityMap] = useState({});
+  useEffect(() => {
+    if (!isPastor) return;
+    let alive = true;
+    (async () => {
+      try {
+        const { data, error } = await supabase
+          .from('member_activity')
+          .select('member_id, last_seen_at, app_installed_at, notifications_on');
+        if (!alive || error || !data) return;
+        const map = {};
+        for (const r of data) {
+          map[r.member_id] = { lastSeenAt: r.last_seen_at, appInstalledAt: r.app_installed_at, notificationsOn: r.notifications_on };
+        }
+        setActivityMap(map);
+      } catch { /* no crítico: la ficha muestra "sin registro" si falla */ }
+    })();
+    return () => { alive = false; };
+  }, [isPastor, members.length]);
 
   const [formData, setFormData] = useState({
     name: '',
@@ -709,6 +748,38 @@ export const Miembros = () => {
                   </span>
                 ))}
               </div>
+
+              {/* Actividad (solo pastor): última conexión + app instalada + notificaciones */}
+              {isPastor && (() => {
+                const act = activityMap[member.id];
+                const seen = fmtLastSeen(act?.lastSeenAt);
+                const inactivo = seen && seen.days >= 14; // resaltar ≥ 2 semanas sin conectarse
+                return (
+                  <div className="mt-4 pt-3 border-t border-neutral-800/60 flex items-center justify-between gap-2 text-xs">
+                    <span className="flex min-w-0 items-center gap-1.5 text-gray-400" title="Última vez que abrió la app">
+                      <Clock size={13} className="shrink-0 text-gray-500" />
+                      {seen ? (
+                        <span className="truncate">
+                          {seen.fecha}
+                          <span className={`ml-1 ${inactivo ? 'text-amber-400' : 'text-gray-500'}`}>· {seen.rel}</span>
+                        </span>
+                      ) : (
+                        <span className="text-gray-600">Sin registro aún</span>
+                      )}
+                    </span>
+                    <span className="flex shrink-0 items-center gap-2.5">
+                      <span title={act?.appInstalledAt ? 'App instalada en el celular' : 'App no instalada'}>
+                        <Smartphone size={15} className={act?.appInstalledAt ? 'text-gold-300' : 'text-gray-600'} />
+                      </span>
+                      <span title={act?.notificationsOn ? 'Notificaciones activadas' : 'Notificaciones desactivadas'}>
+                        {act?.notificationsOn
+                          ? <Bell size={15} className="text-gold-300" />
+                          : <BellOff size={15} className="text-gray-600" />}
+                      </span>
+                    </span>
+                  </div>
+                );
+              })()}
 
               {isPastor && (
                 <div className="mt-4 pt-4 border-t border-neutral-800">
