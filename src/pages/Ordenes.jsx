@@ -6,7 +6,7 @@ import {
   MessageSquare, Eye, Trash2, Search, Check, X,
   User, Zap, AlertCircle, ChevronDown, FileDown, History, Award,
   FileText, Printer, Copy as CopyIcon,
-  Edit, CheckCircle, XCircle, RotateCcw, Target, ChevronRight
+  Edit, CheckCircle, XCircle, RotateCcw, Target, ChevronRight, ListChecks, Play
 } from 'lucide-react';
 import {
   CalendarDots,
@@ -29,6 +29,7 @@ import { EmptyState } from '../components/ui/EmptyState';
 import { OrderHistoryTimeline } from '../components/OrderHistoryTimeline';
 import { OrderCalendar } from '../components/OrderCalendar';
 import { RepertoireInsightsModal } from '../components/RepertoireInsightsModal';
+import { SchemaBuilderModal } from '../components/schema/SchemaBuilderModal';
 import { suggestDirectorForSong } from '../lib/orders';
 import {
   DndContext,
@@ -81,11 +82,12 @@ const statusConfig = {
 
 export const Ordenes = () => {
   useDocumentTitle('Órdenes');
-  const { orders, bands, songs, members, bandTemporaryMembers, addOrder, updateOrder, deleteOrder, cloneOrder, getUnusedByBand, getSongById, getBandById, getMemberById, getEffectiveBandMemberIds } = useAppStore();
+  const { orders, bands, songs, members, bandTemporaryMembers, addOrder, updateOrder, deleteOrder, cloneOrder, getUnusedByBand, getSongById, getBandById, getMemberById, getEffectiveBandMemberIds, getServiceSchema } = useAppStore();
   const userRole = useCurrentRole();
   const isPastor = userRole === 'pastor';
   const isLeader = userRole === 'leader';
 
+  const [schemaModal, setSchemaModal] = useState({ isOpen: false, order: null });
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [showInsights, setShowInsights] = useState(false); // Radiografía del repertorio (solo lectura)
   const [editingOrder, setEditingOrder] = useState(null);
@@ -1645,6 +1647,16 @@ export const Ordenes = () => {
                     Editar
                   </Button>
                 )}
+                {(isPastor || isLeader) && (
+                  <Button
+                    variant="secondary"
+                    size="sm"
+                    icon={ListChecks}
+                    onClick={() => { setIsDetailOpen(false); setSchemaModal({ isOpen: true, order: viewingOrder }); }}
+                  >
+                    {getServiceSchema(viewingOrder.id) ? 'Editar esquema' : 'Crear esquema'}
+                  </Button>
+                )}
                 <Badge className={statusConfig[viewingOrder.status]?.bg}>
                   <span className={statusConfig[viewingOrder.status]?.color}>
                     {statusConfig[viewingOrder.status]?.label}
@@ -1671,6 +1683,24 @@ export const Ordenes = () => {
                   </p>
                 </div>
                 <ChevronRight size={20} className="shrink-0 text-black/70" />
+              </Link>
+            )}
+
+            {/* Iniciar servicio: sólo si el orden tiene esquema (la RLS ya limita a
+                la banda del orden + pastor/líder, así que si está en el store, lo ve). */}
+            {getServiceSchema(viewingOrder.id) && (
+              <Link
+                to={`/servicio/${viewingOrder.id}`}
+                className="flex items-center gap-3 rounded-xl p-4 bg-neutral-900 border border-gold-500/40 text-gold-200 hover:bg-gold-500/10 transition-all"
+              >
+                <div className="p-2 rounded-lg bg-gold-500/15 shrink-0">
+                  <Play size={22} className="text-gold-300" />
+                </div>
+                <div className="flex-1 min-w-0">
+                  <p className="font-semibold">Iniciar servicio</p>
+                  <p className="text-sm text-gold-300/70 truncate">El esquema de la reunión, paso a paso, con tiempos y letras</p>
+                </div>
+                <ChevronRight size={20} className="shrink-0 text-gold-300/70" />
               </Link>
             )}
 
@@ -1795,6 +1825,14 @@ export const Ordenes = () => {
 
       {/* Radiografía del repertorio (solo lectura) */}
       <RepertoireInsightsModal isOpen={showInsights} onClose={() => setShowInsights(false)} />
+
+      {schemaModal.order && (
+        <SchemaBuilderModal
+          order={schemaModal.order}
+          isOpen={schemaModal.isOpen}
+          onClose={() => setSchemaModal({ isOpen: false, order: null })}
+        />
+      )}
     </div>
   );
 };

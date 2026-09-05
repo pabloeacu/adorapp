@@ -97,6 +97,15 @@ button, a, [role="button"] {
   to { opacity: 1; transform: scale(1); }
 }
 
+/* Transición del presentador "Iniciar servicio" (avance/retroceso como línea de tiempo). */
+@keyframes slideLeft { from { opacity: 0; transform: translateX(28px); } to { opacity: 1; transform: translateX(0); } }
+@keyframes slideRight { from { opacity: 0; transform: translateX(-28px); } to { opacity: 1; transform: translateX(0); } }
+.animate-slide-left { animation: slideLeft 0.28s ease-out; }
+.animate-slide-right { animation: slideRight 0.28s ease-out; }
+@media (prefers-reduced-motion: reduce) {
+  .animate-slide-left, .animate-slide-right { animation: none; }
+}
+
 /* Respect users who request reduced motion (vestibular sensitivity / OS toggle).
    This keeps animations effectively instant without removing the visual end-state. */
 @media (prefers-reduced-motion: reduce) {

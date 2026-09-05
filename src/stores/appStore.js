@@ -179,6 +179,26 @@ const convertCollabParticipantFromDB = (p) => ({
   updatedAt: p.updated_at,
 });
 
+// "Esquema de reunión" (tablas service_schemas / schema_templates). Accesorio:
+// sections es jsonb libre (round-trip como song.structure). El cliente escribe
+// directo (RLS: schema = pastor/líder; plantilla = pastor). Ver 20260905_service_schemas.
+const convertServiceSchemaFromDB = (s) => ({
+  id: s.id,
+  orderId: s.order_id,
+  createdBy: s.created_by,
+  sections: s.sections || [],
+  createdAt: s.created_at,
+  updatedAt: s.updated_at,
+});
+const convertSchemaTemplateFromDB = (t) => ({
+  id: t.id,
+  name: t.name,
+  createdBy: t.created_by,
+  sections: t.sections || [],
+  createdAt: t.created_at,
+  updatedAt: t.updated_at,
+});
+
 const convertSongFromDB = (s) => ({
   id: s.id,
   title: s.title,
@@ -338,6 +358,8 @@ export const useAppStore = create((set, get) => ({
   bandTemporaryMembers: [], // temporales de banda (permanentes siguen en bands.members)
   collaborationRequests: [],     // "Solicitar colaboración" (RLS acota lo que ve cada uno)
   collaborationParticipants: [], // participación propia + (para el que pidió) sus voluntarios
+  serviceSchemas: [],            // "Esquema de reunión" por orden (accesorio)
+  schemaTemplates: [],           // plantillas de esquema (pastor)
   loading: false,
   error: null,
 
@@ -346,7 +368,7 @@ export const useAppStore = create((set, get) => ({
     set({ loading: true, error: null });
 
     try {
-      const [membersRes, bandsRes, songsRes, ordersRes, tempRes, collabReqRes, collabPartRes] = await Promise.all([
+      const [membersRes, bandsRes, songsRes, ordersRes, tempRes, collabReqRes, collabPartRes, schemasRes, templatesRes] = await Promise.all([
         supabase.from('members').select('*').order('name'),
         supabase.from('bands').select('*').order('name'),
         supabase.from('songs').select('*').order('title'),
@@ -354,6 +376,8 @@ export const useAppStore = create((set, get) => ({
         supabase.from('band_temporary_members').select('*'),
         supabase.from('collaboration_requests').select('*'),
         supabase.from('collaboration_participants').select('*'),
+        supabase.from('service_schemas').select('*'),
+        supabase.from('schema_templates').select('*'),
       ]);
 
       if (membersRes.error) throw membersRes.error;
@@ -374,6 +398,11 @@ export const useAppStore = create((set, get) => ({
       if (collabPartRes.error) console.warn('collaboration_participants no disponible:', collabPartRes.error.message);
       const collaborationRequests = collabReqRes.error ? [] : (collabReqRes.data || []).map(convertCollabRequestFromDB);
       const collaborationParticipants = collabPartRes.error ? [] : (collabPartRes.data || []).map(convertCollabParticipantFromDB);
+      // Esquemas de reunión: TOLERANTE (tablas nuevas y accesorias). RLS acota lo que ve cada uno.
+      if (schemasRes.error) console.warn('service_schemas no disponible:', schemasRes.error.message);
+      if (templatesRes.error) console.warn('schema_templates no disponible:', templatesRes.error.message);
+      const serviceSchemas = schemasRes.error ? [] : (schemasRes.data || []).map(convertServiceSchemaFromDB);
+      const schemaTemplates = templatesRes.error ? [] : (templatesRes.data || []).map(convertSchemaTemplateFromDB);
 
       // Persist to localStorage for survival across page refreshes
       localStorage.setItem('appMembers', JSON.stringify(members));
@@ -383,6 +412,8 @@ export const useAppStore = create((set, get) => ({
       try { localStorage.setItem('appBandTempMembers', JSON.stringify(bandTemporaryMembers)); } catch { /* non-fatal */ }
       try { localStorage.setItem('appCollabRequests', JSON.stringify(collaborationRequests)); } catch { /* non-fatal */ }
       try { localStorage.setItem('appCollabParticipants', JSON.stringify(collaborationParticipants)); } catch { /* non-fatal */ }
+      try { localStorage.setItem('appServiceSchemas', JSON.stringify(serviceSchemas)); } catch { /* non-fatal */ }
+      try { localStorage.setItem('appSchemaTemplates', JSON.stringify(schemaTemplates)); } catch { /* non-fatal */ }
 
       set({
         members,
@@ -392,6 +423,8 @@ export const useAppStore = create((set, get) => ({
         bandTemporaryMembers,
         collaborationRequests,
         collaborationParticipants,
+        serviceSchemas,
+        schemaTemplates,
         loading: false,
       });
     } catch (err) {
@@ -405,6 +438,8 @@ export const useAppStore = create((set, get) => ({
         const cachedTemp = JSON.parse(localStorage.getItem('appBandTempMembers') || '[]');
         const cachedCollabReq = JSON.parse(localStorage.getItem('appCollabRequests') || '[]');
         const cachedCollabPart = JSON.parse(localStorage.getItem('appCollabParticipants') || '[]');
+        const cachedSchemas = JSON.parse(localStorage.getItem('appServiceSchemas') || '[]');
+        const cachedTemplates = JSON.parse(localStorage.getItem('appSchemaTemplates') || '[]');
 
         if (cachedMembers.length > 0 || cachedBands.length > 0 || cachedSongs.length > 0) {
           console.log('📦 Loading from localStorage cache...');
@@ -416,6 +451,8 @@ export const useAppStore = create((set, get) => ({
             bandTemporaryMembers: cachedTemp,
             collaborationRequests: cachedCollabReq,
             collaborationParticipants: cachedCollabPart,
+            serviceSchemas: cachedSchemas,
+            schemaTemplates: cachedTemplates,
             loading: false,
           });
           return;
@@ -1174,6 +1211,7 @@ export const useAppStore = create((set, get) => ({
       band_temporary_members: { key: 'bandTemporaryMembers', from: convertBandTemporaryMemberFromDB, lsKey: 'appBandTempMembers' },
       collaboration_requests: { key: 'collaborationRequests', from: convertCollabRequestFromDB, lsKey: 'appCollabRequests' },
       collaboration_participants: { key: 'collaborationParticipants', from: convertCollabParticipantFromDB, lsKey: 'appCollabParticipants' },
+      service_schemas: { key: 'serviceSchemas', from: convertServiceSchemaFromDB, lsKey: 'appServiceSchemas' },
     };
     const spec = tableSpec[table];
     if (!spec) return;
@@ -1210,6 +1248,8 @@ export const useAppStore = create((set, get) => ({
       localStorage.removeItem('appBandTempMembers');
       localStorage.removeItem('appCollabRequests');
       localStorage.removeItem('appCollabParticipants');
+      localStorage.removeItem('appServiceSchemas');
+      localStorage.removeItem('appSchemaTemplates');
     } catch {
       // localStorage may be unavailable in some embedded contexts; non-fatal.
     }
@@ -1221,6 +1261,8 @@ export const useAppStore = create((set, get) => ({
       bandTemporaryMembers: [],
       collaborationRequests: [],
       collaborationParticipants: [],
+      serviceSchemas: [],
+      schemaTemplates: [],
       loading: false,
       error: null,
     });
@@ -1278,6 +1320,66 @@ export const useAppStore = create((set, get) => ({
   getCollaborationVolunteers: (requestId) => {
     const parts = get().collaborationParticipants || [];
     return parts.filter((p) => p.requestId === requestId && p.status === 'offered');
+  },
+
+  // ---------- "Esquema de reunión" ----------
+  getServiceSchema: (orderId) => (get().serviceSchemas || []).find((s) => s.orderId === orderId) || null,
+
+  // Crear o editar el esquema de un orden (upsert por order_id). `sections` es el
+  // array COMPLETO desde el armador (nunca parcial → sin data-loss). Optimista + realtime.
+  upsertServiceSchema: async ({ orderId, sections, createdBy }) => {
+    try {
+      const { data, error } = await supabase
+        .from('service_schemas')
+        .upsert({ order_id: orderId, created_by: createdBy || null, sections: sections || [], updated_at: new Date().toISOString() }, { onConflict: 'order_id' })
+        .select().single();
+      if (error) return { error: error.message };
+      const row = convertServiceSchemaFromDB(data);
+      set((state) => {
+        const next = [row, ...(state.serviceSchemas || []).filter((s) => s.orderId !== orderId)];
+        try { localStorage.setItem('appServiceSchemas', JSON.stringify(next)); } catch { /* non-fatal */ }
+        return { serviceSchemas: next };
+      });
+      return { ok: true, schema: row };
+    } catch (err) { return { error: err.message }; }
+  },
+
+  deleteServiceSchema: async (orderId) => {
+    try {
+      const { error, count } = await supabase.from('service_schemas').delete({ count: 'exact' }).eq('order_id', orderId);
+      if (error) return { error: error.message };
+      if (!count) return { error: 'Solo pastor o líder puede quitar el esquema.' };
+      set((state) => {
+        const next = (state.serviceSchemas || []).filter((s) => s.orderId !== orderId);
+        try { localStorage.setItem('appServiceSchemas', JSON.stringify(next)); } catch { /* non-fatal */ }
+        return { serviceSchemas: next };
+      });
+      return { ok: true };
+    } catch (err) { return { error: err.message }; }
+  },
+
+  // Plantilla (solo pastor por RLS). No está en realtime (cambian poco): update optimista.
+  saveSchemaTemplate: async ({ name, sections, createdBy }) => {
+    try {
+      const { data, error } = await supabase
+        .from('schema_templates')
+        .insert({ name: (name || '').trim() || 'Plantilla', created_by: createdBy || null, sections: sections || [] })
+        .select().single();
+      if (error) return { error: error.message };
+      const row = convertSchemaTemplateFromDB(data);
+      set((state) => ({ schemaTemplates: [row, ...(state.schemaTemplates || [])] }));
+      return { ok: true, template: row };
+    } catch (err) { return { error: err.message }; }
+  },
+
+  deleteSchemaTemplate: async (id) => {
+    try {
+      const { error, count } = await supabase.from('schema_templates').delete({ count: 'exact' }).eq('id', id);
+      if (error) return { error: error.message };
+      if (!count) return { error: 'Solo el pastor puede quitar plantillas.' };
+      set((state) => ({ schemaTemplates: (state.schemaTemplates || []).filter((t) => t.id !== id) }));
+      return { ok: true };
+    } catch (err) { return { error: err.message }; }
   },
 }));
 
