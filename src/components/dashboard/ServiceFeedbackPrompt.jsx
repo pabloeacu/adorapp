@@ -38,7 +38,7 @@ const serviceStartEpoch = (date, time) => {
 
 // Orden elegible más reciente para pedir feedback. Función de módulo (pura) para que
 // el useMemo del componente sea preservable por el React Compiler (como PrepBanner).
-const resolveFeedbackOrder = (orders, memberId, role, getBandById, nowMs) => {
+const resolveFeedbackOrder = (orders, memberId, role, getEffectiveBandMemberIds, nowMs) => {
   try {
     if (!Array.isArray(orders) || !memberId) return null;
     const isPastor = role === 'pastor';
@@ -49,8 +49,8 @@ const resolveFeedbackOrder = (orders, memberId, role, getBandById, nowMs) => {
       if (s == null) continue;
       if (nowMs < s + FOUR_H_MS) continue;      // todavía no pasaron 4 h del servicio
       if (nowMs > s + RECENCY_MS) continue;     // demasiado viejo (no molestar)
-      const inBand = (getBandById(o.bandId)?.members || []).includes(memberId);
-      if (!isPastor && !inBand) continue;       // pastor: cualquiera; líder: su banda
+      const inBand = getEffectiveBandMemberIds(o.bandId).has(memberId);
+      if (!isPastor && !inBand) continue;       // pastor: cualquiera; líder: su banda (efectiva)
       if (s > bestS) { best = o; bestS = s; }   // el más reciente
     }
     return best;
@@ -64,6 +64,8 @@ const dismissKey = (orderId) => `adorapp_fb_dismissed_${orderId}`;
 export const ServiceFeedbackPrompt = ({ member, role }) => {
   const orders = useAppStore((s) => s.orders);
   const getBandById = useAppStore((s) => s.getBandById);
+  const getEffectiveBandMemberIds = useAppStore((s) => s.getEffectiveBandMemberIds);
+  const bandTemporaryMembers = useAppStore((s) => s.bandTemporaryMembers);
   const fetchServiceFeedbackForOrder = useAppStore((s) => s.fetchServiceFeedbackForOrder);
 
   const [order, setOrder] = useState(null);
@@ -79,7 +81,7 @@ export const ServiceFeedbackPrompt = ({ member, role }) => {
   // mostrar la tarjeta.
   useEffect(() => {
     let alive = true;
-    const o = resolveFeedbackOrder(orders, member?.id, role, getBandById, Date.now());
+    const o = resolveFeedbackOrder(orders, member?.id, role, getEffectiveBandMemberIds, Date.now());
     setOrder(o);
     if (!o?.id) { setStatus('hidden'); return () => { alive = false; }; }
     let dismissed = false;
@@ -96,7 +98,7 @@ export const ServiceFeedbackPrompt = ({ member, role }) => {
       }
     })();
     return () => { alive = false; };
-  }, [orders, member?.id, member?.userId, role, getBandById, fetchServiceFeedbackForOrder]);
+  }, [orders, member?.id, member?.userId, role, getEffectiveBandMemberIds, bandTemporaryMembers, fetchServiceFeedbackForOrder]);
 
   const dismiss = () => {
     try { if (order?.id) localStorage.setItem(dismissKey(order.id), '1'); } catch { /* noop */ }

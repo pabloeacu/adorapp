@@ -1,6 +1,11 @@
 # Plan: miembros de banda agregados por líderes (permanentes y temporales)
 
-> Estado: **estudio terminado, listo para implementar**. Decisiones de producto tomadas por Paul el 2026-09-05. Este documento es el contrato de implementación para la sesión que lo desarrolle: NO improvisar por fuera de lo que dice acá; si algo del código real contradice un hallazgo, verificarlo en vivo y actualizar este doc.
+> Estado: **IMPLEMENTADO (2026-09-05)** en 3 PRs (§2.8). PR A y PR B aplicados a producción y verificados en vivo; PR C (cliente) commiteado, a la espera del merge. Decisiones de producto tomadas por Paul el 2026-09-05.
+>
+> **Desvíos verificados en vivo respecto de este contrato (Regla de Oro):**
+> - §2.5: el "agregar permanente" del líder usa un **update DIRIGIDO solo a `members`** (`addPermanentBandMember`), no `updateBand`. Motivo verificado: `convertBandToDB` coerce `meeting_time` null→'20:00' y normaliza el nombre; con el trigger append-only del PR A, cualquier campo que difiera del row real haría rechazar el append del líder. El update dirigido no toca otros campos → inmune. (Hoy 0 bandas tienen esos valores, pero es a prueba de futuro.)
+> - §2.1: el CHECK enforce el rango **completo 1–90 días** (piso Y techo), no solo el techo (hallazgo de la auditoría; el plan pedía "validado por el CHECK"). El guard anti-duplicado suma un **`pg_advisory_xact_lock`** por par (airtight bajo concurrencia). La tabla lleva **FORCE RLS** (consistencia con bands/members). Contrato cliente↔base: el cliente manda `starts_at` y `expires_at` del mismo instante (documentado en la migración) para que el CHECK no dependa del reloj del server.
+> - §2.3/§2.7: el `band_effective_member_ids` SQL quedó `REVOKE`ado de authenticated (solo lo usan los crons como owner); el cliente calcula su propio efectivo en JS (paridad testeada).
 
 ## 0. Decisiones de producto (cerradas)
 

@@ -25,7 +25,7 @@ const fmtDate = (d) => {
 // Orden 'scheduled' más próximo, de una banda que integra el miembro, con canciones.
 // Mismo filtro que el cron send_practice_reminders() (landmine #27). Función de
 // módulo (pura) para que el useMemo del componente sea preservable por el compiler.
-const resolveActiveOrder = (orders, memberId, todayART, getBandById) => {
+const resolveActiveOrder = (orders, memberId, todayART, getEffectiveBandMemberIds) => {
   try {
     if (!memberId || !Array.isArray(orders)) return null;
     const cmp = (a, b) => {
@@ -38,7 +38,7 @@ const resolveActiveOrder = (orders, memberId, todayART, getBandById) => {
       const ok = o?.status === 'scheduled' &&
         o?.date && String(o.date).slice(0, 10) >= todayART &&
         Array.isArray(o.songs) && o.songs.length > 0 &&
-        (getBandById(o.bandId)?.members || []).includes(memberId);
+        getEffectiveBandMemberIds(o.bandId).has(memberId);
       if (!ok) return best;
       return best === null || cmp(o, best) < 0 ? o : best;
     }, null);
@@ -52,12 +52,15 @@ export const PrepBanner = ({ member, todayART }) => {
   const getBandById = useAppStore((s) => s.getBandById);
   const getSongById = useAppStore((s) => s.getSongById);
   const fetchPracticeLogs = useAppStore((s) => s.fetchPracticeLogs);
+  const getEffectiveBandMemberIds = useAppStore((s) => s.getEffectiveBandMemberIds);
+  const bandTemporaryMembers = useAppStore((s) => s.bandTemporaryMembers);
 
-  // El orden 'scheduled' más próximo, de una banda que integra el miembro, con
-  // canciones. Mismo filtro que el cron send_practice_reminders() (landmine #27).
+  // El orden 'scheduled' más próximo, de una banda que integra el miembro
+  // (permanente o temporal vigente), con canciones. Mismo filtro que el cron
+  // send_practice_reminders() (landmine #27) — que también usa el miembro efectivo.
   const activeOrder = useMemo(
-    () => resolveActiveOrder(orders, member?.id, todayART, getBandById),
-    [orders, member?.id, todayART, getBandById]
+    () => resolveActiveOrder(orders, member?.id, todayART, getEffectiveBandMemberIds),
+    [orders, member?.id, todayART, getEffectiveBandMemberIds, bandTemporaryMembers]
   );
 
   const [prep, setPrep] = useState(null);

@@ -81,7 +81,7 @@ const statusConfig = {
 
 export const Ordenes = () => {
   useDocumentTitle('Órdenes');
-  const { orders, bands, songs, members, addOrder, updateOrder, deleteOrder, cloneOrder, getUnusedByBand, getSongById, getBandById, getMemberById } = useAppStore();
+  const { orders, bands, songs, members, bandTemporaryMembers, addOrder, updateOrder, deleteOrder, cloneOrder, getUnusedByBand, getSongById, getBandById, getMemberById, getEffectiveBandMemberIds } = useAppStore();
   const userRole = useCurrentRole();
   const isPastor = userRole === 'pastor';
   const isLeader = userRole === 'leader';
@@ -121,15 +121,15 @@ export const Ordenes = () => {
   // (see the search input below) so this can't be reached needing directors.
   const singers = useMemo(() => {
     if (!formData.bandId) return [];
-    const band = bands.find(b => b.id === formData.bandId);
-    if (!band) return [];
-    const bandMemberIds = new Set(band.members || []);
+    // Elegibles = miembros EFECTIVOS (permanentes ∪ temporales vigentes) activos
+    // con 'Voz'. Un temporal vigente cuenta como director/voz (decisión de producto).
+    const bandMemberIds = getEffectiveBandMemberIds(formData.bandId);
     return members.filter(m =>
       m.active &&
       bandMemberIds.has(m.id) &&
       m.instruments?.includes('Voz')
     );
-  }, [members, bands, formData.bandId]);
+  }, [members, bands, bandTemporaryMembers, formData.bandId, getEffectiveBandMemberIds]);
 
   // Confirmation modals
   const [confirmModal, setConfirmModal] = useState({
@@ -1243,7 +1243,8 @@ export const Ordenes = () => {
                   // don't belong to the new band — those members aren't
                   // singers of this band anymore. The key reverts to the
                   // song's default; the user can pick a valid director next.
-                  const newBandMemberIds = new Set(band?.members || []);
+                  // Efectivos = permanentes ∪ temporales vigentes.
+                  const newBandMemberIds = getEffectiveBandMemberIds(bandId);
                   const songsAfterBandSwap = formData.songs.map((s) => (
                     s.directorId && !newBandMemberIds.has(s.directorId)
                       ? { ...s, directorId: null, _suggestedDirector: false }

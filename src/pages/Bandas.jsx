@@ -2,11 +2,11 @@ import React, { useState } from 'react';
 import { useDocumentTitle } from '../hooks/useDocumentTitle';
 import {
   Plus, Calendar, Clock, Edit, Trash2,
-  Check, ChevronDown, AlertTriangle
+  Check, ChevronDown, AlertTriangle, UserPlus, X, Search
 } from 'lucide-react';
 import { MicrophoneStage, UsersThree } from '@phosphor-icons/react';
 import { useAppStore, MEETING_TYPES } from '../stores/appStore';
-import { useCurrentRole } from '../hooks/useCurrentMember';
+import { useCurrentRole, useCurrentMember } from '../hooks/useCurrentMember';
 import { Card } from '../components/ui/Card';
 import { Button } from '../components/ui/Button';
 import { Badge } from '../components/ui/Badge';
@@ -21,8 +21,13 @@ import { dayLabels, dayPluralLabels, compareBandsByCalendar } from '../lib/days'
 
 export const Bandas = () => {
   useDocumentTitle('Bandas');
-  const { bands, members, orders, addBand, updateBand, deleteBand, getBandMembers } = useAppStore();
+  const {
+    bands, members, orders, bandTemporaryMembers,
+    addBand, updateBand, deleteBand, getBandMembers,
+    addPermanentBandMember, addTemporaryBandMember, removeTemporaryBandMember, getEffectiveBandMemberIds,
+  } = useAppStore();
   const userRole = useCurrentRole();
+  const currentMember = useCurrentMember();
   const isPastor = userRole === 'pastor';
   const isLeader = userRole === 'leader';
 
@@ -59,6 +64,86 @@ export const Bandas = () => {
     title: '',
     message: ''
   });
+
+  // "Agregar miembro" (permanente o temporal) — visible para líder y pastor.
+  const [addModal, setAddModal] = useState({ isOpen: false, band: null });
+  const [addForm, setAddForm] = useState({ memberId: '', isTemporary: false, days: 7 });
+  const [addSubmitting, setAddSubmitting] = useState(false);
+  const [addSearch, setAddSearch] = useState(''); // buscador por nombre en el selector
+
+  const openAddModal = (band) => {
+    setAddForm({ memberId: '', isTemporary: false, days: 7 });
+    setAddSearch('');
+    setAddModal({ isOpen: true, band });
+  };
+  const closeAddModal = () => {
+    setAddModal({ isOpen: false, band: null });
+    setAddForm({ memberId: '', isTemporary: false, days: 7 });
+    setAddSearch('');
+  };
+
+  const handleAddSubmit = async () => {
+    const band = addModal.band;
+    if (!band || !addForm.memberId || addSubmitting) return;
+    const n = Number(addForm.days);
+    if (addForm.isTemporary && (!Number.isInteger(n) || n < 1 || n > 90)) {
+      setErrorModal({ isOpen: true, title: 'Días inválidos', message: 'La cantidad de días del temporal debe ser un número entre 1 y 90.' });
+      return;
+    }
+    setAddSubmitting(true);
+    const res = addForm.isTemporary
+      ? await addTemporaryBandMember({ bandId: band.id, memberId: addForm.memberId, days: n, addedBy: currentMember?.id })
+      : await addPermanentBandMember(band.id, addForm.memberId);
+    setAddSubmitting(false);
+    if (res?.ok) {
+      const who = members.find(m => m.id === addForm.memberId)?.name || 'La persona';
+      closeAddModal();
+      setSuccessModal({
+        isOpen: true,
+        title: 'Integrante agregado',
+        message: addForm.isTemporary
+          ? `${who} se sumó a "${band.name}" como temporal por ${n} ${n === 1 ? 'día' : 'días'}.`
+          : `${who} se sumó a "${band.name}".`,
+      });
+    } else {
+      setErrorModal({ isOpen: true, title: 'No se pudo agregar', message: res?.error || 'Intentá de nuevo.' });
+    }
+  };
+
+  const handleRemoveTemporary = (band, member) => {
+    const tempRow = bandTemporaryMembers.find(
+      t => t.bandId === band.id && t.memberId === member.id && new Date(t.expiresAt).getTime() > Date.now()
+    );
+    if (!tempRow) return;
+    setConfirmModal({
+      isOpen: true,
+      title: 'Quitar temporal',
+      message: `¿Quitar a "${member.name}" de "${band.name}"? Es un integrante temporal; dejará de contar de inmediato.`,
+      type: 'warning',
+      confirmText: 'Sí, quitar',
+      cancelText: 'Mejor no',
+      icon: AlertTriangle,
+      onConfirm: async () => {
+        setConfirmModal(prev => ({ ...prev, loading: true }));
+        const res = await removeTemporaryBandMember(tempRow.id);
+        setConfirmModal(prev => ({ ...prev, loading: false, isOpen: false }));
+        if (res?.ok) {
+          setSuccessModal({ isOpen: true, title: 'Temporal quitado', message: `"${member.name}" ya no integra "${band.name}".` });
+        } else {
+          setErrorModal({ isOpen: true, title: 'No se pudo quitar', message: res?.error || 'Intentá de nuevo.' });
+        }
+      },
+    });
+  };
+
+  // Formatea el vencimiento del temporal en ART (DD/MM).
+  const fmtExpiry = (iso) => {
+    try {
+      return new Date(iso).toLocaleDateString('es-AR', { timeZone: 'America/Argentina/Buenos_Aires', day: '2-digit', month: '2-digit' });
+    } catch {
+      return '';
+    }
+  };
 
   // Tarjetas en orden calendario (martes → jueves → sábado → domingo con las
   // bandas actuales), no en el orden de carga de la DB.
@@ -232,49 +317,83 @@ export const Bandas = () => {
 
               {isExpanded && (
                 <div className="border-t border-neutral-800 p-4 bg-neutral-800/20 animate-slide-up">
-                  <div className="flex items-center justify-between mb-4">
+                  <div className="flex flex-wrap items-center justify-between gap-2 mb-4">
                     <h4 className="text-sm font-medium text-gray-400">Miembros ({bandMembers.length})</h4>
-                    {isPastor && (
-                      <div className="flex items-center gap-2">
+                    <div className="flex flex-wrap items-center gap-2">
+                      {/* Líder y pastor pueden AGREGAR (permanente o temporal) */}
+                      {(isPastor || isLeader) && (
                         <Button
                           variant="ghost"
                           size="sm"
-                          icon={Edit}
+                          icon={UserPlus}
                           onClick={(e) => {
                             e.stopPropagation();
-                            handleOpenModal(band);
+                            openAddModal(band);
                           }}
                         >
-                          Editar
+                          Agregar miembro
                         </Button>
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          icon={Trash2}
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            handleDelete(band);
-                          }}
-                        >
-                          Eliminar
-                        </Button>
-                      </div>
-                    )}
+                      )}
+                      {/* Solo el pastor edita/elimina la banda */}
+                      {isPastor && (
+                        <>
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            icon={Edit}
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              handleOpenModal(band);
+                            }}
+                          >
+                            Editar
+                          </Button>
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            icon={Trash2}
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              handleDelete(band);
+                            }}
+                          >
+                            Eliminar
+                          </Button>
+                        </>
+                      )}
+                    </div>
                   </div>
 
                   <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
                     {bandMembers.map((member) => (
                       <div
                         key={member.id}
-                        className="flex items-center gap-3 p-3 bg-neutral-900 rounded-xl"
+                        className={`relative flex items-center gap-3 p-3 rounded-xl ${member.temporary ? 'bg-neutral-900 ring-1 ring-gold-500/25' : 'bg-neutral-900'}`}
                       >
                         <Avatar name={member.name} size="sm" />
                         <div className="flex-1 min-w-0">
                           <p className="text-sm font-medium truncate">{member.name}</p>
-                          <p className="text-xs text-gray-500 truncate">
-                            {member.instruments?.join(', ')}
-                          </p>
+                          {member.temporary ? (
+                            <span className="mt-0.5 inline-flex items-center gap-1 text-[11px] font-medium text-gold-300">
+                              <Clock size={11} /> Temporal · vence {fmtExpiry(member.expiresAt)}
+                            </span>
+                          ) : (
+                            <p className="text-xs text-gray-500 truncate">
+                              {member.instruments?.join(', ')}
+                            </p>
+                          )}
                         </div>
+                        {/* El pastor puede quitar un temporal (el líder no ve la ✕) */}
+                        {member.temporary && isPastor && (
+                          <button
+                            type="button"
+                            onClick={() => handleRemoveTemporary(band, member)}
+                            className="shrink-0 p-1 rounded-md text-gray-500 hover:text-red-400 hover:bg-red-500/10 transition-colors"
+                            aria-label={`Quitar a ${member.name}`}
+                          >
+                            <X size={16} />
+                          </button>
+                        )}
                       </div>
                     ))}
                   </div>
@@ -419,6 +538,113 @@ export const Bandas = () => {
             </div>
           </div>
         </form>
+      </Modal>
+
+      {/* Agregar miembro (permanente o temporal) — líder y pastor */}
+      <Modal
+        isOpen={addModal.isOpen}
+        onClose={closeAddModal}
+        title={addModal.band ? `Agregar a ${addModal.band.name}` : 'Agregar miembro'}
+        size="md"
+        footer={
+          <>
+            <Button variant="secondary" onClick={closeAddModal} disabled={addSubmitting}>Cancelar</Button>
+            <Button onClick={handleAddSubmit} disabled={!addForm.memberId || addSubmitting}>
+              {addSubmitting ? 'Agregando…' : 'Agregar'}
+            </Button>
+          </>
+        }
+      >
+        <div className="space-y-5">
+          {/* Selector de persona: activos que todavía NO integran la banda (ni permanente ni temporal vigente) */}
+          <div>
+            <label className="text-xs text-gray-400 font-medium uppercase tracking-wide block mb-2">Persona</label>
+            {(() => {
+              const effective = addModal.band ? getEffectiveBandMemberIds(addModal.band.id) : new Set();
+              const allCandidates = members.filter(m => m.active && !effective.has(m.id));
+              if (allCandidates.length === 0) {
+                return <p className="text-sm text-gray-500">Todos los miembros activos ya integran esta banda.</p>;
+              }
+              // Filtro por nombre, insensible a mayúsculas y acentos (con muchos miembros, sobre todo en móvil).
+              const norm = (s) => (s || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase();
+              const q = norm(addSearch.trim());
+              const candidates = q ? allCandidates.filter(m => norm(m.name).includes(q)) : allCandidates;
+              return (
+                <>
+                  <div className="relative mb-2">
+                    <Search size={15} className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-gray-500" />
+                    <input
+                      type="text"
+                      value={addSearch}
+                      onChange={(e) => setAddSearch(e.target.value)}
+                      placeholder="Buscar por nombre…"
+                      className="w-full pl-9 pr-3"
+                    />
+                  </div>
+                  {candidates.length === 0 ? (
+                    <p className="py-2 text-sm text-gray-500">Nadie coincide con “{addSearch.trim()}”.</p>
+                  ) : (
+                  <div className="grid grid-cols-1 gap-2 max-h-56 overflow-y-auto">
+                  {candidates.map((m) => (
+                    <button
+                      key={m.id}
+                      type="button"
+                      onClick={() => setAddForm(prev => ({ ...prev, memberId: m.id }))}
+                      className={`flex items-center gap-3 p-3 rounded-xl text-left transition-all border-2 ${addForm.memberId === m.id ? 'border-gold-500/60 bg-gold-500/10' : 'border-neutral-800 hover:border-neutral-700'}`}
+                    >
+                      <Avatar name={m.name} size="sm" />
+                      <div className="flex-1 min-w-0">
+                        <p className="font-medium text-sm truncate">{m.name}</p>
+                        <p className="text-xs text-gray-500 truncate">{m.instruments?.slice(0, 2).join(', ')}</p>
+                      </div>
+                      {addForm.memberId === m.id && (
+                        <div className="w-5 h-5 rounded-full bg-gold-gradient flex items-center justify-center shrink-0">
+                          <Check size={12} className="text-black" />
+                        </div>
+                      )}
+                    </button>
+                  ))}
+                  </div>
+                  )}
+                </>
+              );
+            })()}
+          </div>
+
+          {/* Tipo: permanente (default) / temporal — switch inmune a iOS (landmine #23) */}
+          <div className="flex items-center justify-between gap-3">
+            <div className="min-w-0 flex-1">
+              <p className="text-sm font-medium">Temporal</p>
+              <p className="text-xs text-gray-500">Se suma por unos días y después deja de contar solo, sin aviso.</p>
+            </div>
+            <label className="relative inline-flex shrink-0 cursor-pointer items-center">
+              <input
+                type="checkbox"
+                className="sr-only peer"
+                checked={addForm.isTemporary}
+                onChange={(e) => setAddForm(prev => ({ ...prev, isTemporary: e.target.checked }))}
+              />
+              <span className="block w-[52px] h-8 rounded-full bg-neutral-700 transition-colors peer-checked:bg-gold-500 peer-focus-visible:ring-2 peer-focus-visible:ring-gold-500/50" />
+              <span className="pointer-events-none absolute top-[2px] left-[2px] h-7 w-7 rounded-full bg-white shadow transition-transform peer-checked:translate-x-5" />
+            </label>
+          </div>
+
+          {/* Días (solo temporal) */}
+          {addForm.isTemporary && (
+            <div>
+              <label className="text-xs text-gray-400 font-medium uppercase tracking-wide block mb-1.5">¿Por cuántos días? (1 a 90)</label>
+              <input
+                type="number"
+                min="1"
+                max="90"
+                className="w-full"
+                value={addForm.days}
+                onChange={(e) => setAddForm(prev => ({ ...prev, days: e.target.value }))}
+              />
+              <p className="text-xs text-gray-500 mt-1.5">Cuenta como integrante pleno (puede dirigir) hasta que venza. Después desaparece sin aviso.</p>
+            </div>
+          )}
+        </div>
       </Modal>
 
       {/* Confirmation Modal */}
