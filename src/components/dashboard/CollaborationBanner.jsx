@@ -1,5 +1,5 @@
 import React, { useState, useMemo } from 'react';
-import { HelpingHand, Hourglass, Users, PartyPopper, HeartHandshake, X, Check } from 'lucide-react';
+import { Megaphone, Hourglass, Users, PartyPopper, HeartHandshake, X, Check } from 'lucide-react';
 import { useAppStore } from '../../stores/appStore';
 import { useCurrentMember } from '../../hooks/useCurrentMember';
 import { Button } from '../ui/Button';
@@ -133,7 +133,7 @@ export const CollaborationBanner = () => {
   return (
     <div className="space-y-3">
       {invited.map((r) => (
-        <GoldBanner key={r.id} icon={HelpingHand}>
+        <GoldBanner key={r.id} icon={Megaphone}>
           <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
             <div className="min-w-0">
               <p className="text-sm font-semibold text-gold-100">Se busca {cats(r)} para {bandName(r.bandId)}</p>
