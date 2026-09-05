@@ -55,10 +55,12 @@ export const GreetingHeader = ({ member, role, todayART, artHour, profileName })
   }
 
   const roleLabel = ROLE_LABELS[role] || null;
-  const instrument = Array.isArray(member?.instruments) && member.instruments.length
-    ? member.instruments[0]
+  // Instrumentos: TODOS los configurados (antes mostraba solo instruments[0] y se
+  // "comía" los demás), como chip aparte. El rol va en su PROPIO tag (no mezclado
+  // con el instrumento). Mismo criterio que la ficha de Miembros.
+  const instrumentsLabel = Array.isArray(member?.instruments) && member.instruments.length
+    ? member.instruments.join(' · ')
     : null;
-  const roleInstrument = [instrument, roleLabel].filter(Boolean).join(' · ');
 
   return (
     <div className="relative overflow-hidden rounded-2xl p-5 border border-gold-500/25 bg-gradient-to-br from-gold-600/[0.32] via-neutral-900 to-gold-300/[0.12]">
@@ -69,9 +71,10 @@ export const GreetingHeader = ({ member, role, todayART, artHour, profileName })
         <div className="min-w-0 flex-1">
           <p className="text-xl sm:text-2xl font-bold text-white leading-tight">{greeting}</p>
           <p className="text-sm text-gray-400 mt-1">{timeGreeting(artHour)}</p>
-          {roleInstrument && (
-            <div className="mt-2">
-              <Badge variant="default" size="sm">{roleInstrument}</Badge>
+          {(instrumentsLabel || roleLabel) && (
+            <div className="mt-2 flex flex-wrap items-center gap-2">
+              {instrumentsLabel && <Badge variant="default" size="sm">{instrumentsLabel}</Badge>}
+              {roleLabel && <Badge variant="primary" size="sm">{roleLabel}</Badge>}
             </div>
           )}
         </div>
