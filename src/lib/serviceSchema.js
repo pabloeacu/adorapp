@@ -64,3 +64,13 @@ export const sectionDurationMin = (s) => {
 // Etiqueta visible de la sección: alias si lo pusieron, si no el nombre del tipo.
 export const sectionDisplayLabel = (s, meta) =>
   (s?.alias && s.alias.trim()) ? s.alias.trim() : (meta?.label || 'Sección');
+
+// Total de minutos → etiqueta legible. <60 → "45 min"; ≥60 pasa a horas
+// (70′ = "1 hr 10 min"; exacto → "2 hr"). Usado para el total del esquema.
+export const minToDurationLabel = (total) => {
+  const m = Math.max(0, Math.round(Number(total) || 0));
+  if (m < 60) return `${m} min`;
+  const h = Math.floor(m / 60);
+  const rem = m % 60;
+  return rem === 0 ? `${h} hr` : `${h} hr ${rem} min`;
+};
