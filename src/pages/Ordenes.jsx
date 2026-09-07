@@ -32,6 +32,14 @@ import { RepertoireInsightsModal } from '../components/RepertoireInsightsModal';
 import { SchemaBuilderModal } from '../components/schema/SchemaBuilderModal';
 import { TemplateManagerModal } from '../components/schema/TemplateManagerModal';
 import { suggestDirectorForSong } from '../lib/orders';
+
+// Parsear 'YYYY-MM-DD' como fecha LOCAL (no UTC). `new Date('2026-09-11')` se
+// interpreta en UTC y, en ART (-3), muestra el día ANTERIOR (jueves 10 en vez de
+// viernes 11). Mismo patrón local ya usado en PrepBanner/Practica (landmine TZ).
+const parseLocalDate = (dateStr) => {
+  const s = String(dateStr || '').slice(0, 10);
+  return /^\d{4}-\d{2}-\d{2}$/.test(s) ? new Date(`${s}T00:00:00`) : new Date(dateStr);
+};
 import {
   DndContext,
   closestCenter,
@@ -268,6 +276,16 @@ export const Ordenes = () => {
   const handleSubmit = async (e) => {
     e.preventDefault();
     if (!formData.date || !formData.bandId) return;
+
+    // Un orden no se puede guardar sin repertorio: al menos una canción.
+    if (!formData.songs || formData.songs.length === 0) {
+      setErrorModal({
+        isOpen: true,
+        title: 'Falta el repertorio',
+        message: 'No podés guardar un orden sin canciones. Agregá al menos una.',
+      });
+      return;
+    }
 
     // Rehearsal is optional. Only attach date+time when the switch is on and a
     // date was picked; otherwise both stay null (no rehearsal for this order).
@@ -544,7 +562,7 @@ export const Ordenes = () => {
     doc.text('Generado por AdorAPP - La plataforma de Adoración CAF', 105, y, { align: 'center' });
 
     // Download the PDF
-    const dateStr = new Date(order.date).toLocaleDateString('es-ES', { day: '2-digit', month: '2-digit', year: '2-digit' }).replace(/\//g, '-');
+    const dateStr = parseLocalDate(order.date).toLocaleDateString('es-ES', { day: '2-digit', month: '2-digit', year: '2-digit' }).replace(/\//g, '-');
     const fileName = `${band?.name || 'Banda'} - Orden ${dateStr}.pdf`;
     doc.save(fileName);
   };
@@ -730,7 +748,7 @@ export const Ordenes = () => {
     });
 
     // Download the PDF
-    const dateStr = new Date(order.date).toLocaleDateString('es-ES', { day: '2-digit', month: '2-digit', year: '2-digit' }).replace(/\//g, '-');
+    const dateStr = parseLocalDate(order.date).toLocaleDateString('es-ES', { day: '2-digit', month: '2-digit', year: '2-digit' }).replace(/\//g, '-');
     const fileName = `${band?.name || 'Banda'} - Orden ${dateStr} - Canciones.pdf`;
     doc.save(fileName);
   };
@@ -867,8 +885,7 @@ export const Ordenes = () => {
   };
 
   const formatDate = (dateStr) => {
-    const date = new Date(dateStr);
-    return date.toLocaleDateString('es-ES', {
+    return parseLocalDate(dateStr).toLocaleDateString('es-ES', {
       weekday: 'long',
       year: 'numeric',
       month: 'long',
