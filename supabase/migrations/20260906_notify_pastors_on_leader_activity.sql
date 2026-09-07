@@ -9,7 +9,8 @@
 -- agrupando por autor + tabla + acción.
 --
 -- Como es un cron (fuera de la transacción del usuario), NO puede romper ninguna
--- acción en vivo. Igual, el envío por pastor está en BEGIN/EXCEPTION.
+-- acción en vivo. Igual, el envío por pastor está en BEGIN/EXCEPTION, y hay un
+-- BEGIN/EXCEPTION general que loguea a error_log sin romper nada.
 
 --------------------------------------------------------------------------------
 -- 0) Hardening: audit_events solo lo escribe el trigger de auditoría (SECURITY
@@ -104,6 +105,8 @@ $$;
 --------------------------------------------------------------------------------
 -- 5) Función del resumen diario. Resume la ventana [p_now - 24h, p_now).
 --    p_now = fin de ventana (NULL → now()); parametrizable para testeo.
+--    Dedup por fecha (evita doble envío) + BEGIN/EXCEPTION general (loguea a
+--    error_log sin romper nada).
 --------------------------------------------------------------------------------
 CREATE OR REPLACE FUNCTION public.send_leader_activity_digest(p_now timestamptz DEFAULT NULL)
   RETURNS void LANGUAGE plpgsql
@@ -113,6 +116,7 @@ DECLARE
   v_end    timestamptz;
   v_start  timestamptz;
   v_fecha  text;
+  v_title  text;
   v_total  int := 0;
   v_html   text := '';
   v_plain  text := '';
@@ -123,6 +127,15 @@ BEGIN
   v_end   := COALESCE(p_now, now());
   v_start := v_end - interval '24 hours';
   v_fecha := to_char((v_end AT TIME ZONE 'America/Argentina/Buenos_Aires')::date, 'DD/MM/YYYY');
+  v_title := 'Resumen de actividad · ' || v_fecha;
+
+  -- Dedup: si ya se mandó el resumen de esta fecha en las últimas 20 h, no repetir
+  -- (protege ante un doble disparo del cron o una re-invocación manual).
+  IF EXISTS (SELECT 1 FROM public.notifications
+             WHERE type = 'activity' AND title = v_title
+               AND created_at >= v_end - interval '20 hours') THEN
+    RETURN;
+  END IF;
 
   -- Movimientos de las últimas 24 h, agrupados por autor + tabla + acción.
   -- Incluye LÍDERES (actor_role='leader') y miembros EDITORES (members.editor=true).
@@ -150,19 +163,16 @@ BEGIN
     v_html  := v_html  || '• ' || public._html_escape(v_line) || '<br>';
   END LOOP;
 
-  IF v_total = 0 THEN RETURN; END IF;  -- día sin movimientos: no se envía nada
+  IF v_total = 0 THEN RETURN; END IF;
 
   FOR v_pastor IN
     SELECT user_id, email, name FROM public.members
     WHERE role = 'pastor' AND active = true AND user_id IS NOT NULL
   LOOP
     BEGIN
-      -- Aviso en la campanita (dispara el push web por notify_push_on_notification_insert).
       INSERT INTO public.notifications (user_id, title, message, type, is_global, created_at, expires_at)
-      VALUES (v_pastor.user_id, 'Resumen de actividad · ' || v_fecha, v_plain, 'activity', false,
-              now(), now() + interval '30 days');
+      VALUES (v_pastor.user_id, v_title, v_plain, 'activity', false, now(), now() + interval '30 days');
 
-      -- Correo del resumen (best-effort). Contenido de usuario escapado.
       IF v_pastor.email IS NOT NULL AND v_pastor.email <> '' THEN
         PERFORM public.encolar_email('actividad-lider', v_pastor.email, v_pastor.name,
           jsonb_build_object(
@@ -173,9 +183,19 @@ BEGIN
           5::smallint);
       END IF;
     EXCEPTION WHEN OTHERS THEN
-      NULL;  -- un pastor que falla no frena al otro
+      -- Un pastor que falla no frena al otro; dejamos rastro.
+      INSERT INTO public.error_log (message, severity, context)
+      VALUES ('leader-activity-digest: fallo enviando a un pastor', 'warning',
+              jsonb_build_object('pastor', v_pastor.user_id, 'error', SQLERRM));
     END;
   END LOOP;
+
+EXCEPTION WHEN OTHERS THEN
+  -- Blindaje total: si el armado falla, se registra y no se rompe nada.
+  BEGIN
+    INSERT INTO public.error_log (message, severity, context)
+    VALUES ('leader-activity-digest: fallo general', 'error', jsonb_build_object('error', SQLERRM));
+  EXCEPTION WHEN OTHERS THEN NULL; END;
 END;
 $function$;
 
