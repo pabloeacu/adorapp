@@ -2,7 +2,7 @@
 
 Este archivo se carga automáticamente al iniciar cualquier sesión de Claude Code en este repo. Es el contrato mínimo para no perder contexto entre sesiones.
 
-> 📐 **Mapa completo del proyecto:** `ARCHITECTURE.md` (raíz) documenta **cada página, store, componente, librería, migración y cron** con sus funciones y flujo de datos, más la foto autoritativa de la base (tablas/RLS/crons/FKs/funciones). Leé PRIMERO este `CLAUDE.md` (el contrato: Regla de Oro + reglas + los 47 landmines), y usá `ARCHITECTURE.md` como el mapa exhaustivo del código.
+> 📐 **Mapa completo del proyecto:** `ARCHITECTURE.md` (raíz) documenta **cada página, store, componente, librería, migración y cron** con sus funciones y flujo de datos, más la foto autoritativa de la base (tablas/RLS/crons/FKs/funciones). Leé PRIMERO este `CLAUDE.md` (el contrato: Regla de Oro + reglas + los 48 landmines), y usá `ARCHITECTURE.md` como el mapa exhaustivo del código.
 
 ## ⭐ REGLA DE ORO — método obligatorio para CADA pedido (innegociable)
 
@@ -78,6 +78,7 @@ PWA en Vite/React 18 + Supabase + Vercel para ~8 usuarios reales del **ministeri
 - `daily-birthday-notification` 09:00 ART (push a pastores con cumpleaños del día; jobid 7)
 - `rehearsal-reminders` cada 15 min (push a la banda 2 h antes de un ensayo programado en una orden; ver "Estado al 2026-06-20")
 - `auto-complete-orders` `0 6 * * *` (03:00 ART): pasa a `completed` las órdenes `scheduled` con `date < hoy ART` (no toca canceladas; UPDATE no dispara push). Ver "Estado al 2026-06-21".
+- `leader-activity-digest` `0 1 * * *` (22:00 ART): resumen diario a los pastores (correo + campanita) de las altas/ediciones/eliminaciones que hicieron LÍDERES o miembros EDITORES sobre songs/orders/bands en las últimas 24 h; solo si hubo movimientos. Ver "Estado al 2026-09-06".
 
 ## Comandos útiles
 
@@ -403,3 +404,14 @@ Feature nueva **100% accesoria** (tablas y pantallas nuevas; NO toca orders/song
 **Landmines nuevos:**
 46. **`/servicio/:orderId` vive FUERA del Layout** (hermano de `/login`, en `App.jsx`) para ser pantalla completa sin barra lateral/header. Por eso trae **su propia guarda** (`if (!user) <Navigate to="/login">`) y, en deep-link/refresh con el store vacío, llama `initialize()` él mismo (el Layout no corrió). Estado del presentador = **por-dispositivo en localStorage** (`adorapp_presenter_pos_<orderId>`, `adorapp_presenter_speed`) — nunca en DB. La RLS ya limita ver el esquema a la banda del orden + pastor/líder, así que un ajeno que entra por URL ve "no hay esquema".
 47. **Esquema = accesorio, solo-lectura sobre lo existente.** `service_schemas.sections` es jsonb libre; las secciones cargan `_localId` para el dnd que se STRIPEA antes de persistir (landmine #22). En "Adoración" se referencian canciones por `songId` de `order.songs` (per-order key = `songRef.key`, no `song.key`). Nada de esto escribe orders/songs. Si tocás el presentador, mantené el patrón de reset de la cuenta por SECCIÓN (no por canción) y el autoscroll por rAF (no setInterval).
+
+## Estado al 2026-09-06 — Resumen diario de actividad de líderes/editores (PR #95)
+
+Feature nueva **100% backend** (migración `20260906_notify_pastors_on_leader_activity.sql`, aplicada a prod + QA transaccional + correo verificado en vivo en Gmail). Pedido de Paul: que los pastores se enteren de lo que tocan los líderes. Refinado por Paul a **un resumen DIARIO** (no por-acción → sin spam) e incluyendo **también a los miembros EDITORES**.
+
+- **Qué hace:** cron `leader-activity-digest` (`0 1 * * *` = 22:00 ART) → `send_leader_activity_digest(p_now timestamptz DEFAULT now())`. Resume la **ventana móvil [now-24h, now)** de `audit_events` (el log ya existente): movimientos (insert/update/delete) sobre **songs/orders/bands** hechos por **líderes** (`actor_role='leader'`) o **miembros editores** (`members.editor=true`), **excluyendo pastores y crons/service_role** (`actor_role<>'pastor'` + `actor_member_id IS NOT NULL`). Agrupa por autor+tabla+acción (`_leader_activity_phrase`, pluraliza: "agregó 2 canciones"; n=1 muestra el título). Si hubo ≥1 movimiento, a **cada pastor activo**: 1 notificación `type='activity'` (campanita + push por `push_on_notification_insert`) + 1 correo (plantilla `actividad-lider`, layout dorado, `{{items}}` HTML). **Día sin movimientos = 0 envíos.**
+- **Seguridad/robustez:** el cron corre FUERA de la transacción del usuario → **imposible** que rompa una acción en vivo. Envío por pastor en `BEGIN/EXCEPTION`. Funciones `SECURITY DEFINER` + `search_path` fijo + `REVOKE` de authenticated/anon. **Hardening:** `REVOKE INSERT/UPDATE/DELETE ON audit_events FROM authenticated, anon` (la RLS ya lo bloqueaba —sin policy de INSERT— pero se saca el grant redundante). **Escape HTML** de todo dato de usuario (título/nombre/actor) porque `email_templates.cuerpo_html` se renderiza RAW (helper `_html_escape`).
+- **Anti-spam en capas:** cadencia diaria (1 envío/día) + el worker `send-emails` ya throttlea 5 min por destinatario. El `type='activity'` se agregó al CHECK `notifications_type_check` (si no, INSERT 23514); la campanita lo renderiza con el fallback (cruz ámbar, igual que 'collaboration').
+
+**Landmine nuevo:**
+48. **El digest de actividad se apoya en `audit_events.actor_role`** (snapshot del rol al momento de la acción, que setea `audit_log_trigger` desde `auth.uid()`): crons/service_role llegan con `actor_role`/`actor_member_id` NULL → excluidos. El filtro "editor" usa `members.editor` ACTUAL (join), no el de la época. El trigger de push en `notifications` se llama **`push_on_notification_insert`** (la FUNCIÓN es `notify_push_on_notification_insert` — no confundir al DISABLE en QA). Para QA de `send_leader_activity_digest`, sembrar `audit_events` en una ventana LIMPIA (p. ej. 2025, antes de que existiera la app) y llamar con `p_now` explícito; envolver en `DO … RAISE EXCEPTION` (rollback) con `push_on_notification_insert` deshabilitado. `email_templates.cuerpo_html` es RAW → SIEMPRE escapar dato de usuario antes de meterlo en `{{items}}`/`{{usuario}}`.
