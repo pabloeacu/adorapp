@@ -50,7 +50,7 @@ Deno.serve(async (req: Request) => {
 
   const { data: request, error: getErr } = await admin
     .from("pending_registrations")
-    .select("id, name, email, phone, pastor_area, leader_of, birthdate, instruments, status")
+    .select("id, name, email, phone, pastor_area, leader_of, birthdate, instruments, areas, status")
     .eq("id", requestId)
     .maybeSingle();
   if (getErr) return json({ error: "request lookup failed", detail: getErr.message }, 500);
@@ -86,10 +86,13 @@ Deno.serve(async (req: Request) => {
       leader_of: request.leader_of,
       birthdate: request.birthdate,
       instruments: request.instruments || [],
-      // Área(s) que el pastor asigna al aprobar (toda esta EF es pastor-only → seguro).
-      // Si un cliente viejo no manda areas, default Adoración (músico). El área define
+      // Área(s) que el pastor confirma al aprobar (toda esta EF es pastor-only → seguro).
+      // Prioridad: lo que manda el cliente (pre-rellenado desde la solicitud, el pastor
+      // pudo cambiarlo) → el área que declaró el solicitante → Adoración. El área define
       // el texto del push de bienvenida (notify_on_member_insert).
-      areas: Array.isArray(areas) ? areas : ['adoracion'],
+      areas: Array.isArray(areas)
+        ? areas
+        : (Array.isArray(request.areas) && request.areas.length ? request.areas : ['adoracion']),
       role,
       active: true,
       user_id: userId,
