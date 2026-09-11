@@ -41,7 +41,7 @@ Deno.serve(async (req: Request) => {
   let body: any;
   try { body = await req.json(); } catch { return json({ error: "Invalid JSON" }, 400); }
 
-  const { requestId, role, password } = body || {};
+  const { requestId, role, password, areas } = body || {};
   if (!requestId || typeof requestId !== "string") return json({ error: "requestId required" }, 400);
   if (!role || !["pastor", "leader", "member"].includes(role)) return json({ error: "valid role required" }, 400);
   if (!password || typeof password !== "string" || password.length < 6) {
@@ -86,6 +86,10 @@ Deno.serve(async (req: Request) => {
       leader_of: request.leader_of,
       birthdate: request.birthdate,
       instruments: request.instruments || [],
+      // Área(s) que el pastor asigna al aprobar (toda esta EF es pastor-only → seguro).
+      // Si un cliente viejo no manda areas, default Adoración (músico). El área define
+      // el texto del push de bienvenida (notify_on_member_insert).
+      areas: Array.isArray(areas) ? areas : ['adoracion'],
       role,
       active: true,
       user_id: userId,
