@@ -1002,7 +1002,7 @@ export const Header = () => {
                 <Users2 size={18} className="text-gray-400" />
               </div>
               <div className="flex-1">
-                <p className="text-xs text-gray-400">Líder de</p>
+                <p className="text-xs text-gray-400">Tu líder</p>
                 {isEditing ? (
                   <input
                     type="text"

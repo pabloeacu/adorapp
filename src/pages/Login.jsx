@@ -430,7 +430,7 @@ const RegisterModal = ({ isOpen, onClose, onSuccess }) => {
         />
 
         <Input
-          label="Líder de"
+          label="Tu líder"
           hint="(tu líder del Equipo de Avivamiento)"
           name="leader_of"
           placeholder="Nombre de tu líder"

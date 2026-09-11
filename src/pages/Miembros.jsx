@@ -490,7 +490,7 @@ export const Miembros = () => {
                   { header: 'Editor', get: (m) => (m.editor ? 'sí' : 'no') },
                   { header: 'Activo', get: (m) => (m.active ? 'sí' : 'no') },
                   { header: 'Pastor de área', get: (m) => m.pastor_area },
-                  { header: 'Líder de', get: (m) => m.leader_of },
+                  { header: 'Líder', get: (m) => m.leader_of },
                   { header: 'Fecha nacimiento', get: (m) => m.birthdate },
                   { header: 'Instrumentos', get: (m) => m.instruments },
                 ]);
@@ -1020,7 +1020,7 @@ export const Miembros = () => {
               onChange={(e) => setFormData({ ...formData, pastor_area: e.target.value })}
             />
             <Input
-              label="Líder de"
+              label="Tu líder"
               placeholder="Nombre de tu líder (Equipo de Avivamiento)"
               value={formData.leader_of}
               onChange={(e) => setFormData({ ...formData, leader_of: e.target.value })}
