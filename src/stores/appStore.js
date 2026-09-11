@@ -1,4 +1,5 @@
 import { create } from 'zustand';
+import { participantIdsOf, isOrderParticipant as isOrderParticipantPure, groupByInstrument } from '../lib/lineup';
 import { supabase, callAdminFunction } from '../lib/supabase';
 import { v4 as uuidv4 } from 'uuid';
 
@@ -226,6 +227,8 @@ const convertOrderFromDB = (o) => ({
   status: o.status,
   rehearsalDate: o.rehearsal_date,
   rehearsalTime: o.rehearsal_time,
+  // Formación del servicio (jsonb normalizado por la base; null = sin formación).
+  lineup: o.lineup ?? null,
   createdAt: o.created_at,
   updatedAt: o.updated_at,
 });
@@ -253,6 +256,15 @@ const convertOrderFromDB = (o) => ({
 // alfabético/búsqueda cuando el título arranca con espacio (" Como En El Cielo").
 // Pura sobre un solo campo → segura respecto del merge anti-DATA-LOSS.
 const normalizeName = (s) => (s ?? '').toString().trim().replace(/\s+/g, ' ');
+
+// Las filas de canciones del orden viajan con claves de UI (`_localId` para el
+// drag-and-drop, `_pendingHistory`, `_suggestedDirector`) que NO deben
+// persistirse (landmine #51). Se stripean acá, en la única puerta a la base.
+const stripSongRefs = (songs) => (Array.isArray(songs) ? songs : []).map((s) => {
+  if (!s || typeof s !== 'object') return s;
+  const { _localId, _pendingHistory, _suggestedDirector, ...rest } = s;
+  return rest;
+});
 
 // Convert camelCase to snake_case for Supabase
 const convertMemberToDB = (m) => {
@@ -308,7 +320,7 @@ const convertOrderToDB = (o) => ({
   time: o.time || '20:00',
   band_id: o.bandId || null,
   meeting_type: o.meetingType || 'culto_general',
-  songs: o.songs || [],
+  songs: stripSongRefs(o.songs),
   feedback: o.feedback || null,
   status: o.status || 'scheduled',
   // Rehearsal scheduling (nullable). NOTE: rehearsal_reminder_sent is owned by
@@ -316,6 +328,10 @@ const convertOrderToDB = (o) => ({
   // client, so an update can never clobber the dedup flag.
   rehearsal_date: o.rehearsalDate || null,
   rehearsal_time: o.rehearsalTime || null,
+  // Formación: SIEMPRE se reenvía (regla #8: el converter regenera la fila
+  // completa; si faltara la clave, un update no la tocaría pero un merge
+  // parcial sin ella la perdería del snapshot). La base la valida/normaliza.
+  lineup: o.lineup ?? null,
 });
 
 // Ensayómetro: personal practice log per (user, order, song).
@@ -976,6 +992,11 @@ export const useAppStore = create((set, get) => ({
         date: new Date().toISOString().split('T')[0],
         status: 'scheduled',
         feedback: '',
+        // El clon arranca sin ensamble (la fecha vieja no tiene sentido) y sin
+        // formación (se define para el servicio nuevo).
+        rehearsalDate: null,
+        rehearsalTime: null,
+        lineup: null,
       };
       return get().addOrder(newOrder);
     }
@@ -1149,6 +1170,31 @@ export const useAppStore = create((set, get) => ({
     }
     return result;
   },
+
+  // --- Formación del orden ------------------------------------------------
+  // Participantes = formación custom, o la banda efectiva si no hay formación /
+  // es "todos". Fuente ÚNICA para todo lo que sea "avisos del servicio" en el
+  // cliente (Dashboard, PrepBanner, Mi Ensayo). Espejo de order_participant_ids.
+  getOrderParticipantIds: (order) => {
+    if (!order) return new Set();
+    return participantIdsOf(order, get().getEffectiveBandMemberIds(order.bandId));
+  },
+
+  isOrderParticipant: (order, memberId) => {
+    if (!order || !memberId) return false;
+    return isOrderParticipantPure(order, memberId, get().getEffectiveBandMemberIds(order.bandId));
+  },
+
+  // Objetos miembro (activos) que participan del orden, ordenados por nombre.
+  getOrderParticipants: (order) => {
+    const ids = get().getOrderParticipantIds(order);
+    return get().members
+      .filter((m) => m.active && ids.has(m.id))
+      .sort((a, b) => (a.name || '').localeCompare(b.name || '', 'es'));
+  },
+
+  // { groups: [{ instrument, members }], noInstrument: [] } para mostrar.
+  getOrderLineupGroups: (order) => groupByInstrument(order, get().getOrderParticipants(order)),
 
   // Get song with transposed key
   getSongWithKey: (songId, key) => {

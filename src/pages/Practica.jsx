@@ -20,6 +20,7 @@ import { MusicNotes, MusicNotesSimple } from '@phosphor-icons/react';
 import { useAppStore, transposeSongStructure } from '../stores/appStore';
 import { milestonesOf, ensayometroPercent } from '../lib/ensayometro';
 import { useDocumentTitle } from '../hooks/useDocumentTitle';
+import { useCurrentMember } from '../hooks/useCurrentMember';
 import { Card } from '../components/ui/Card';
 import { Badge } from '../components/ui/Badge';
 import { Button } from '../components/ui/Button';
@@ -170,7 +171,8 @@ const encouragement = (percent) => {
 export const Practica = () => {
   useDocumentTitle('Mi Ensayo');
   const { orderId } = useParams();
-  const { orders, loading, getSongById, getBandById, getMemberById, fetchPracticeLogs, upsertPracticeLog, fetchPracticeAlarm, setPracticeAlarm } = useAppStore();
+  const { orders, loading, getSongById, getBandById, getMemberById, fetchPracticeLogs, upsertPracticeLog, fetchPracticeAlarm, setPracticeAlarm, isOrderParticipant, getEffectiveBandMemberIds } = useAppStore();
+  const currentMember = useCurrentMember();
 
   const order = orders.find(o => o.id === orderId);
   const band = order ? getBandById(order.bandId) : null;
@@ -382,6 +384,15 @@ export const Practica = () => {
           {saveState === 'saved' && (<><CheckCircle2 size={14} className="text-green-400" /> Guardado</>)}
         </div>
       </div>
+
+      {/* Formación: quien integra la banda pero NO está en la formación de este
+          orden puede practicar igual (decisión de producto), pero se le avisa con
+          claridad — y no recibe la alarma de 18:00 ni el aviso de ensamble. */}
+      {currentMember?.id && getEffectiveBandMemberIds(order.bandId).has(currentMember.id) && !isOrderParticipant(order, currentMember.id) && (
+        <div className="rounded-xl border border-neutral-700 bg-neutral-900 p-3 text-sm text-gray-300" data-testid="practice-not-in-lineup">
+          <span className="font-medium text-gold-200">No estás en la formación de este servicio</span>, pero siempre viene bien repasar. No vas a recibir la alarma de ensayo ni el aviso de ensamble de este orden.
+        </div>
+      )}
 
       {/* Ensayómetro: anillo de progreso + ánimo */}
       <div className="rounded-2xl p-5 border border-gold-500/25 bg-gradient-to-br from-gold-600/[0.28] via-neutral-900 to-gold-300/[0.10]">

@@ -1,4 +1,4 @@
-import React, { useState, useMemo, useEffect } from 'react';
+import React, { useState, useMemo, useEffect, useRef } from 'react';
 import { useSearchParams, Link } from 'react-router-dom';
 import { useDocumentTitle } from '../hooks/useDocumentTitle';
 import {
@@ -6,13 +6,14 @@ import {
   MessageSquare, Eye, Trash2, Search, Check, X,
   User, Zap, AlertCircle, ChevronDown, FileDown, History, Award,
   FileText, Printer, Copy as CopyIcon,
-  Edit, CheckCircle, XCircle, RotateCcw, Target, ChevronRight, ListChecks, Play
+  Edit, CheckCircle, XCircle, RotateCcw, Target, ChevronRight, ListChecks, Play, CalendarClock
 } from 'lucide-react';
 import {
   CalendarDots,
   CalendarBlank,
   MusicNotes as MusicNotesDuo,
   MagnifyingGlass,
+  UsersThree,
 } from '@phosphor-icons/react';
 // jspdf is loaded on demand inside generateOrderPDF / generateSongsPDF
 // (~140 KB; no need at first paint).
@@ -32,6 +33,11 @@ import { RepertoireInsightsModal } from '../components/RepertoireInsightsModal';
 import { SchemaBuilderModal } from '../components/schema/SchemaBuilderModal';
 import { TemplateManagerModal } from '../components/schema/TemplateManagerModal';
 import { suggestDirectorForSong } from '../lib/orders';
+import { SelectMenu } from '../components/ui/SelectMenu';
+import { LineupEditor } from '../components/orders/LineupEditor';
+import { LineupSummary } from '../components/orders/LineupSummary';
+import { LineupModal } from '../components/orders/LineupModal';
+import { buildLineup, lineupSummaryText, isCustomLineup } from '../lib/lineup';
 
 // Parsear 'YYYY-MM-DD' como fecha LOCAL (no UTC). `new Date('2026-09-11')` se
 // interpreta en UTC y, en ART (-3), muestra el día ANTERIOR (jueves 10 en vez de
@@ -91,7 +97,7 @@ const statusConfig = {
 
 export const Ordenes = () => {
   useDocumentTitle('Órdenes');
-  const { orders, bands, songs, members, bandTemporaryMembers, addOrder, updateOrder, deleteOrder, cloneOrder, getUnusedByBand, getSongById, getBandById, getMemberById, getEffectiveBandMemberIds, getServiceSchema } = useAppStore();
+  const { orders, bands, songs, members, bandTemporaryMembers, addOrder, updateOrder, deleteOrder, cloneOrder, getUnusedByBand, getSongById, getBandById, getMemberById, getEffectiveBandMemberIds, getServiceSchema, getOrderParticipants } = useAppStore();
   const userRole = useCurrentRole();
   const isPastor = userRole === 'pastor';
   const isLeader = userRole === 'leader';
@@ -114,6 +120,13 @@ export const Ordenes = () => {
   // Key history feature
   const [keyHistoryLoading, setKeyHistoryLoading] = useState(false);
   const [keyHistoryTooltip, setKeyHistoryTooltip] = useState(null);
+
+  // Formación del servicio: paso 2 del alta ('form' → 'lineup'), borrador y
+  // modal de edición desde el detalle. Ver docs/PLAN_formacion_orden.md.
+  const [formStep, setFormStep] = useState('form');
+  const [lineupDraft, setLineupDraft] = useState({ mode: 'all', members: [] });
+  const [lineupSaving, setLineupSaving] = useState(false);
+  const [lineupModal, setLineupModal] = useState({ isOpen: false, order: null });
 
   const [formData, setFormData] = useState({
     date: '',
@@ -238,6 +251,9 @@ export const Ordenes = () => {
     setSongSearchTerm('');
     setShowSongDropdown(false);
     setKeyHistoryTooltip(null);
+    setFormStep('form');
+    setLineupDraft({ mode: 'all', members: [] });
+    setLineupSaving(false);
     setIsModalOpen(true);
   };
 
@@ -249,6 +265,28 @@ export const Ordenes = () => {
     setSongSearchTerm('');
     setShowSongDropdown(false);
     setKeyHistoryTooltip(null);
+    setFormStep('form');
+    setLineupSaving(false);
+  };
+
+  // Cerrar el modal de alta/edición. En el paso "Formación" el orden todavía NO
+  // está guardado → se confirma antes de descartar (también cubre el gesto
+  // "atrás" del celular, que el <Modal> traduce a onClose).
+  const handleRequestClose = () => {
+    if (formStep === 'lineup' && !editingOrder) {
+      setConfirmModal({
+        isOpen: true,
+        title: 'El orden todavía no se guardó',
+        message: 'Si salís ahora se pierde lo que armaste. ¿Salir sin guardar?',
+        type: 'warning',
+        confirmText: 'Salir sin guardar',
+        cancelText: 'Seguir editando',
+        loading: false,
+        onConfirm: () => { setConfirmModal(prev => ({ ...prev, isOpen: false })); handleCloseModal(); },
+      });
+      return;
+    }
+    handleCloseModal();
   };
 
   // Pastor/leader can change an order's status from the detail view. Routes
@@ -295,6 +333,17 @@ export const Ordenes = () => {
     const rehearsalTime = rehearsalDate ? (formData.rehearsalTime || null) : null;
     const orderPayload = { ...formData, rehearsalDate, rehearsalTime };
 
+    // Crear: ANTES de grabar, el paso "Formación" (decisión de producto: el mail
+    // "nuevo orden" se dispara en el INSERT, así que la formación tiene que
+    // viajar en el mismo guardado). Editar: se guarda directo (la formación se
+    // edita desde el detalle del orden).
+    if (!editingOrder && formStep === 'form') {
+      setFormStep('lineup');
+      return;
+    }
+    if (lineupSaving) return; // anti doble toque
+    setLineupSaving(true);
+
     let orderId;
     if (editingOrder) {
       // Editar: updateOrder mergea el partial con el snapshot del store antes
@@ -305,10 +354,16 @@ export const Ordenes = () => {
     } else {
       // Crear: addOrder corre PRIMERO para tener el order.id real y satisfacer
       // el FK song_key_history.order_id (ver incidente histórico).
-      const newOrder = await addOrder(orderPayload);
+      const newOrder = await addOrder({ ...orderPayload, lineup: buildLineup(lineupDraft.mode, lineupDraft.members) });
       if (!newOrder?.id) {
-        console.error('addOrder did not return an id; skipping key history save');
-        handleCloseModal();
+        // La base rechazó el alta (p. ej. la formación quedó inválida): NO se
+        // miente con un cierre silencioso (landmine #32).
+        setLineupSaving(false);
+        setErrorModal({
+          isOpen: true,
+          title: 'No se pudo guardar el orden',
+          message: useAppStore.getState().error || 'Intentá de nuevo. Si el problema sigue, avisale al pastor.',
+        });
         return;
       }
       orderId = newOrder.id;
@@ -322,7 +377,18 @@ export const Ordenes = () => {
         .map(s => saveKeyHistory(s.directorId, s.songId, s.key, orderId))
     );
 
+    const created = !editingOrder;
+    const n = lineupDraft.mode === 'custom' ? lineupDraft.members.length : null;
     handleCloseModal();
+    if (created) {
+      setSuccessModal({
+        isOpen: true,
+        title: 'Orden guardado',
+        message: n == null
+          ? 'Se avisó a toda la banda. Participan todos: todos reciben los avisos de ensamble y ensayo.'
+          : `Se avisó a toda la banda con la formación (${n} ${n === 1 ? 'integrante' : 'integrantes'}). Los avisos de ensamble y ensayo llegan solo a quienes participan.`,
+      });
+    }
   };
 
   const handleViewOrder = (order) => {
@@ -451,7 +517,18 @@ export const Ordenes = () => {
     doc.setFontSize(12);
     doc.setTextColor(...white);
     doc.text(`${band?.name || 'Banda'}   •   ${getMeetingTypeLabel(order.meetingType)}   •   ${order.songs.length} canciones`, 105, y, { align: 'center' });
-    y += 15;
+    y += 8;
+    // Formación del servicio (solo si el orden la tiene definida)
+    if (order.lineup) {
+      const participants = getOrderParticipants(order);
+      if (participants.length > 0) {
+        const text = `Formación${isCustomLineup(order) ? '' : ' (toda la banda)'}: ${lineupSummaryText(order, participants)}`;
+        doc.setFontSize(10);
+        doc.setTextColor(...lightGray);
+        doc.splitTextToSize(text, 170).forEach((line) => { doc.text(line, 105, y, { align: 'center' }); y += 5; });
+      }
+    }
+    y += 7;
 
     // Separator line
     doc.setDrawColor(...purple);
@@ -810,7 +887,7 @@ export const Ordenes = () => {
     // The .catch keeps a transient network failure from leaving the user with
     // a stale tooltip and no idea why — we just fall back to the song's own key.
     if (directorId && songId) {
-      fetchKeyHistory(directorId, songId).then(result => {
+      fetchKeyHistory(directorId, songId, index).then(result => {
         const song = getSongById(songId);
 
         if (result.found) {
@@ -899,7 +976,18 @@ export const Ordenes = () => {
   };
 
   // Fetch key history for a director-song combination from database
-  const fetchKeyHistory = async (directorId, songId) => {
+  // rowIndex: la fila que disparó la consulta (el tooltip se muestra SOLO ahí, se
+  // auto-cierra a los 6 s y no captura taps — antes salía en todas las filas con
+  // director y tapaba el selector de director en el celular).
+  const keyHistoryTimerRef = useRef(null);
+  const showKeyHistoryTooltip = (tip) => {
+    if (keyHistoryTimerRef.current) clearTimeout(keyHistoryTimerRef.current);
+    setKeyHistoryTooltip(tip);
+    keyHistoryTimerRef.current = setTimeout(() => setKeyHistoryTooltip(null), 6000);
+  };
+  useEffect(() => () => { if (keyHistoryTimerRef.current) clearTimeout(keyHistoryTimerRef.current); }, []);
+
+  const fetchKeyHistory = async (directorId, songId, rowIndex = null) => {
     if (!directorId || !songId) return { found: false, key: null };
 
     setKeyHistoryLoading(true);
@@ -926,10 +1014,11 @@ export const Ordenes = () => {
         // Get the order info for the tooltip
         const order = orders.find(o => o.id === data.order_id);
         const formattedDate = order
-          ? new Date(order.date).toLocaleDateString('es-ES', { day: '2-digit', month: '2-digit', year: 'numeric' })
+          ? parseLocalDate(order.date).toLocaleDateString('es-ES', { day: '2-digit', month: '2-digit', year: 'numeric' })
           : 'fecha no disponible';
 
-        setKeyHistoryTooltip({
+        showKeyHistoryTooltip({
+          rowIndex,
           key: data.key,
           orderBand: order ? getBandById(order.bandId)?.name : '',
           orderDate: formattedDate,
@@ -941,7 +1030,8 @@ export const Ordenes = () => {
       }
 
       // No history found - it's the first time
-      setKeyHistoryTooltip({
+      showKeyHistoryTooltip({
+        rowIndex,
         found: false,
         isFirstTime: true,
         message: 'Esta es la primera vez que el director la va a cantar. Guardaremos el registro de su tonalidad.'
@@ -1119,6 +1209,11 @@ export const Ordenes = () => {
                       <span className="flex items-center gap-1">
                         <Music size={14} /> {order.songs.length} canciones
                       </span>
+                      {isCustomLineup(order) && (
+                        <span className="flex items-center gap-1 text-gold-300" data-testid="card-lineup-pill">
+                          <UsersThree size={14} weight="duotone" /> {getOrderParticipants(order).length} en la formación
+                        </span>
+                      )}
                     </div>
                   </div>
                 </div>
@@ -1229,18 +1324,57 @@ export const Ordenes = () => {
       {/* Create Order Modal */}
       <Modal
         isOpen={isModalOpen}
-        onClose={handleCloseModal}
-        title={editingOrder ? 'Editar Orden de Servicio' : 'Nuevo Orden de Servicio'}
+        onClose={handleRequestClose}
+        title={editingOrder ? 'Editar Orden de Servicio' : formStep === 'lineup' ? 'Formación del servicio' : 'Nuevo Orden de Servicio'}
         size="xl"
         footer={
-          <>
-            <Button variant="secondary" onClick={handleCloseModal}>Cancelar</Button>
-            <Button onClick={handleSubmit} disabled={!formData.date || !formData.bandId}>
-              {editingOrder ? 'Guardar cambios' : 'Crear Orden'}
-            </Button>
-          </>
+          formStep === 'lineup' && !editingOrder ? (
+            <>
+              <Button variant="ghost" onClick={() => setFormStep('form')} disabled={lineupSaving} data-testid="lineup-back">Volver</Button>
+              <Button
+                onClick={handleSubmit}
+                disabled={lineupSaving || (lineupDraft.mode === 'custom' && lineupDraft.members.length === 0)}
+                data-testid="lineup-save"
+              >
+                {lineupSaving ? 'Guardando…' : 'Guardar orden'}
+              </Button>
+            </>
+          ) : (
+            <>
+              <Button variant="secondary" onClick={handleRequestClose}>Cancelar</Button>
+              <Button onClick={handleSubmit} disabled={!formData.date || !formData.bandId} data-testid="order-submit">
+                {editingOrder ? 'Guardar cambios' : 'Continuar'}
+              </Button>
+            </>
+          )
         }
       >
+        {formStep === 'lineup' && !editingOrder ? (
+          <div className="space-y-5" data-testid="lineup-step">
+            {/* Resumen del orden que se va a guardar */}
+            <div className="rounded-2xl border border-gold-500/25 bg-gradient-to-br from-gold-600/[0.22] via-neutral-900 to-gold-300/[0.08] p-4">
+              <div className="flex items-start gap-3">
+                <div className="p-2 rounded-xl bg-gold-500/15 ring-1 ring-gold-500/25 text-gold-300 shrink-0"><UsersThree size={22} weight="duotone" /></div>
+                <div className="min-w-0 flex-1">
+                  <p className="text-[11px] uppercase tracking-wide text-gold-300/80 font-medium">Paso 2 de 2 · Formación</p>
+                  <p className="font-semibold mt-0.5">{formData.date ? formatDate(formData.date) : ''} · {formData.time} · {getBandById(formData.bandId)?.name || 'Banda'}</p>
+                  <p className="text-xs text-gray-400 mt-0.5">
+                    {formData.songs.length} {formData.songs.length === 1 ? 'canción' : 'canciones'}
+                    {formData.rehearsalEnabled && formData.rehearsalDate ? ` · ensamble ${formatDate(formData.rehearsalDate)}${formData.rehearsalTime ? ` ${formData.rehearsalTime}` : ''}` : ''}
+                  </p>
+                  <p className="text-xs text-gray-500 mt-1.5">¿Quiénes tocan este servicio? Los avisos de ensamble y la alarma de ensayo llegan solo a los que participan. El orden y sus canciones los ve toda la banda igual.</p>
+                </div>
+              </div>
+            </div>
+            <LineupEditor
+              bandId={formData.bandId}
+              songs={formData.songs}
+              orderDate={formData.date}
+              value={lineupDraft}
+              onChange={setLineupDraft}
+            />
+          </div>
+        ) : (
         <div className="space-y-6">
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
             <Input
@@ -1259,11 +1393,12 @@ export const Ordenes = () => {
               <label className="text-xs text-gray-400 font-medium uppercase tracking-wide block mb-1.5">
                 Banda
               </label>
-              <select
-                className="w-full"
+              <SelectMenu
                 value={formData.bandId || ''}
-                onChange={(e) => {
-                  const bandId = e.target.value || null;
+                placeholder="Seleccionar banda"
+                options={bands.map((band) => ({ value: band.id, label: band.name }))}
+                onChange={(v) => {
+                  const bandId = v || null;
                   const band = getBandById(bandId);
                   // When the band changes, drop any director assignments that
                   // don't belong to the new band — those members aren't
@@ -1284,12 +1419,7 @@ export const Ordenes = () => {
                   });
                   setSelectedBandForUnused(bandId);
                 }}
-              >
-                <option value="">Seleccionar banda</option>
-                {bands.map(band => (
-                  <option key={band.id} value={band.id}>{band.name}</option>
-                ))}
-              </select>
+              />
             </div>
           </div>
 
@@ -1411,17 +1541,14 @@ export const Ordenes = () => {
                       <p className="text-xs text-gray-400 truncate">{song?.artist}</p>
                     </div>
                     {/* Director selector - filtered to singers only */}
-                    <div className="relative shrink-0">
-                      <select
-                        className={`bg-neutral-900 border rounded-lg px-2 py-1.5 text-sm w-40 ${
-                          songRef._suggestedDirector
-                            ? 'border-gold-500/60'
-                            : 'border-neutral-700'
-                        }`}
+                    <div className="relative shrink-0 w-44" title={songRef._suggestedDirector ? 'Director sugerido por historial' : undefined}>
+                      <SelectMenu
                         value={songRef.directorId || ''}
-                        title={songRef._suggestedDirector ? 'Director sugerido por historial' : undefined}
-                        onChange={(e) => {
-                          const newDirectorId = e.target.value || null;
+                        placeholder="Director"
+                        icon={User}
+                        options={[{ value: '', label: 'Sin director' }, ...singers.map((member) => ({ value: member.id, label: member.name }))]}
+                        onChange={(v) => {
+                          const newDirectorId = v || null;
                           // Clear the "suggested" flag once the user makes a manual choice
                           setFormData(prev => ({
                             ...prev,
@@ -1431,12 +1558,7 @@ export const Ordenes = () => {
                           }));
                           handleDirectorChange(index, newDirectorId, songRef.songId);
                         }}
-                      >
-                        <option value="">Director</option>
-                        {singers.map(member => (
-                          <option key={member.id} value={member.id}>{member.name}</option>
-                        ))}
-                      </select>
+                      />
                       {songRef._suggestedDirector && (
                         <span
                           className="absolute -top-1.5 -right-1.5 text-[9px] bg-gold-gradient text-black rounded-full px-1.5 py-0.5 leading-none pointer-events-none"
@@ -1448,20 +1570,17 @@ export const Ordenes = () => {
                     </div>
                     {/* Key selector with history lookup icon */}
                     <div className="relative flex items-center shrink-0">
-                      <select
-                        className="bg-neutral-900 border border-neutral-700 rounded-lg px-2 py-1.5 text-sm w-20 text-center font-mono"
+                      <SelectMenu
+                        className="w-24 font-mono"
                         value={songRef.key}
-                        onChange={(e) => handleKeyChange(index, e.target.value)}
-                        title="Tonalidad"
-                      >
-                        {MUSICAL_KEYS.map(key => (
-                          <option key={key} value={key}>{key}</option>
-                        ))}
-                      </select>
+                        placeholder="Tono"
+                        options={MUSICAL_KEYS.map((key) => ({ value: key, label: key }))}
+                        onChange={(v) => handleKeyChange(index, v)}
+                      />
                       {songRef.directorId && (
                         <button
                           type="button"
-                          onClick={() => fetchKeyHistory(songRef.directorId, songRef.songId)}
+                          onClick={() => fetchKeyHistory(songRef.directorId, songRef.songId, index)}
                           className={`ml-1 p-1 transition-colors ${keyHistoryLoading ? 'animate-spin' : ''} ${
                             keyHistoryTooltip?.found === true
                               ? 'text-green-400 hover:text-green-300'
@@ -1497,8 +1616,8 @@ export const Ordenes = () => {
                           longer overflows off-screen on mobile — the key column
                           sits at the right edge, so the tooltip grows leftward,
                           inward, and wraps to a few lines within max-w. */}
-                      {keyHistoryTooltip && songRef.directorId && (
-                        <div className="absolute bottom-full mb-2 right-0 px-3 py-2 bg-neutral-700 text-xs rounded-lg shadow-lg z-50 max-w-[13rem] w-max">
+                      {keyHistoryTooltip && keyHistoryTooltip.rowIndex === index && songRef.directorId && (
+                        <div className="pointer-events-none absolute bottom-full mb-2 right-0 px-3 py-2 bg-neutral-700 text-xs rounded-lg shadow-lg z-50 max-w-[13rem] w-max">
                           {keyHistoryTooltip.found === true ? (
                             // Found history tooltip
                             <>
@@ -1632,6 +1751,7 @@ export const Ordenes = () => {
             </div>
           </div>
         </div>
+        )}
       </Modal>
 
       {/* Order Detail Modal */}
@@ -1760,6 +1880,31 @@ export const Ordenes = () => {
               </Card>
             </div>
 
+            {/* Ensamble programado (antes el detalle no lo mostraba, aunque la
+                card del inicio mandaba acá "para ver el orden"). */}
+            {viewingOrder.rehearsalDate && (
+              <div className="flex items-center gap-3 rounded-xl border border-amber-500/30 bg-amber-500/[0.07] p-3" data-testid="detail-rehearsal">
+                <div className="p-2 rounded-lg bg-amber-500/15 text-amber-300 shrink-0"><CalendarClock size={18} /></div>
+                <div className="min-w-0">
+                  <p className="text-[11px] uppercase tracking-wide text-amber-300/80 font-medium">Ensamble</p>
+                  <p className="text-sm font-medium">{formatDate(viewingOrder.rehearsalDate)}{viewingOrder.rehearsalTime ? ` · ${viewingOrder.rehearsalTime}` : ''}</p>
+                </div>
+              </div>
+            )}
+
+            {/* Formación del servicio */}
+            <div data-testid="detail-lineup">
+              <div className="flex flex-wrap items-center justify-between gap-2 mb-3">
+                <h4 className="text-sm font-medium text-gray-400">Formación</h4>
+                {(isPastor || isLeader) && getBandById(viewingOrder.bandId) && (
+                  <Button variant="secondary" size="sm" icon={UsersThree} onClick={() => setLineupModal({ isOpen: true, order: viewingOrder })} data-testid="detail-lineup-edit">
+                    {isCustomLineup(viewingOrder) ? 'Editar formación' : 'Definir formación'}
+                  </Button>
+                )}
+              </div>
+              <LineupSummary order={viewingOrder} />
+            </div>
+
             <div>
               <h4 className="text-sm font-medium text-gray-400 mb-3">Canciones</h4>
               <div className="space-y-3">
@@ -1845,6 +1990,15 @@ export const Ordenes = () => {
         onClose={() => setErrorModal(prev => ({ ...prev, isOpen: false }))}
         title={errorModal.title}
         message={errorModal.message}
+      />
+
+      {/* Formación: edición desde el detalle (líder/pastor). `viewingOrder` es una
+          foto, no el store → se parchea al guardar (como handleChangeStatus). */}
+      <LineupModal
+        isOpen={lineupModal.isOpen}
+        order={lineupModal.order}
+        onClose={() => setLineupModal({ isOpen: false, order: null })}
+        onSaved={(fresh) => setViewingOrder((prev) => (prev && prev.id === fresh.id ? { ...prev, lineup: fresh.lineup } : prev))}
       />
 
       {/* Radiografía del repertorio (solo lectura) */}

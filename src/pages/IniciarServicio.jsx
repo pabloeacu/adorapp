@@ -2,6 +2,7 @@ import React, { useState, useEffect, useRef, useMemo } from 'react';
 import { useParams, Navigate, useNavigate } from 'react-router-dom';
 import { X, Play, Pause, Square, ChevronRight, ChevronLeft, Gauge, Music2 } from 'lucide-react';
 import { useAppStore, transposeSongStructure } from '../stores/appStore';
+import { isCustomLineup, lineupSummaryText } from '../lib/lineup';
 import { useAuthStore } from '../stores/authStore';
 import { GoldWave } from '../components/ui/GoldWave';
 import { PageLoader } from '../components/ui/PageLoader';
@@ -29,6 +30,7 @@ export const IniciarServicio = () => {
   const getServiceSchema = useAppStore((s) => s.getServiceSchema);
   const getSongById = useAppStore((s) => s.getSongById);
   const getBandById = useAppStore((s) => s.getBandById);
+  const getOrderParticipants = useAppStore((s) => s.getOrderParticipants);
 
   // Deep-link / refresh: si el store está vacío, cargarlo.
   useEffect(() => {
@@ -125,6 +127,7 @@ export const IniciarServicio = () => {
   }
 
   const band = getBandById(order.bandId);
+  const lineupText = isCustomLineup(order) ? lineupSummaryText(order, getOrderParticipants(order), { maxGroups: 6 }) : '';
   const total = steps.length;
   const go = (delta) => {
     setDir(delta);
@@ -200,6 +203,7 @@ export const IniciarServicio = () => {
         <div className="min-w-0">
           <p className="text-sm font-semibold truncate">{band?.name || 'Servicio'}</p>
           <p className="text-xs text-neutral-500 truncate">Paso {Math.min(stepIdx + 1, total)} de {total}</p>
+          {lineupText && <p className="text-[11px] text-gold-300/80 truncate" title={lineupText} data-testid="presenter-lineup">Formación · {lineupText}</p>}
         </div>
         {remaining != null && (
           <div className={`tabular-nums text-2xl sm:text-3xl font-bold ${overtime ? 'text-red-400' : 'text-gold-200'}`}>
