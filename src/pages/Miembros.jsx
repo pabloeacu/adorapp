@@ -1021,7 +1021,7 @@ export const Miembros = () => {
             />
             <Input
               label="Líder de"
-              placeholder="Grupo o área"
+              placeholder="Nombre de tu líder (Equipo de Avivamiento)"
               value={formData.leader_of}
               onChange={(e) => setFormData({ ...formData, leader_of: e.target.value })}
             />

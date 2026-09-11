@@ -1009,7 +1009,7 @@ export const Header = () => {
                     value={editLeaderOf}
                     onChange={(e) => setEditLeaderOf(e.target.value)}
                     className="w-full bg-neutral-700 border border-neutral-600 rounded-lg px-3 py-1.5 text-white focus:outline-none focus:ring-2 focus:ring-gold-500/40 focus:border-gold-500"
-                    placeholder="Grupo o área"
+                    placeholder="Nombre de tu líder (Equipo de Avivamiento)"
                   />
                 ) : (
                   <p className="font-medium">{currentUserMember?.leader_of || profile?.leader_of || 'No configurado'}</p>
