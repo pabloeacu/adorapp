@@ -9,6 +9,7 @@ import { UserPlus } from '@phosphor-icons/react';
 import { useAuthStore } from '../stores/authStore';
 import { PageLoader } from '../components/ui/PageLoader';
 import { useAppStore, MEMBER_ROLES } from '../stores/appStore';
+import { SELECTABLE_AREAS } from '../lib/areas';
 import { supabase, callAdminFunction } from '../lib/supabase';
 import { Card } from '../components/ui/Card';
 import { Button } from '../components/ui/Button';
@@ -48,6 +49,7 @@ export const Solicitudes = () => {
   const [selectedRequest, setSelectedRequest] = useState(null);
   const [showApproveModal, setShowApproveModal] = useState(false);
   const [selectedRole, setSelectedRole] = useState('member');
+  const [selectedAreas, setSelectedAreas] = useState(['adoracion']);
   const [generatedPassword, setGeneratedPassword] = useState('');
   const [createdMember, setCreatedMember] = useState(null);
   const [showPasswordReveal, setShowPasswordReveal] = useState(false);
@@ -134,6 +136,7 @@ export const Solicitudes = () => {
   const handleApprove = (request) => {
     setSelectedRequest(request);
     setSelectedRole('member');
+    setSelectedAreas(['adoracion']);
     setGeneratedPassword(generateRandomPassword());
     setShowApproveModal(true);
   };
@@ -154,6 +157,7 @@ export const Solicitudes = () => {
     const { data, error } = await callAdminFunction('admin-approve-registration', {
       requestId: selectedRequest.id,
       role: selectedRole,
+      areas: selectedAreas,
       password: generatedPassword,
     });
 
@@ -550,7 +554,7 @@ export const Solicitudes = () => {
             <Button onClick={() => setConfirmModal({
               isOpen: true,
               title: 'Confirmar Aprobación',
-              message: `¿Estás seguro de aprobar a ${selectedRequest?.name} como ${MEMBER_ROLES.find(r => r.id === selectedRole)?.label}? Se crearán sus credenciales de acceso.`,
+              message: `¿Estás seguro de aprobar a ${selectedRequest?.name} como ${MEMBER_ROLES.find(r => r.id === selectedRole)?.label}${selectedAreas.length ? ` · Área: ${SELECTABLE_AREAS.filter(a => selectedAreas.includes(a.slug)).map(a => a.label).join(', ')}` : ''}? Se crearán sus credenciales de acceso.`,
               type: 'success',
               confirmText: 'Aprobar',
               cancelText: 'Cancelar',
@@ -609,6 +613,35 @@ export const Solicitudes = () => {
                 </button>
               ))}
             </div>
+          </div>
+
+          <div>
+            <label className="text-xs text-gray-400 font-medium uppercase tracking-wide block mb-3">
+              Área(s) de ministerio
+            </label>
+            <div className="grid grid-cols-3 gap-3">
+              {SELECTABLE_AREAS.map(area => (
+                <button
+                  key={area.slug}
+                  type="button"
+                  onClick={() => setSelectedAreas(prev => prev.includes(area.slug)
+                    ? prev.filter(a => a !== area.slug)
+                    : [...prev, area.slug])}
+                  className={`
+                    p-3 rounded-xl text-sm transition-all border-2
+                    ${selectedAreas.includes(area.slug)
+                      ? 'border-gold-500 bg-gold-500/10'
+                      : 'border-neutral-800 hover:border-gold-500/40'
+                    }
+                  `}
+                >
+                  {area.label}
+                </button>
+              ))}
+            </div>
+            <p className="text-xs text-gray-500 mt-2">
+              Adoración = integrante de banda. Multimedia y Sonido reciben por correo los órdenes y las formaciones, ven el presentador y no editan nada.
+            </p>
           </div>
 
           <div>
