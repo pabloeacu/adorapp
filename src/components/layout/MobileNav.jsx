@@ -935,7 +935,7 @@ export const MobileNav = () => {
                     </div>
 
                     <div>
-                      <label className="block text-neutral-400 text-xs mb-1.5 ml-1">Líder de</label>
+                      <label className="block text-neutral-400 text-xs mb-1.5 ml-1">Tu líder</label>
                       <div className="relative">
                         <Users2 size={16} className="absolute left-4 top-1/2 -translate-y-1/2 text-neutral-500" />
                         <input
@@ -1036,7 +1036,7 @@ export const MobileNav = () => {
                         <Users2 size={16} className="text-neutral-400" />
                       </div>
                       <div className="flex-1">
-                        <p className="text-xs text-neutral-500">Líder de</p>
+                        <p className="text-xs text-neutral-500">Tu líder</p>
                         <p className="text-white text-sm">{displayLeaderOf || 'No configurado'}</p>
                       </div>
                     </div>
