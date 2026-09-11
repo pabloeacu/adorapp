@@ -65,10 +65,10 @@
 | `daily-devotional-notification` | `0 9 * * *` | 06:00 | Push devocional del día. |
 | `daily-birthday-notification` | `0 12 * * *` | 09:00 | Push a pastores por cumpleaños. |
 | `daily-afternoon-reflection` | `0 20 * * *` | 17:00 | Push reflexión de la tarde. |
-| `practice-reminders` | `0 21 * * *` | 18:00 | Alarma de ensayo (1/día si hay pendientes). |
+| `practice-reminders` | `0 21 * * *` | 18:00 | Alarma de ensayo (1/día si hay pendientes) a los **participantes** del orden (`order_participant_ids`). |
 | `auto-complete-orders` | `0 6 * * *` | 03:00 | `scheduled`→`completed` órdenes pasadas. |
 | `practice-cleanup` | `30 7 * * *` | 04:30 | Poda `practice_logs` de órdenes viejas (gracia 7d). |
-| `rehearsal-reminders` | `*/15 * * * *` | — | Push a la banda 2 h antes del ensamble. |
+| `rehearsal-reminders` | `*/15 * * * *` | — | Push 2 h antes del ensamble a los **participantes** del orden (`order_participant_ids`; sin formación = banda efectiva). |
 | `notification-monitor` | `0 */6 * * *` | cada 6 h | Escribe a `error_log` si falta contenido. |
 
 **FKs críticas hacia bands/songs/members/orders** (reglas de DELETE post PR #42/#59 — nunca volver a `NO ACTION`):
@@ -115,6 +115,7 @@ Pantalla más grande del repo. CRUD completo de órdenes (listas de canciones po
 - `songSearchTerm` / `showSongDropdown` / `songDropdownPosition` — buscador de repertorio; viven FUERA de `formData` (por eso se blanquean aparte, landmine 8) (`Ordenes.jsx:89-91`).
 - `keyHistoryLoading` / `keyHistoryTooltip` — estado del lookup de historial de tonos (`Ordenes.jsx:94-95`).
 - `formData` — `{ date, time:'20:00', bandId, meetingType:'culto_general', songs:[], feedback, rehearsalEnabled, rehearsalDate, rehearsalTime:'18:00' }` (`Ordenes.jsx:97-107`).
+- **Formación (2026-09-11):** `formStep` (`'form'|'lineup'`, `Ordenes.jsx:126`) — al CREAR, "Guardar" pasa primero al paso "Formación del servicio" (antes del INSERT, para que el mail `nuevo-orden` la lleve); `lineupDraft` (`{mode:'all'|'custom', members:[{memberId,instruments}]}`, borrador que sobrevive Volver/Continuar); `lineupSaving`; `lineupModal` (`{isOpen, order}`, edición desde el detalle vía `<LineupModal>`). `handleRequestClose` (`:275`) pide confirmación "El orden todavía no se guardó" al cerrar en el paso de formación o con cambios.
 - `confirmModal` / `successModal` / `errorModal` — modales genéricos (`Ordenes.jsx:126-145`).
 - `searchParams`/`setSearchParams` de react-router (deep-link) (`Ordenes.jsx:149`).
 
@@ -133,7 +134,7 @@ Pantalla más grande del repo. CRUD completo de órdenes (listas de canciones po
 - `Ordenes.jsx:242`. Card del dashboard "Hoy tenés ensamble" navega a `/ordenes?order=<id>`; el effect espera a que `orders` cargue, abre el detalle de ese id y limpia el param con `setSearchParams(..., {replace:true})`.
 
 #### Submit / CRUD
-- **`handleSubmit(e)`** — `Ordenes.jsx:255`. Valida `date`+`bandId`. Arma `orderPayload` adjuntando `rehearsalDate/Time` SOLO si el switch está on y hay fecha (si no, ambos `null`). Si `editingOrder`: `await updateOrder(id, payload)` (merge-safe, NO toca `rehearsal_reminder_sent`, landmine 9/13). Si no: `await addOrder(payload)` PRIMERO para obtener `order.id` real (satisface FK `song_key_history.order_id`). Luego, en paralelo, `saveKeyHistory(...)` por cada canción con `directorId`. Cierra al final.
+- **`handleSubmit(e)`** — `Ordenes.jsx:255`. Valida `date`+`bandId`. Arma `orderPayload` adjuntando `rehearsalDate/Time` SOLO si el switch está on y hay fecha (si no, ambos `null`). Si `editingOrder`: `await updateOrder(id, payload)` (merge-safe, NO toca `rehearsal_reminder_sent`, landmine 9/13). Si no (crear): con `formStep==='form'` solo valida y pasa a `setFormStep('lineup')`; en el paso de formación hace `await addOrder({...payload, lineup: buildLineup(lineupDraft)})` PRIMERO para obtener `order.id` real (satisface FK `song_key_history.order_id`); `null` ⇒ ErrorModal (sin mentir). Luego, en paralelo, `saveKeyHistory(...)` por cada canción con `directorId`. Cierra al final.
 - **`handleChangeStatus(order, status)`** — `Ordenes.jsx:235`. `await updateOrder(id,{status})` + parchea `viewingOrder` local. Botones Marcar completado / Cancelar / Reabrir (solo pastor/líder, detalle).
 - **`handleCloneOrder(order)`** — `Ordenes.jsx:302`. ConfirmModal → `cloneOrder(order.id)` (store: copia con fecha hoy, `status:'scheduled'`, `feedback:''`) → SuccessModal. (NO awaitea el clone; fire-and-confirm.)
 - **`handleDeleteOrder(order)`** — `Ordenes.jsx:324`. ConfirmModal → **`const ok = await deleteOrder(order.id)`** → SuccessModal si `ok`, **ErrorModal si falla** (LANDMINES 19,32: nunca fire-and-forget; antes mostraba "eliminada" aunque la FK rechazara con 23503).
@@ -171,10 +172,11 @@ Pantalla más grande del repo. CRUD completo de órdenes (listas de canciones po
 - **Switch "Programar ensamble" iOS-safe** (`Ordenes.jsx:1264-1274`): patrón `<label>` + `<input type=checkbox class="sr-only peer">` + dos `<span>` (track `w-[52px] h-8`, knob `h-7 w-7`, `peer-checked:translate-x-5`). NO usar `<button>` (landmine 23 — iOS lo deforma). "Ensamble" = encuentro de la banda (glosario, landmine 26).
 - Buscador de repertorio bloqueado hasta elegir banda (foco/click ⇒ ErrorModal "Elegí la banda primero") (`Ordenes.jsx:1502-1537`); dropdown se auto-posiciona arriba/abajo según `spaceBelow` (`Ordenes.jsx:1488-1493`).
 - Selector de tono con botón de lookup (íconos History/Check/Award/Clock según estado) y **tooltip anclado a la derecha** (`right-0`, `max-w-[13rem]`, sin `whitespace-nowrap`) para no desbordar en móvil (`Ordenes.jsx:1442-1467`).
-- Modal detalle (`viewingOrder`): card "Practicar este orden" → `/practica/:id` solo si `status==='scheduled'` (`Ordenes.jsx:1630`); control de estado (pastor/líder); textarea de feedback (pastor); `<OrderHistoryTimeline orderId>` (pastor, gateado por RLS) (`Ordenes.jsx:1730`).
+- Selectores Banda / Director / Tono son `<SelectMenu>` (bottom sheet en móvil, sin `<select>` nativo del navegador); director incluye la opción `{value:'', label:'Sin director'}`. El tooltip de historial de tono es **por fila** (`keyHistoryTooltip.rowIndex === index`), se auto-cierra a los 6 s (`showKeyHistoryTooltip` + `keyHistoryTimerRef`, `Ordenes.jsx:982-988`) y es `pointer-events-none` (antes interceptaba taps sobre el control de director en móvil).
+- Modal detalle (`viewingOrder`): bloque **Ensamble** (`detail-rehearsal`, fecha con `parseLocalDate`) y bloque **Formación** (`detail-lineup`: `<LineupSummary order>` + botón "Editar formación" pastor/líder → `<LineupModal>`, que al guardar parchea `viewingOrder` con `onSaved`); pill `card-lineup-pill` en la tarjeta ("N en la formación" / "Toda la banda (N)"); `generateOrderPDF` agrega las líneas "Formación…" vía `lineupSummaryText`. Card "Practicar este orden" → `/practica/:id` solo si `status==='scheduled'` (`Ordenes.jsx:1630`); control de estado (pastor/líder); textarea de feedback (pastor); `<OrderHistoryTimeline orderId>` (pastor, gateado por RLS) (`Ordenes.jsx:1730`).
 
 ### Flujo de datos (resumen)
-- **Store (`appStore.js`)**: `addOrder` inserta con `uuidv4()` id, hace `updateSong(..., {lastUsed})` por canción, devuelve la row; `updateOrder` **mergea con el snapshot del store ANTES** de `convertOrderToDB` (evita data-loss, `appStore.js:685`); `deleteOrder` devuelve `true/false`; `cloneOrder` copia y delega en `addOrder`. `convertOrderToDB` (`appStore.js:237`) NUNCA escribe `rehearsal_reminder_sent` (lo maneja el cron).
+- **Store (`appStore.js`)**: `addOrder` inserta con `uuidv4()` id, hace `updateSong(..., {lastUsed})` por canción, devuelve la row; `updateOrder` **mergea con el snapshot del store ANTES** de `convertOrderToDB` (evita data-loss, `appStore.js:685`); `deleteOrder` devuelve `true/false`; `cloneOrder` copia y delega en `addOrder` (**sin** heredar `rehearsalDate/Time` ni `lineup`). `convertOrderToDB` (`appStore.js:237`) NUNCA escribe `rehearsal_reminder_sent` (lo maneja el cron) y pasa `songs` por `stripSongRefs` (quita `_localId/_pendingHistory/_suggestedDirector`). `lineup` viaja en ambos converters; la base lo valida/normaliza (`validate_order_lineup`) y avisa por mail/campanita solo a quien entra/sale/cambia de instrumento.
 - **Supabase directo desde la página**: tabla `song_key_history` (SELECT en `fetchKeyHistory`, UPSERT en `saveKeyHistory`). El resto pasa por el store.
 - **Realtime**: cambios en `orders` entran vía `mergeRealtimeChange` del store (`appStore.js:890`, la página no se suscribe directo).
 - **Crons relacionados** (no en este archivo): `send_rehearsal_reminders` (push 2h antes del ensamble), `auto_complete_past_orders` (scheduled→completed cuando `date < hoy`).
@@ -190,7 +192,8 @@ Pantalla más grande del repo. CRUD completo de órdenes (listas de canciones po
 - **23** — El switch "Programar ensamble" NO debe ser `<button>` (iOS lo deforma). Patrón label+checkbox sr-only+spans con px fijos.
 - **26 (glosario)** — "ensamble" = encuentro de la banda (lo que se programa acá); "ensayo" = práctica personal (pantalla `/practica`). No confundir en copy nuevo.
 - **32 (fallback band_id null)** — Mostrar "Banda eliminada" cuando `getBandById(...)` es null (tarjeta y detalle; los PDFs ya tienen su propio fallback "Banda").
-- **DnD `_localId`** — Es id efímero de cliente para @dnd-kit; se persiste tal cual dentro de `songs` (a diferencia de Repertorio, aquí NO se stripea). El grip "⋮⋮" es el único drag handle; sin `useSortable` sería decorativo.
+- **DnD `_localId`** — Es id efímero de cliente para @dnd-kit; desde 2026-09-11 el store lo stripea (`stripSongRefs`, junto con `_pendingHistory/_suggestedDirector`) antes de persistir `songs`. Si agregás claves de UI nuevas a las canciones del editor, sumalas al strip (landmine 52). El grip "⋮⋮" es el único drag handle; sin `useSortable` sería decorativo.
+- **Formación (landmines 52–55)** — el asistente corre ANTES del INSERT (`formStep`); el detalle edita con `updateOrder({lineup})` (merge-safe, la base valida). Avisos del servicio (ensamble/ensayo/card/banner/chips) = participantes (`isOrderParticipant`/`order_participant_ids`); info general (mail/push de alta y edición, orden, canciones, Practicar) = banda efectiva. Los directores de canción quedan siempre en la formación (candado en el editor + trigger).
 - **null-guards del buscador** — `filteredSongsForDropdown` protege título/artista/tono null; un NULL legacy crashea toda la página.
 
 ---
@@ -382,6 +385,7 @@ Si `!order`: mientras `loading || orders.length===0` → `<PageLoader/>` (espera
 - **Landmine 30 (festejo 100%):** dispara sólo en la transición `prevPercentRef` `<100→100`; entrar ya al 100% no re-festeja. Si tocás el cálculo de `percent`, cuidá no re-disparar en carga (por eso el gate `logsLoaded` y el `prev !== null`).
 - **Reset al cambiar de `:orderId`:** el mismo componente sirve distintos órdenes; sin el reset de `logs`/`logsLoaded` (`:239-240`), un log de otro orden con la misma canción se mostraría como propio. Guards `alive` en ambos fetch anti-race.
 - **Flush al desmontar:** los guardados pendientes con debounce se disparan en el cleanup (`:252-260`); salir rápido de la pantalla no pierde el último cambio.
+- **Formación (landmine 53):** la pantalla sigue abierta a toda la banda efectiva; si el usuario integra la banda pero NO está en la formación del orden, muestra la nota "No estás en la formación, pero siempre viene bien repasar" (`practice-not-in-lineup`, `Practica.jsx:391`). La alarma de las 18:00 (`send_practice_reminders`) solo le llega si participa.
 - **Switch iOS-safe (landmine 23):** el toggle de alarma NO es un `<button>` sino `label + input.sr-only.peer + span`; no volver a un `<button>` pill o iOS lo deforma.
 
 ---
@@ -498,11 +502,11 @@ Componente `Dashboard` (`Dashboard.jsx:35`). Sin props. Panel de cards de estad�
 - `unusedSongs` = `getUnusedSongs(4)` (`:42`) → del store: canciones sin `lastUsed` o con `lastUsed` < hace 4 semanas (`appStore.js:857`).
 - `recentSongs` = `songs.slice(0, 4)` (`:43`).
 
-**Card de ensamble del día** (`:45-97`): calcula la wall-clock ART vía `toLocaleString('en-US', {timeZone: 'America/Argentina/Buenos_Aires'})` (ART es UTC-3, sin DST) → `todayART` (YYYY-MM-DD) + `artHour`. `todaysRehearsal` = primer order cuyo `rehearsalDate.slice(0,10) === todayART` (`:53`). Se muestra (`showRehearsalCard`) solo si hay ensamble hoy **y** `8 <= artHour < 23` (`:56`). Es un `<Link to={/ordenes?order=<id>}>` full-width ámbar; copy "¡Hoy tenés ensamble!" (glosario: **ensamble** = encuentro de banda, no "ensayo", landmine 26).
+**Card de ensamble del día** (`:45-97`): calcula la wall-clock ART vía `toLocaleString('en-US', {timeZone: 'America/Argentina/Buenos_Aires'})` (ART es UTC-3, sin DST) → `todayART` (YYYY-MM-DD) + `artHour`. `todaysRehearsal` = primer order cuyo `rehearsalDate.slice(0,10) === todayART` **y del que el usuario participa** (`role === 'pastor' || isOrderParticipant(o, member.id)`, `:75`; formación custom → solo los listados, sin formación → banda efectiva). Se muestra (`showRehearsalCard`) solo si hay ensamble hoy **y** `8 <= artHour < 23` (`:56`). Es un `<Link to={/ordenes?order=<id>}>` full-width ámbar; copy "¡Hoy tenés ensamble!" (glosario: **ensamble** = encuentro de banda, no "ensayo", landmine 26).
 
 **Stats grid (cards = accesos directos por permiso)** (`:68-126`): array `stats` con `{label, value, icon, color, bg, to, roles?}`. El card **Órdenes** cuenta `upcomingOrders.length` (SOLO scheduled), NO `orders.length` (landmine 24). Miembros lleva `roles: ['pastor','leader']`; los otros 3 no tienen `roles` (abiertos). Render: `canAccess = !stat.roles || stat.roles.includes(role)` (`:102`); si accesible → `<Link to={stat.to}>` envolviendo `<Card>`; si no → `<Card>` plano informativo (`:114-124`). Espeja el criterio de nav/route-guards de `App.jsx`.
 
-**Paneles inferiores:** "Canciones Recientes" (`recentSongs` + badge `unusedSongs.length`), "Próximos Servicios" (`upcomingOrders.slice(0,3)`, resuelve `band` por `order.bandId`, formatea fecha es-ES), "Resumen Rápido" (completados = `orders.filter(o=>o.status==='completed').length` + `unusedSongs.length`), "Miembros Activos" (lista scrolleable con `Avatar`, `getInstrumentIcon`, badge por rol).
+**Paneles inferiores:** "Canciones Recientes" (`recentSongs` + badge `unusedSongs.length`), "Próximos Servicios" (`upcomingOrders.slice(0,3)`, resuelve `band` por `order.bandId`, formatea fecha es-ES con `parseLocalDate`; chip personal `upcoming-lineup-chip`: "Tocás: Bajo y Batería" (`lineupInstrumentsFor`) / "Participás" / "No estás en la formación", solo para integrantes de la banda del orden), "Resumen Rápido" (completados = `orders.filter(o=>o.status==='completed').length` + `unusedSongs.length`), "Miembros Activos" (lista scrolleable con `Avatar`, `getInstrumentIcon`, badge por rol).
 
 - `getInstrumentIcon(instrument)` (`:26`) — helper local; matchea substring lower-case del instrumento → ícono lucide (Guitar/Mic2/Drum/Piano), default `User`.
 
@@ -590,6 +594,7 @@ Exporta `Comunicaciones` (`:12`). Sin props. Gate: `profile?.role !== 'pastor'` 
 
 - **Landmine 24 (Dashboard):** el card "Órdenes" cuenta SOLO `status==='scheduled'` (`upcomingOrders.length`), nunca `orders.length` (crecería sin techo). Cada card es `<Link>` solo si el rol tiene acceso (`canAccess`, fuente de verdad = criterio de `App.jsx`/nav: `/miembros` es pastor/líder); si no, `<Card>` plano. Card nuevo → definir `to`+`roles` alineado al route-guard.
 - **Landmine 26 (glosario):** en Dashboard el card del día dice "¡Hoy tenés **ensamble**!" (encuentro de banda). No renombrarlo "ensayo" (eso es la práctica personal en Mi Ensayo).
+- **Formación (landmine 53):** la card del día y el `PrepBanner` (`resolveActiveOrder(orders, memberId, todayART, isOrderParticipant)`) se muestran solo a participantes (pastor siempre). No volver a filtrar por banda efectiva o quien no toca ese día recibe "hoy tenés ensamble".
 - **Ensamble del día — TZ:** `Dashboard.jsx:48` calcula la fecha/hora ART vía `toLocaleString` a propósito para no depender del TZ del dispositivo. El `rehearsalDate` es `date` (no `timestamptz`) justamente para evitar el off-by-one de TZ (landmine 11). La ventana de visibilidad es dura: 08:00 ≤ hora ART < 23:00.
 - **Landmine 16 (Login/registro):** el rate limit es un trigger `BEFORE INSERT` en `pending_registrations` que devuelve 429 vía `ERRCODE='PT429'`. `Login.jsx:299` mapea `insertError.code === 'PT429'` a un mensaje amable — si cambiás el ERRCODE server-side, actualizá este `if` o el usuario ve error genérico. También maneja `23505` (duplicado). El INSERT es el ÚNICO punto de escritura `anon` por diseño; no se manda password (la genera el pastor al aprobar).
 - **Login — nunca password en localStorage:** el `useEffect` borra `rememberedPassword` legacy y solo persiste `rememberedEmail`. No reintroducir guardado de contraseña.
@@ -623,9 +628,9 @@ El corazón de datos de la app: un único store Zustand (`useAppStore`) con las 
 ### Converters DB↔frontend (internos) — ⚠️ DATA-LOSS LANDMINE
 Bloque de comentario clave en líneas 175-189 (regla #8, incidente 15-jun-2026 / PR #20).
 - `convertMemberFromDB(m)` (112) → camelCase. Notas: `editor` default false; `onboarded: m.onboarded !== false` (default true para filas viejas); expone **`avatar_url` Y `avatarUrl`** (ambos apuntan al mismo valor, por compatibilidad).
-- `convertBandFromDB(b)` (132), `convertSongFromDB(s)` (144), `convertOrderFromDB(o)` (160). Song soporta `categories` array o legacy `category` single (150); `compass`/`bpm` default `''`. Order expone `rehearsalDate`/`rehearsalTime` (169-170).
+- `convertBandFromDB(b)` (132), `convertSongFromDB(s)` (144), `convertOrderFromDB(o)` (160). Song soporta `categories` array o legacy `category` single (150); `compass`/`bpm` default `''`. Order expone `rehearsalDate`/`rehearsalTime` (169-170) y **`lineup`** (`o.lineup ?? null`; `null` = sin formación).
 - `convertMemberToDB(m)` (192) → snake_case, rellena **defaults para TODA la fila** (`role:'member'`, `active:true`, etc.). Sutileza: **`onboarded` sólo se forwardea si el caller lo pasó explícito** (210), si no la columna conserva su valor.
-- `convertBandToDB(b)` (214), `convertSongToDB(s)` (223), `convertOrderToDB(o)` (237). Song genera BOTH `categories` (array) y `category` (single, `categories[0]`) por compat (228-229). **`convertOrderToDB` NO escribe `rehearsal_reminder_sent`** (comentario 245-247; landmine 9): lo maneja sólo el cron.
+- `convertBandToDB(b)` (214), `convertSongToDB(s)` (223), `convertOrderToDB(o)` (237). Song genera BOTH `categories` (array) y `category` (single, `categories[0]`) por compat (228-229). **`convertOrderToDB` NO escribe `rehearsal_reminder_sent`** (comentario 245-247; landmine 9): lo maneja sólo el cron. Escribe `lineup` tal cual (la base lo valida/normaliza) y `songs` vía **`stripSongRefs`** (`appStore.js:263`: quita `_localId/_pendingHistory/_suggestedDirector`; landmine 52).
 - **Contrato (regla #8, landmine crítico):** estos `*ToDB` regeneran una fila COMPLETA con defaults → correcto para INSERT, catastrófico para UPDATE. **NUNCA `supabase.from(...).update(convertXToDB(partial))`.** Siempre rutear por `updateMember/Band/Song/Order`, que mergean `{...current, ...updates}` contra el snapshot del store ANTES del converter.
 
 ### Estado del store (líneas 285-290)
@@ -651,7 +656,7 @@ Bloque de comentario clave en líneas 175-189 (regla #8, incidente 15-jun-2026 /
 - `addOrder(order)` (651) — inserta `{...convertOrderToDB(order), id: uuidv4()}` en `orders` (lo prepende: `[nuevo, ...orders]`). **Efecto lateral:** por cada `songs[]` de la orden llama `updateSong(songEntry.songId, {lastUsed: order.date})` (671-675, merge-safe, no pisa datos). → data/`null`.
 - `updateOrder(id, updates)` (685) — merge-safe (sin el merge, guardar sólo `feedback` borraría date/band/songs). Usado también por edición de orden y control de estado manual (Completar/Cancelar/Reabrir). → data/`null`.
 - `deleteOrder(id)` (717) — `delete` → `true/false`. (FKs a `orders` deben ser SET NULL/CASCADE — landmine 18/32; el handler llamante DEBE `await` + ramificar.)
-- `cloneOrder(id)` (738) — clona quitando `id`, fecha = hoy, `status:'scheduled'`, `feedback:''`, rutea a `addOrder`. → data/`null`.
+- `cloneOrder(id)` (738) — clona quitando `id`, fecha = hoy, `status:'scheduled'`, `feedback:''`, **`rehearsalDate/Time: null`, `lineup: null`** (un orden repetido no hereda ensamble ni formación), rutea a `addOrder`. → data/`null`.
 
 Todos los `add/update/delete` devuelven data/true en éxito y `null`/false en error (setean `error` en el store). Nunca lanzan.
 
@@ -668,7 +673,8 @@ Comentario 790-794: preferencia personal, push diario 18:00 ART lo manda el cron
 
 ### Selectores / helpers derivados
 - `getMemberById(id)` (830), `getBandById(id)` (831), `getSongById(id)` (832) — find por id.
-- `getBandMembers(bandId)` (835) — miembros ACTIVOS cuyo id está en `band.members`.
+- `getBandMembers(bandId)` (835) — miembros ACTIVOS de la banda efectiva (permanentes ∪ temporales vigentes, con `{temporary, expiresAt}`); `getEffectiveBandMemberIds(bandId)` → `Set`.
+- **Formación (2026-09-11, `appStore.js:1178-1197`):** `getOrderParticipantIds(order)` → `Set` (custom → lista del `lineup`; all/null → banda efectiva), `isOrderParticipant(order, memberId)`, `getOrderParticipants(order)` (activos, ordenados por nombre, con flag temporal), `getOrderLineupGroups(order)` → `{groups:[{instrument, members}], noInstrument}` (orden canónico de `INSTRUMENT_ORDER`). Delegan en `src/lib/lineup.js`. Fuente única para los avisos personales (landmine 53).
 - `getSongWithKey(songId, key)` (842) — devuelve `{...song, displayStructure}`; si `key===originalKey` o sin key, `displayStructure = structure` (sin transponer); si no, `transposeSongStructure(structure, originalKey, key)`.
 - `getUnusedSongs(weeks=4)` (857) — canciones sin `lastUsed` o con `lastUsed` anterior al corte.
 - `getUnusedByBand(bandId, weeks=4)` (869) — canciones no usadas en las órdenes recientes de esa banda.
@@ -691,6 +697,7 @@ Comentario 790-794: preferencia personal, push diario 18:00 ART lo manda el cron
 - **Landmine 25 — `practice_logs` owner-only:** el cliente NUNCA manda `user_id` (DEFAULT `auth.uid()` + RLS WITH CHECK). `upsertPracticeLog` exige objeto COMPLETO. No agregar SELECT de práctica ajena "para el pastor" (decisión de producto).
 - **Landmine 28 — `practice_alarms` opt-in:** `fetchPracticeAlarm` sin fila = `false`; no crear filas por default (sería spam masivo el día 1). El toggle optimista DEBE revertir si `setPracticeAlarm` devuelve `null`.
 - **Landmine 32 (borrado) — no afecta al store en sí pero sí a callers:** `deleteBand/Song/Order` devuelven true/false; el handler llamante debe `await` + ramificar (fire-and-forget + modal de éxito = mentira cuando la DB rechaza con 23503). Las FKs quedaron: `orders.band_id` SET NULL, `song_key_history.{song_id,member_id}` CASCADE / `.order_id` SET NULL, `practice_logs.*` CASCADE.
+- **Landmine 52 — columna nueva en `orders`:** va en `convertOrderFromDB` Y `convertOrderToDB` (si falta en `ToDB`, cualquier `updateOrder` la pisa con NULL) Y en la lista de exclusión/etiquetas del digest (`activity_digest_items`). `lineup` ya está en los tres.
 - **`avatar_url` duplicado:** `convertMemberFromDB` expone `avatar_url` Y `avatarUrl`; si tocás uno mantené ambos sincronizados o el cropper (Header/MobileNav) lee stale.
 - **`song_key_history` NO lo maneja este store:** el fetch/save de historial de tonos vive fuera de `appStore.js` (buscar `song_key_history` en `Ordenes.jsx`/otros); acá sólo se referencia indirecto vía las FKs de borrado. No hay `fetchKeyHistory`/`saveKeyHistory` en este archivo.
 - **`mergeRealtimeChange` sólo cubre las 4 tablas globales:** `practice_logs`/`practice_alarms` no tienen realtime ni localStorage por diseño (dato personal).
@@ -964,6 +971,12 @@ Overlay que oscurece la pantalla, recorta un hueco alrededor de un elemento `[da
 - **Estado:** `rect` (bounding box del target + PADDING) y `viewport` (w/h). `measure` (`WizardSpotlight.jsx:40`) hace `document.querySelector(targetSelector).getBoundingClientRect()`.
 - **Delicado:** re-mide en `ResizeObserver(body)` + `resize` + `scroll` (capture) + timeouts 50/250ms porque el target puede montar después del spotlight (`WizardSpotlight.jsx:56-76`). Si el target no está en el DOM (ej. bottom-nav oculto en desktop) → `rect=null` → overlay full-screen centrado sin cutout, el mensaje igual llega. El backdrop se dibuja con **4 rectángulos** formando marco alrededor del hueco (`WizardSpotlight.jsx:99-113`), + ring highlight `pointer-events-none`. `tooltipPos` (`WizardSpotlight.jsx:80`) coloca arriba si `rect.top>240`, si no abajo, clamp a viewport.
 
+### Formación del orden — `components/orders/{LineupEditor,LineupSummary,LineupModal}.jsx` (2026-09-11)
+
+- **`LineupEditor({ bandId, songs, orderDate, excludeOrderId, value, onChange })`** — controlado; `value = {mode:'all'|'custom', members:[{memberId,instruments[]}]}`. Dos tarjetas de modo ("Participan todos" / "Elegir la formación"), picker con Todos/Ninguno, buscador (>6 integrantes), chips de instrumento por persona (solo los de la ficha), **directores de canción bloqueados** (`withDirectors`, candado "Dirige N canciones", `aria-disabled`), alerta de cobertura (`coverageGaps`), **sugerencia de rotación** (`suggestRotation`: por instrumento, quién hace más tiempo no lo toca en órdenes custom anteriores de la banda, con fecha y quién tocó; "Aplicar sugerencia" — los directores conservan sus instrumentos), badge ⏱ para temporales. Lee `getBandMembers`/`orders`/`bandTemporaryMembers` del store.
+- **`LineupSummary({ order, compact })`** — agrupa participantes por instrumento (orden canónico) + "También participan" (sin instrumento); badge "Participan N de la banda" / "Participa toda la banda (N)". `compact` → una sola pill (tarjetas).
+- **`LineupModal({ isOpen, onClose, order, onSaved })`** — edición desde el detalle: `<Modal>` + `<LineupEditor>` → `updateOrder(order.id, {lineup: buildLineup(...)})` (merge-safe; la base valida y avisa solo a quien entra/sale/cambia). `SuccessModal` "Formación guardada"; `ErrorModal` si el store devuelve `null`.
+
 ### `OrderCalendar` (`components/OrderCalendar.jsx:30`)
 
 Vista mensual de órdenes, sin lib de fechas. Props `{ orders, getBandById, onSelectOrder }`.
@@ -1027,6 +1040,16 @@ Módulos utilitarios puros y de infraestructura. Casi todo es JS salvo `csv.ts` 
 - `dayKey(dateLike): string` — clave de día local `YYYY-MM-DD`. **Delicado/anti off-by-one:** si el string ya empieza con forma `YYYY-MM-DD` lo **slicea directo** (evita el drift de `toISOString()` a UTC); si no, parsea `Date` y usa componentes **locales** (`getFullYear/getMonth/getDate`). Inválido/nulo → `''`. `orders.ts:10-20`. Consumido por `OrderCalendar.jsx` (buckets por día, ensambles, hoy) `OrderCalendar.jsx:41,60,98,141`.
 - `type OrderSongRef`, `OrderForSuggestion`, `SuggestDirectorArgs` — tipos de apoyo. `orders.ts:22-37`.
 - `suggestDirectorForSong({ singerIds, orders, songId, bandId }): string | null` — sugiere el director más probable de una canción por historial: primero el que más la dirigió **en la banda elegida**, si no el más frecuente en **cualquier** banda. Solo cuenta candidatos presentes en `singerIds` (cantantes activos). `null` si nunca se dirigió o ningún candidato está activo. `orders.ts:46-74`. Usado en `Ordenes.jsx:727` al agregar canción.
+
+### `lineup.js` — formación del orden (puro, espejo de la semántica SQL)
+
+- `INSTRUMENT_ORDER` / `instrumentRank` / `sortInstruments` — orden canónico (Voz, Coros, guitarras, Piano, Teclado, Bajo, Batería, vientos y cuerdas; desconocidos al final por nombre). Debe coincidir con `_instrument_rank` en SQL.
+- `lineupMode(order)` / `isCustomLineup` / `lineupEntries(lineup)` — lectura tolerante del jsonb (dedup por `memberId`, ignora basura).
+- `participantIdsOf(order, effectiveIds)` / `isOrderParticipant(order, memberId, effectiveIds)` — custom → lista; all/null/desconocido → `effectiveIds`. Espejo de `order_participant_ids`.
+- `lineupInstrumentsFor(order, member)` — custom usa lo declarado; all usa la ficha. `groupByInstrument(order, participants)` → `{groups, noInstrument}`.
+- `directorIdsOf(songs)`, `coverageGaps(bandMembers, entries)` (instrumentos de la banda sin nadie), `suggestRotation({bandId, orderDate, orders, bandMembers, excludeOrderId, lookbackDays=120})`.
+- `buildLineup(mode, entries)` (all → `members:[]`; custom ordena instrumentos), `lineupSummaryText(order, participants, {maxGroups})` (PDF/presentador), `formatShortDate('YYYY-MM-DD')` → `DD/MM`.
+- Tests: `src/lib/lineup.test.js` (13). Consumido por `appStore` (helpers), `LineupEditor/Summary`, `Ordenes`, `Dashboard`, `IniciarServicio`.
 
 ### `days.js` — etiquetas y orden de días (español correcto)
 
@@ -1165,6 +1188,11 @@ Las migraciones son **acumulativas por nombre de archivo** (orden lexicográfico
 - `20260803_practice_alarms.sql` (F2) — **crea** `practice_alarms` (`user_id PK DEFAULT auth.uid()`, `enabled DEFAULT true`), RLS owner-only + GRANT. Crea `send_practice_reminders()` (SECURITY DEFINER): CTE que manda 1 push `reminder` por usuario con alarma ON, integrante de banda de ≥1 orden `scheduled` con fecha ≥ hoy y canciones, cuyo Ensayómetro (4 hitos/canción, sólo canciones vigentes) < 100%, **dedup diario matcheando el título `'🎸 Tu ensayo te espera'`**. REVOKE. **Programa cron `practice-reminders` `0 21 * * *` (18:00 ART)**. :15-136
 - `20260803_practice_cleanup.sql` (F3) — crea `cleanup_practice_logs()`: `DELETE` de logs de órdenes no-`scheduled` con `date < hoy ART - 7` (gracia de 7 días). REVOKE. **Programa cron `practice-cleanup` `30 7 * * *` (04:30 ART)**. :13-38
 
+**Septiembre 2026** (ver `CLAUDE.md` "Estado al 2026-09-05" en adelante para el detalle): `20260905_bands_append_only_leaders.sql`, `20260905_band_temporary_members.sql` (banda efectiva = `band_effective_member_ids`), `20260905_members_enforce_update_rules.sql`, `20260905_notifications_insert_guard.sql`, `20260905_collaboration_*.sql` (+ EF `collab`, cron `collab-expire`), `20260905_service_schemas.sql`, `20260906_notify_pastors_on_leader_activity.sql` (+ `notify_on_order_update`, cron `leader-activity-digest`), `20260910_leader_digest_precise.sql` (`activity_digest_items`).
+
+**Formación del orden**
+- `20260911_order_lineup.sql` — `orders.lineup jsonb` (NULL = sin formación). Trigger **BEFORE INSERT/UPDATE `validate_order_lineup`** (SECURITY DEFINER: shape/modo/uuids, miembros de la banda efectiva, instrumentos de la ficha, directores siempre incluidos, vacío → `all`, sella `definedBy/definedAt`). Helpers blindados `_lineup_participants`, **`order_participant_ids(uuid)`**, `_lineup_member_instruments`, `_lineup_html`, `_instrument_rank`, `_safe_uuid`. Supersede `notify_on_order_insert` (destinatarios banda efectiva ∪ pastores + `{{formacion}}`), `notify_on_order_update` (rama contenido + rama solo-formación → plantilla `formacion-cambio` a quien entra/sale/cambia), `send_rehearsal_reminders` y `send_practice_reminders` (participantes), `activity_digest_items` ("actualizó la formación"). Plantillas vivas `nuevo-orden`/`orden-editado` reciben `{{formacion}}` por reemplazo quirúrgico. Landmines 52–56.
+
 ### Edge Functions
 
 **En el repo:** sólo `supabase/functions/send-push/index.ts`.
@@ -1187,9 +1215,9 @@ Las migraciones son **acumulativas por nombre de archivo** (orden lexicográfico
 | `daily-reflection-notification` | 17:00 ART | 17:00 | `send_daily_reflection_notification()` | func en `20260427`, cron fuera del repo |
 | `reflection-monitor` | cada 6 h | — | `check_notification_freshness()` (escribe a `error_log` si falta reflexión >25 h) | fuera del repo |
 | `daily-birthday-notification` (jobid 7) | `0 12 * * *` | 09:00 | `send_daily_birthday_notifications()` | `20260516` |
-| `rehearsal-reminders` | `*/15 * * * *` | c/15 min | `send_rehearsal_reminders()` | `20260620` |
+| `rehearsal-reminders` | `*/15 * * * *` | c/15 min | `send_rehearsal_reminders()` → participantes del orden (`order_participant_ids`) | `20260620` → `20260911_order_lineup` |
 | `auto-complete-orders` | `0 6 * * *` | 03:00 | `auto_complete_past_orders()` | `20260621` |
-| `practice-reminders` | `0 21 * * *` | 18:00 | `send_practice_reminders()` | `20260803_practice_alarms` |
+| `practice-reminders` | `0 21 * * *` | 18:00 | `send_practice_reminders()` → participantes del orden | `20260803_practice_alarms` → `20260911_order_lineup` |
 | `practice-cleanup` | `30 7 * * *` | 04:30 | `cleanup_practice_logs()` | `20260803_practice_cleanup` |
 
 Nota TZ: ART es UTC-3 sin DST; los crons "diarios" convierten a mano (18:00 ART = 21:00 UTC). Las fechas ART se calculan con `now() AT TIME ZONE 'America/Argentina/Buenos_Aires'`.

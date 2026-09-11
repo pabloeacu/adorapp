@@ -1,6 +1,8 @@
 # Plan: Formación del orden (quiénes tocan en cada servicio, y en qué)
 
-> Estado: **ESTUDIO TERMINADO, SIN CÓDIGO (2026-09-11).** Pedido de Paul: al armar un orden, un asistente para definir la **formación** (qué integrantes de la banda tocan ese día y con qué instrumento), que se informe en el mismo mail del orden y que los avisos de práctica (ensamble/ensayo) lleguen **solo** a los que participan. Este documento es el contrato para implementarlo. Las preguntas de §1 las decide Paul antes de escribir código.
+> Estado: **IMPLEMENTADO (2026-09-11)** — PR #104 (base, migración `20260911_order_lineup.sql`), PR #105 (cliente) y PR de docs. Resumen de lo hecho, decisiones finales de Paul y landmines #52–#57 en `CLAUDE.md` → "Estado al 2026-09-11 (II)". Lo que sigue es el estudio original, conservado como contrato de diseño.
+>
+> Estado original: **ESTUDIO TERMINADO, SIN CÓDIGO (2026-09-11).** Pedido de Paul: al armar un orden, un asistente para definir la **formación** (qué integrantes de la banda tocan ese día y con qué instrumento), que se informe en el mismo mail del orden y que los avisos de práctica (ensamble/ensayo) lleguen **solo** a los que participan. Este documento es el contrato para implementarlo. Las preguntas de §1 las decide Paul antes de escribir código.
 
 Glosario: "ensamble" = encuentro de la banda; "ensayo" = práctica personal (Mi Ensayo). "Orden" es masculino. "Formación" = la lista de quiénes participan de un orden y con qué instrumento.
 
