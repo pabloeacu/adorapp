@@ -431,16 +431,18 @@ const RegisterModal = ({ isOpen, onClose, onSuccess }) => {
 
         <Input
           label="Líder de"
+          hint="(tu líder del Equipo de Avivamiento)"
           name="leader_of"
-          placeholder="Grupo o área que liderás"
+          placeholder="Nombre de tu líder"
           value={formData.leader_of}
           onChange={handleChange}
         />
 
         <div>
-          <label className="text-xs text-gray-400 font-medium uppercase tracking-wide block mb-3">
+          <label className="text-xs text-gray-400 font-medium uppercase tracking-wide block mb-1">
             Área de ministerio *
           </label>
+          <p className="text-[11px] italic text-gray-500 mb-3">(seleccioná el área a la que pertenecés; puede ser más de una)</p>
           <div className="grid grid-cols-3 gap-2">
             {SELECTABLE_AREAS.map(area => (
               <button
@@ -448,10 +450,10 @@ const RegisterModal = ({ isOpen, onClose, onSuccess }) => {
                 type="button"
                 onClick={() => toggleArea(area.slug)}
                 className={`
-                  p-3 rounded-lg text-sm transition-all border-2
+                  p-3 rounded-xl text-sm transition-all border
                   ${formData.areas.includes(area.slug)
-                    ? 'border-gold-500 bg-gold-500/10 text-gold-200'
-                    : 'border-neutral-800 hover:border-gold-500/40'
+                    ? 'border-gold-400 bg-gold-500/15 text-gold-200 shadow-[0_0_0_1px_rgba(212,175,55,0.35)]'
+                    : 'border-gold-500/40 text-gray-200 hover:border-gold-400/70 hover:bg-gold-500/5'
                   }
                 `}
               >
@@ -473,10 +475,10 @@ const RegisterModal = ({ isOpen, onClose, onSuccess }) => {
                 type="button"
                 onClick={() => toggleInstrument(inst)}
                 className={`
-                  p-2 rounded-lg text-xs transition-all border-2
+                  p-2 rounded-xl text-xs transition-all border
                   ${formData.instruments.includes(inst)
-                    ? 'border-gold-500 bg-gold-500/10 text-gold-200'
-                    : 'border-neutral-800 hover:border-gold-500/40'
+                    ? 'border-gold-400 bg-gold-500/15 text-gold-200 shadow-[0_0_0_1px_rgba(212,175,55,0.35)]'
+                    : 'border-gold-500/40 text-gray-200 hover:border-gold-400/70 hover:bg-gold-500/5'
                   }
                 `}
               >
@@ -517,11 +519,12 @@ const RegisterModal = ({ isOpen, onClose, onSuccess }) => {
 };
 
 // Simple Input component
-const Input = ({ label, name, type = 'text', placeholder, value, onChange, required }) => (
+const Input = ({ label, hint, name, type = 'text', placeholder, value, onChange, required }) => (
   <div>
-    <label className="text-xs text-gray-400 font-medium uppercase tracking-wide block mb-2">
+    <label className={`text-xs text-gray-400 font-medium uppercase tracking-wide block ${hint ? 'mb-1' : 'mb-2'}`}>
       {label}
     </label>
+    {hint && <p className="text-[11px] italic text-gray-500 mb-2">{hint}</p>}
     <input
       type={type}
       name={name}

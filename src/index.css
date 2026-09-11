@@ -198,7 +198,12 @@ button {
   transition: all 0.2s ease;
   -webkit-user-select: none;
   user-select: none;
-  border: none;
+  /* NO poner `border: none` acá: fija border-style:none con especificidad de
+     elemento y le gana al preflight de Tailwind (`*{border-style:solid}`), así
+     que TODO <button> con clases `border-*` quedaba sin borde (bug global desde
+     PR #27, jun-2026: los toggles de área/instrumento se veían como texto
+     suelto). El preflight ya deja border-width:0 por defecto; sólo hay borde
+     cuando un componente lo pide con `border`/`border-2`. */
   background: transparent;
   font-family: inherit;
   /* iOS Safari aplica -webkit-appearance: push-button a los <button> por

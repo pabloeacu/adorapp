@@ -943,7 +943,7 @@ export const MobileNav = () => {
                           value={editLeaderOf}
                           onChange={(e) => setEditLeaderOf(e.target.value)}
                           className="w-full bg-neutral-800 border border-neutral-700 rounded-xl pl-11 pr-4 py-3 text-white focus:outline-none focus:ring-2 focus:ring-gold-500/40 focus:border-gold-500 transition-colors"
-                          placeholder="Grupo o área que lidera"
+                          placeholder="Nombre de tu líder"
                         />
                       </div>
                     </div>
