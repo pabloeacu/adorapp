@@ -50,7 +50,7 @@ Deno.serve(async (req: Request) => {
   let body: any;
   try { body = await req.json(); } catch { return json({ error: "Invalid JSON" }, 400); }
 
-  const { name, email, password, phone, pastor_area, leader_of, birthdate, role, editor, instruments, active } = body || {};
+  const { name, email, password, phone, pastor_area, leader_of, birthdate, role, editor, instruments, areas, active } = body || {};
   if (!name || typeof name !== "string") return json({ error: "name required" }, 400);
   if (email && typeof email !== "string") return json({ error: "invalid email" }, 400);
   if (email && (!password || typeof password !== "string" || password.length < 6)) {
@@ -83,6 +83,7 @@ Deno.serve(async (req: Request) => {
     role: role || "member",
     editor: editor || false,
     instruments: Array.isArray(instruments) ? instruments : [],
+    areas: Array.isArray(areas) ? areas : [], // toda esta EF es pastor-only (requirePastor) → seguro
     active: active !== false,
     user_id: userId,
     onboarded: false,

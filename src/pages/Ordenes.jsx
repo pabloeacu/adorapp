@@ -1845,8 +1845,10 @@ export const Ordenes = () => {
               </Link>
             )}
 
-            {/* Iniciar servicio: sólo si el orden tiene esquema (la RLS ya limita a
-                la banda del orden + pastor/líder, así que si está en el store, lo ve). */}
+            {/* Iniciar servicio: sólo si el orden tiene esquema. La RLS (ss_select) lo
+                entrega a pastor/líder, a la banda del orden y a los observadores de área
+                (can_open_service_presenter), así que si está en el store, este usuario
+                puede verlo → el botón aparece solo para quien corresponde. */}
             {getServiceSchema(viewingOrder.id) && (
               <Link
                 to={`/servicio/${viewingOrder.id}`}

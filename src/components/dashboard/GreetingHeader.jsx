@@ -3,6 +3,7 @@ import { useAppStore } from '../../stores/appStore';
 import { Avatar } from '../ui/Avatar';
 import { Badge } from '../ui/Badge';
 import { GoldWave } from '../ui/GoldWave';
+import { observerAreaLabels } from '../../lib/areas';
 
 // Encabezado premium de "Mi Adorapp" — SIEMPRE presente (personalización fija que
 // pidió Paul). No hace ningún fetch bloqueante y está construido para NUNCA lanzar
@@ -61,6 +62,10 @@ export const GreetingHeader = ({ member, role, todayART, artHour, profileName })
   const instrumentsLabel = Array.isArray(member?.instruments) && member.instruments.length
     ? member.instruments.join(' · ')
     : null;
+  // Áreas: los pastores son "Multiárea" (por rol, ya alcanzan todo); el resto muestra
+  // sus áreas observadoras (Multimedia/Sonido). Adoración no se muestra (es el default
+  // del músico, ya implícito en instrumento/rol).
+  const areaBadges = role === 'pastor' ? ['Multiárea'] : observerAreaLabels(member);
 
   return (
     <div className="relative overflow-hidden rounded-2xl p-5 border border-gold-500/25 bg-gradient-to-br from-gold-600/[0.32] via-neutral-900 to-gold-300/[0.12]">
@@ -71,10 +76,15 @@ export const GreetingHeader = ({ member, role, todayART, artHour, profileName })
         <div className="min-w-0 flex-1">
           <p className="text-xl sm:text-2xl font-bold text-white leading-tight">{greeting}</p>
           <p className="text-sm text-gray-400 mt-1">{timeGreeting(artHour)}</p>
-          {(instrumentsLabel || roleLabel) && (
+          {(instrumentsLabel || roleLabel || areaBadges.length > 0) && (
             <div className="mt-2 flex flex-wrap items-center gap-2">
               {instrumentsLabel && <Badge variant="default" size="sm">{instrumentsLabel}</Badge>}
               {roleLabel && <Badge variant="primary" size="sm">{roleLabel}</Badge>}
+              {areaBadges.map((label) => (
+                <span key={label} className="px-2 py-0.5 rounded-full text-xs font-medium bg-gold-500/15 text-gold-200 border border-gold-500/30">
+                  {label}
+                </span>
+              ))}
             </div>
           )}
         </div>
