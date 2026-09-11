@@ -114,6 +114,10 @@ Deno.serve(async (req: Request) => {
     setIf("role", updates.role || "member");
     setIf("editor", !!updates.editor);
     if ("active" in updates) db.active = updates.active ?? true;
+    // Áreas de ministerio: SOLO un pastor las asigna. DEBE quedar DENTRO de este bloque
+    // (nunca junto a instruments/name/phone) — es el único vector de auto-asignación que
+    // sobrevive al freeze de la base, porque la EF corre como service_role (landmine #58).
+    if ("areas" in updates) db.areas = Array.isArray(updates.areas) ? updates.areas : [];
   }
   // NUNCA se tocan user_id / avatar_url / onboarded (no vienen en updates).
 

@@ -9,6 +9,7 @@ import {
 } from 'lucide-react';
 import { UsersThree, UserPlus } from '@phosphor-icons/react';
 import { useAppStore, MEMBER_ROLES, INSTRUMENTS } from '../stores/appStore';
+import { SELECTABLE_AREAS, areaLabels } from '../lib/areas';
 import { useAuthStore } from '../stores/authStore';
 import { useCurrentRole } from '../hooks/useCurrentMember';
 import { Card } from '../components/ui/Card';
@@ -112,6 +113,7 @@ export const Miembros = () => {
     role: 'member',
     editor: false, // Editor permission for songs
     instruments: [],
+    areas: ['adoracion'], // default: integrante de banda; el pastor lo cambia para observadores (Multimedia/Sonido)
     active: true,
     password: '' // Password field for new members
   });
@@ -185,6 +187,7 @@ export const Miembros = () => {
         role: member.role,
         editor: member.editor || false,
         instruments: member.instruments || [],
+        areas: member.areas || [],
         active: member.active,
         // NOTE: Do NOT include avatar_url here - let the store preserve it
         // The store's updateMember function will preserve the existing avatar
@@ -203,6 +206,7 @@ export const Miembros = () => {
         role: 'member',
         editor: false,
         instruments: [],
+        areas: ['adoracion'],
         active: true,
         password: ''
       });
@@ -320,6 +324,15 @@ export const Miembros = () => {
       instruments: prev.instruments.includes(instrument)
         ? prev.instruments.filter(i => i !== instrument)
         : [...prev.instruments, instrument]
+    }));
+  };
+
+  const toggleArea = (area) => {
+    setFormData(prev => ({
+      ...prev,
+      areas: (prev.areas || []).includes(area)
+        ? prev.areas.filter(a => a !== area)
+        : [...(prev.areas || []), area]
     }));
   };
 
@@ -749,6 +762,19 @@ export const Miembros = () => {
                 ))}
               </div>
 
+              {areaLabels(member).length > 0 && (
+                <div className="flex flex-wrap gap-1.5 mt-2">
+                  {areaLabels(member).map((label) => (
+                    <span
+                      key={label}
+                      className="px-2 py-0.5 rounded text-xs bg-gold-500/10 text-gold-200 border border-gold-500/30"
+                    >
+                      {label}
+                    </span>
+                  ))}
+                </div>
+              )}
+
               {/* Actividad (solo pastor): última conexión + app instalada + notificaciones */}
               {isPastor && (() => {
                 const act = activityMap[member.id];
@@ -872,6 +898,11 @@ export const Miembros = () => {
                             +{member.instruments.length - 2}
                           </span>
                         )}
+                        {areaLabels(member, { includeAdoracion: false }).map((label) => (
+                          <span key={label} className="px-2 py-0.5 rounded text-xs bg-gold-500/10 text-gold-200 border border-gold-500/30">
+                            {label}
+                          </span>
+                        ))}
                       </div>
                     </td>
                     {isPastor && (
@@ -1104,6 +1135,35 @@ export const Miembros = () => {
               ))}
             </div>
           </div>
+
+          {isPastor && (
+            <div>
+              <label className="text-xs text-gray-400 font-medium uppercase tracking-wide block mb-3">
+                Áreas de ministerio (puede seleccionar varias)
+              </label>
+              <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
+                {SELECTABLE_AREAS.map(area => (
+                  <button
+                    key={area.slug}
+                    type="button"
+                    onClick={() => toggleArea(area.slug)}
+                    className={`
+                      p-3 rounded-xl text-sm transition-all border-2
+                      ${(formData.areas || []).includes(area.slug)
+                        ? 'border-gold-500 bg-gold-500/10'
+                        : 'border-neutral-800 hover:border-neutral-700'
+                      }
+                    `}
+                  >
+                    {area.label}
+                  </button>
+                ))}
+              </div>
+              <p className="text-xs text-gray-500 mt-2">
+                Adoración = integrantes de banda. Multimedia y Sonido reciben por correo los órdenes y las formaciones, pueden ver el presentador y no editan nada.
+              </p>
+            </div>
+          )}
         </form>
       </Modal>
 
