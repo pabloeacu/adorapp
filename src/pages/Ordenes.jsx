@@ -407,13 +407,24 @@ export const Ordenes = () => {
       icon: CopyIcon,
       onConfirm: async () => {
         setConfirmModal(prev => ({ ...prev, loading: true }));
-        cloneOrder(order.id);
+        // Esperar el resultado real (landmine #32): cloneOrder devuelve el
+        // nuevo orden o null si la base rechaza. Sin await mostraba "duplicado"
+        // aunque fallara.
+        const res = await cloneOrder(order.id);
         setConfirmModal(prev => ({ ...prev, loading: false, isOpen: false }));
-        setSuccessModal({
-          isOpen: true,
-          title: 'Orden duplicado',
-          message: 'El nuevo orden fue creado. Podés editarlo cuando quieras.'
-        });
+        if (res) {
+          setSuccessModal({
+            isOpen: true,
+            title: 'Orden duplicado',
+            message: 'El nuevo orden fue creado. Podés editarlo cuando quieras.'
+          });
+        } else {
+          setErrorModal({
+            isOpen: true,
+            title: 'No se pudo duplicar',
+            message: 'Hubo un problema al duplicar el orden. Intentá de nuevo.'
+          });
+        }
       }
     });
   };
@@ -1418,6 +1429,10 @@ export const Ordenes = () => {
                     songs: songsAfterBandSwap,
                   });
                   setSelectedBandForUnused(bandId);
+                  // Cambió la banda → la formación en borrador ya no aplica
+                  // (sus integrantes son de la banda anterior). Se reinicia a
+                  // "todos" para no guardar/mostrar una selección fantasma.
+                  setLineupDraft({ mode: 'all', members: [] });
                 }}
               />
             </div>
