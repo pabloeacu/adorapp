@@ -22,10 +22,11 @@ const fmtDate = (d) => {
   }
 };
 
-// Orden 'scheduled' más próximo, de una banda que integra el miembro, con canciones.
-// Mismo filtro que el cron send_practice_reminders() (landmine #27). Función de
-// módulo (pura) para que el useMemo del componente sea preservable por el compiler.
-const resolveActiveOrder = (orders, memberId, todayART, getEffectiveBandMemberIds) => {
+// Orden 'scheduled' más próximo del que el miembro PARTICIPA (formación del orden;
+// sin formación = toda la banda efectiva), con canciones. Mismo filtro que el cron
+// send_practice_reminders() (landmine #27), que usa order_participant_ids. Función
+// de módulo (pura) para que el useMemo del componente sea preservable por el compiler.
+const resolveActiveOrder = (orders, memberId, todayART, isOrderParticipant) => {
   try {
     if (!memberId || !Array.isArray(orders)) return null;
     const cmp = (a, b) => {
@@ -38,7 +39,7 @@ const resolveActiveOrder = (orders, memberId, todayART, getEffectiveBandMemberId
       const ok = o?.status === 'scheduled' &&
         o?.date && String(o.date).slice(0, 10) >= todayART &&
         Array.isArray(o.songs) && o.songs.length > 0 &&
-        getEffectiveBandMemberIds(o.bandId).has(memberId);
+        isOrderParticipant(o, memberId);
       if (!ok) return best;
       return best === null || cmp(o, best) < 0 ? o : best;
     }, null);
@@ -52,15 +53,15 @@ export const PrepBanner = ({ member, todayART }) => {
   const getBandById = useAppStore((s) => s.getBandById);
   const getSongById = useAppStore((s) => s.getSongById);
   const fetchPracticeLogs = useAppStore((s) => s.fetchPracticeLogs);
-  const getEffectiveBandMemberIds = useAppStore((s) => s.getEffectiveBandMemberIds);
+  const isOrderParticipant = useAppStore((s) => s.isOrderParticipant);
   const bandTemporaryMembers = useAppStore((s) => s.bandTemporaryMembers);
 
-  // El orden 'scheduled' más próximo, de una banda que integra el miembro
-  // (permanente o temporal vigente), con canciones. Mismo filtro que el cron
-  // send_practice_reminders() (landmine #27) — que también usa el miembro efectivo.
+  // El orden 'scheduled' más próximo del que el miembro participa (formación;
+  // sin formación = banda efectiva), con canciones. Mismo filtro que el cron
+  // send_practice_reminders() (landmine #27).
   const activeOrder = useMemo(
-    () => resolveActiveOrder(orders, member?.id, todayART, getEffectiveBandMemberIds),
-    [orders, member?.id, todayART, getEffectiveBandMemberIds, bandTemporaryMembers]
+    () => resolveActiveOrder(orders, member?.id, todayART, isOrderParticipant),
+    [orders, member?.id, todayART, isOrderParticipant, bandTemporaryMembers]
   );
 
   const [prep, setPrep] = useState(null);

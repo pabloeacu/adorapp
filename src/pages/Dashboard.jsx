@@ -30,6 +30,11 @@ import { GoldWave } from '../components/ui/GoldWave';
 import { SilentBoundary } from '../components/ui/SilentBoundary';
 import { GreetingHeader } from '../components/dashboard/GreetingHeader';
 import { PrepBanner } from '../components/dashboard/PrepBanner';
+import { lineupInstrumentsFor } from '../lib/lineup';
+
+// Fecha `YYYY-MM-DD` parseada LOCAL (landmine #50: `new Date('2026-09-11')` es UTC
+// y en ART muestra el día anterior).
+const parseLocalDate = (d) => new Date(`${String(d).slice(0, 10)}T00:00:00`);
 import { ServiceFeedbackPrompt } from '../components/dashboard/ServiceFeedbackPrompt';
 import { CollaborationBanner } from '../components/dashboard/CollaborationBanner';
 
@@ -44,7 +49,8 @@ const getInstrumentIcon = (instrument) => {
 
 export const Dashboard = () => {
   useDocumentTitle('Inicio');
-  const { members, bands, songs, orders, getUnusedSongs } = useAppStore();
+  const { members, bands, songs, orders, getUnusedSongs, isOrderParticipant, getEffectiveBandMemberIds } = useAppStore();
+  useAppStore((s) => s.bandTemporaryMembers); // re-render si cambia la pertenencia efectiva
   const role = useCurrentRole();
   const member = useCurrentMember();
   const profile = useAuthStore((s) => s.profile);
@@ -62,8 +68,11 @@ export const Dashboard = () => {
   );
   const todayART = `${artNow.getFullYear()}-${String(artNow.getMonth() + 1).padStart(2, '0')}-${String(artNow.getDate()).padStart(2, '0')}`;
   const artHour = artNow.getHours();
+  // Solo se muestra a quien PARTICIPA del servicio (formación) — antes se la
+  // mostraba a todo el mundo, fuera o no de la banda. El pastor la ve siempre.
   const todaysRehearsal = orders.find(
     (o) => o.rehearsalDate && String(o.rehearsalDate).slice(0, 10) === todayART
+      && (role === 'pastor' || isOrderParticipant(o, member?.id))
   );
   const showRehearsalCard = !!todaysRehearsal && artHour >= 8 && artHour < 23;
   const rehearsalBand = todaysRehearsal
@@ -196,6 +205,15 @@ export const Dashboard = () => {
           <div className="space-y-3">
             {upcomingOrders.slice(0, 3).map((order) => {
               const band = bands.find(b => b.id === order.bandId);
+              // Chip personal de formación: "Tocás: Batería" / "Participás" /
+              // "No estás en la formación" (solo si integra la banda).
+              const inBand = !!member?.id && getEffectiveBandMemberIds(order.bandId).has(member.id);
+              const participates = inBand && isOrderParticipant(order, member.id);
+              const myInstruments = participates ? lineupInstrumentsFor(order, member) : [];
+              const chip = !inBand ? null
+                : participates
+                  ? { variant: 'gold', text: myInstruments.length ? `Tocás: ${myInstruments.join(' y ')}` : 'Participás' }
+                  : { variant: 'default', text: 'No estás en la formación' };
               return (
                 <div
                   key={order.id}
@@ -204,9 +222,14 @@ export const Dashboard = () => {
                   <div className="w-12 h-12 rounded-xl bg-gold-gradient-soft ring-1 ring-gold-500/40 flex items-center justify-center">
                     <CalendarDots size={24} weight="duotone" className="text-gold-100" />
                   </div>
-                  <div className="flex-1">
-                    <p className="font-medium">{new Date(order.date).toLocaleDateString('es-ES', { weekday: 'short', month: 'short', day: 'numeric' })}</p>
+                  <div className="flex-1 min-w-0">
+                    <p className="font-medium">{parseLocalDate(order.date).toLocaleDateString('es-ES', { weekday: 'short', month: 'short', day: 'numeric' })}</p>
                     <p className="text-sm text-gray-400">{order.time} - {band?.name}</p>
+                    {chip && (
+                      <span className="mt-1 inline-block" data-testid="upcoming-lineup-chip">
+                        <Badge variant={chip.variant} size="sm">{chip.text}</Badge>
+                      </span>
+                    )}
                   </div>
                   <Badge variant="primary" size="sm">{order.songs.length} canciones</Badge>
                 </div>
