@@ -6,6 +6,7 @@ import { useNavigate, Navigate } from 'react-router-dom';
 import { Modal } from '../components/ui/Modal';
 import { Button } from '../components/ui/Button';
 import { INSTRUMENTS } from '../stores/appStore';
+import { SELECTABLE_AREAS } from '../lib/areas';
 
 export const Login = () => {
   useDocumentTitle('Iniciar sesión');
@@ -270,6 +271,7 @@ const RegisterModal = ({ isOpen, onClose, onSuccess }) => {
     birthdate: '',
     pastor_area: '',
     leader_of: '',
+    areas: [],
     instruments: [],
   });
   const [loading, setLoading] = useState(false);
@@ -289,6 +291,17 @@ const RegisterModal = ({ isOpen, onClose, onSuccess }) => {
     }));
   };
 
+  const toggleArea = (slug) => {
+    setFormData(prev => {
+      const areas = prev.areas.includes(slug)
+        ? prev.areas.filter(a => a !== slug)
+        : [...prev.areas, slug];
+      // Los instrumentos solo aplican a Adoración; si se saca, se limpian.
+      const instruments = areas.includes('adoracion') ? prev.instruments : [];
+      return { ...prev, areas, instruments };
+    });
+  };
+
   const handleSubmit = async (e) => {
     e.preventDefault();
     setError('');
@@ -299,6 +312,10 @@ const RegisterModal = ({ isOpen, onClose, onSuccess }) => {
     }
     if (!formData.email.trim()) {
       setError('El email es obligatorio');
+      return;
+    }
+    if (!formData.areas.length) {
+      setError('Elegí tu área de ministerio');
       return;
     }
 
@@ -319,7 +336,8 @@ const RegisterModal = ({ isOpen, onClose, onSuccess }) => {
           birthdate: formData.birthdate || null,
           pastor_area: formData.pastor_area.trim() || null,
           leader_of: formData.leader_of.trim() || null,
-          instruments: formData.instruments,
+          areas: formData.areas,
+          instruments: formData.areas.includes('adoracion') ? formData.instruments : [],
           status: 'pending',
         });
 
@@ -421,6 +439,31 @@ const RegisterModal = ({ isOpen, onClose, onSuccess }) => {
 
         <div>
           <label className="text-xs text-gray-400 font-medium uppercase tracking-wide block mb-3">
+            Área de ministerio *
+          </label>
+          <div className="grid grid-cols-3 gap-2">
+            {SELECTABLE_AREAS.map(area => (
+              <button
+                key={area.slug}
+                type="button"
+                onClick={() => toggleArea(area.slug)}
+                className={`
+                  p-3 rounded-lg text-sm transition-all border-2
+                  ${formData.areas.includes(area.slug)
+                    ? 'border-gold-500 bg-gold-500/10 text-gold-200'
+                    : 'border-neutral-800 hover:border-gold-500/40'
+                  }
+                `}
+              >
+                {area.label}
+              </button>
+            ))}
+          </div>
+        </div>
+
+        {formData.areas.includes('adoracion') && (
+        <div>
+          <label className="text-xs text-gray-400 font-medium uppercase tracking-wide block mb-3">
             Instrumentos (seleccioná los que toques)
           </label>
           <div className="grid grid-cols-4 gap-2">
@@ -442,6 +485,7 @@ const RegisterModal = ({ isOpen, onClose, onSuccess }) => {
             ))}
           </div>
         </div>
+        )}
 
         <div className="flex gap-3 pt-4">
           <Button

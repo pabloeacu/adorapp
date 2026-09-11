@@ -136,7 +136,8 @@ export const Solicitudes = () => {
   const handleApprove = (request) => {
     setSelectedRequest(request);
     setSelectedRole('member');
-    setSelectedAreas(['adoracion']);
+    // Pre-relleno con el área que declaró el solicitante (el pastor puede cambiarla).
+    setSelectedAreas(Array.isArray(request.areas) && request.areas.length ? request.areas : ['adoracion']);
     setGeneratedPassword(generateRandomPassword());
     setShowApproveModal(true);
   };
@@ -428,6 +429,15 @@ export const Solicitudes = () => {
                         +{request.instruments.length - 3}
                       </span>
                     )}
+                  </div>
+                )}
+                {request.areas?.length > 0 && (
+                  <div className="flex flex-wrap gap-1 mt-2">
+                    {request.areas.map((slug) => (
+                      <span key={slug} className="px-2 py-0.5 rounded text-xs bg-gold-500/10 text-gold-200 border border-gold-500/30">
+                        {SELECTABLE_AREAS.find(a => a.slug === slug)?.label || slug}
+                      </span>
+                    ))}
                   </div>
                 )}
               </div>
