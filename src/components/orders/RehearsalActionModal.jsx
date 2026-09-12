@@ -27,7 +27,8 @@ export const RehearsalActionModal = ({ order, mode, isOpen, onClose, onDone }) =
     setReason('');
     setError('');
     setBusy(false);
-    setDate(order?.rehearsalDate || '');
+    // Si el ensamble actual ya pasó, el campo arranca vacío (min = hoy): obliga a elegir un día nuevo.
+    setDate(order?.rehearsalDate && order.rehearsalDate >= todayISO() ? order.rehearsalDate : '');
     setTime(order?.rehearsalTime || '18:00');
   }, [isOpen, order?.id, mode]);
 

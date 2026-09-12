@@ -1926,15 +1926,20 @@ export const Ordenes = () => {
                 ) : null}
               </CollapsibleSection>
 
-              {/* DÍA DE ENSAMBLE: estado (activo / suspendido) + Suspender/Reactivar/Reprogramar
-                  (pastor/líder de su banda, solo programado y con ensamble hoy/futuro). No se
-                  muestra activo en un orden cancelado (cancelar arrastra el ensamble). */}
+              {/* DÍA DE ENSAMBLE: estado (activo / suspendido) + Suspender/Reactivar (ensamble de
+                  hoy/futuro) / Reprogramar (también si ya pasó) para pastor/líder de su banda con el
+                  orden programado. No se muestra activo en un orden cancelado (cancelar arrastra). */}
               {viewingOrder.rehearsalDate && viewingOrder.status !== 'cancelled' ? (() => {
                 const suspended = viewingOrder.rehearsalSuspended;
-                const canManage = (isPastor
-                  || (isLeader && getBandById(viewingOrder.bandId)?.members?.includes(currentMember?.id)))
-                  && viewingOrder.status === 'scheduled'
-                  && viewingOrder.rehearsalDate >= localTodayStr();
+                const isManager = isPastor
+                  || (isLeader && getBandById(viewingOrder.bandId)?.members?.includes(currentMember?.id));
+                const isPast = viewingOrder.rehearsalDate < localTodayStr();
+                // Espeja las RPCs: Suspender/Reactivar exigen ensamble de hoy o futuro; Reprogramar
+                // solo exige que la fecha NUEVA no sea pasada → un ensamble que YA PASÓ (orden aún
+                // programado) conserva su opción de reprogramarlo. Así el card siempre se despliega
+                // con las opciones propias del ensamble para pastor/líder de la banda.
+                const canManage = isManager && viewingOrder.status === 'scheduled';
+                const canToggle = canManage && !isPast;
                 const hasContent = canManage || (suspended && viewingOrder.rehearsalSuspendedReason);
                 return (
                   <CollapsibleSection
@@ -1969,13 +1974,20 @@ export const Ordenes = () => {
                           </div>
                         )}
                         {canManage && (
-                          <div className="flex flex-wrap gap-2">
-                            {suspended ? (
-                              <Button variant="secondary" size="sm" icon={RotateCcw} onClick={() => setRehearsalModal({ isOpen: true, order: viewingOrder, mode: 'resume' })}>Reactivar</Button>
-                            ) : (
-                              <Button variant="secondary" size="sm" icon={Ban} onClick={() => setRehearsalModal({ isOpen: true, order: viewingOrder, mode: 'suspend' })}>Suspender</Button>
+                          <div className="space-y-2">
+                            {isPast && (
+                              <p className="text-xs text-gray-400" data-testid="detail-rehearsal-past">
+                                Este ensamble ya pasó. Si hace falta, podés reprogramarlo para otro día.
+                              </p>
                             )}
-                            <Button variant="secondary" size="sm" icon={CalendarClock} onClick={() => setRehearsalModal({ isOpen: true, order: viewingOrder, mode: 'reschedule' })}>Reprogramar</Button>
+                            <div className="flex flex-wrap gap-2">
+                              {canToggle && (suspended ? (
+                                <Button variant="secondary" size="sm" icon={RotateCcw} onClick={() => setRehearsalModal({ isOpen: true, order: viewingOrder, mode: 'resume' })}>Reactivar</Button>
+                              ) : (
+                                <Button variant="secondary" size="sm" icon={Ban} onClick={() => setRehearsalModal({ isOpen: true, order: viewingOrder, mode: 'suspend' })}>Suspender</Button>
+                              ))}
+                              <Button variant="secondary" size="sm" icon={CalendarClock} onClick={() => setRehearsalModal({ isOpen: true, order: viewingOrder, mode: 'reschedule' })}>Reprogramar</Button>
+                            </div>
                           </div>
                         )}
                       </div>

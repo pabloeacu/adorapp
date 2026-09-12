@@ -34,7 +34,6 @@ import { GreetingHeader } from '../components/dashboard/GreetingHeader';
 import { PrepBanner } from '../components/dashboard/PrepBanner';
 import { ObserverAreaBanners } from '../components/dashboard/ObserverAreaBanners';
 import { RehearsalActionModal } from '../components/orders/RehearsalActionModal';
-import { Button } from '../components/ui/Button';
 import { lineupInstrumentsFor } from '../lib/lineup';
 
 // Fecha `YYYY-MM-DD` parseada LOCAL (landmine #50: `new Date('2026-09-11')` es UTC
@@ -145,7 +144,7 @@ export const Dashboard = () => {
       {showRehearsalCard && todaysRehearsal && (() => {
         const suspended = todaysRehearsal.rehearsalSuspended;
         return (
-          <div className={`rounded-2xl p-5 shadow-lg ${suspended ? 'bg-rose-500/15 border border-rose-500/40 text-white' : 'bg-gold-gradient text-black'}`}>
+          <div className={`rounded-2xl p-4 sm:p-5 shadow-lg ${suspended ? 'bg-rose-500/15 border border-rose-500/40 text-white' : 'bg-gold-gradient text-black'}`} data-testid="rehearsal-card">
             <div className="flex items-center gap-4">
               <div className={`p-3 rounded-xl shrink-0 ${suspended ? 'bg-rose-500/20 text-rose-200' : 'bg-black/10 text-black'}`}>
                 {suspended ? <Ban size={28} /> : <CalendarClock size={28} />}
@@ -171,25 +170,32 @@ export const Dashboard = () => {
               </div>
             )}
 
-            <div className="mt-3 flex flex-wrap gap-2">
-              <Link
-                to={`/ordenes?order=${todaysRehearsal.id}`}
-                className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm font-semibold transition-all ${suspended ? 'bg-white/10 text-white hover:bg-white/15' : 'bg-black/10 text-black hover:bg-black/20'}`}
-              >
-                Ver el orden <ChevronRight size={16} />
-              </Link>
-              {canManageRehearsal && (suspended ? (
-                <>
-                  <Button variant="secondary" size="sm" icon={RotateCcw} onClick={() => setRehearsalModal({ isOpen: true, order: todaysRehearsal, mode: 'resume' })}>Reactivar</Button>
-                  <Button variant="secondary" size="sm" icon={CalendarClock} onClick={() => setRehearsalModal({ isOpen: true, order: todaysRehearsal, mode: 'reschedule' })}>Reprogramar</Button>
-                </>
-              ) : (
-                <>
-                  <Button variant="secondary" size="sm" icon={Ban} onClick={() => setRehearsalModal({ isOpen: true, order: todaysRehearsal, mode: 'suspend' })}>Suspender ensamble</Button>
-                  <Button variant="secondary" size="sm" icon={CalendarClock} onClick={() => setRehearsalModal({ isOpen: true, order: todaysRehearsal, mode: 'reschedule' })}>Reprogramar</Button>
-                </>
-              ))}
-            </div>
+            {/* Acciones en UNA sola línea en celu (390 px): las tres con el MISMO estilo que
+                "Ver el orden" (tinta negra sobre dorado; blanca sobre rosa si está suspendido).
+                Un <Button variant="secondary"> (texto gris claro + borde gris) no se leía sobre
+                el dorado. Etiquetas cortas ("Suspender" / "Reprogramar") para que entren. */}
+            {(() => {
+              // flex-1 + flex-wrap: en 375/390 px las tres comparten la fila (medido con Inter
+              // real: 301 px de contenido mínimo); en pantallas más angostas la última baja de
+              // línea en vez de desbordar. text-xs + íconos 13 px + px-2 para que entren.
+              const action = `flex-1 inline-flex items-center justify-center gap-1 px-2 py-1.5 rounded-lg text-xs font-semibold whitespace-nowrap transition-all active:scale-95 ${suspended ? 'bg-white/10 text-white hover:bg-white/15' : 'bg-black/10 text-black hover:bg-black/20'}`;
+              const open = (mode) => setRehearsalModal({ isOpen: true, order: todaysRehearsal, mode });
+              return (
+                <div className="mt-3 flex flex-wrap gap-1.5" data-testid="rehearsal-card-actions">
+                  <Link to={`/ordenes?order=${todaysRehearsal.id}`} className={action}>
+                    Ver el orden <ChevronRight size={13} />
+                  </Link>
+                  {canManageRehearsal && (suspended ? (
+                    <button type="button" className={action} onClick={() => open('resume')}><RotateCcw size={13} /> Reactivar</button>
+                  ) : (
+                    <button type="button" className={action} onClick={() => open('suspend')}><Ban size={13} /> Suspender</button>
+                  ))}
+                  {canManageRehearsal && (
+                    <button type="button" className={action} onClick={() => open('reschedule')}><CalendarClock size={13} /> Reprogramar</button>
+                  )}
+                </div>
+              );
+            })()}
           </div>
         );
       })()}
