@@ -15,6 +15,12 @@ module.exports = defineConfig({
   plugins: [react()],
   define: {
     'import.meta.env.VITE_BUILD_DATE': JSON.stringify(buildDate),
+    // Identificador único del build: sha del commit en Vercel (o timestamp en local).
+    // La app lo guarda en el teléfono y, si cambió, sabe que es la primera apertura
+    // después de una publicación → pantalla "Actualizando a la nueva versión".
+    'import.meta.env.VITE_BUILD_ID': JSON.stringify(
+      (process.env.VERCEL_GIT_COMMIT_SHA || '').slice(0, 12) || `local-${Date.now()}`,
+    ),
   },
   // Rutas de assets ABSOLUTAS (/assets/...). Con base relativo ('./') una carga
   // fresca de una ruta de 2+ segmentos (ej. /practica/:orderId, linkeada desde el

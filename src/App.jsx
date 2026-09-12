@@ -5,7 +5,7 @@ import { PageLoader } from './components/ui/PageLoader';
 import { useAuthStore } from './stores/authStore';
 import { useAppStore } from './stores/appStore';
 import { useCurrentRole } from './hooks/useCurrentMember';
-import { getUpdateState, subscribeUpdate, markUpdateStep, finishUpdate, isPreReloadStep, UPDATE_STEPS } from './lib/updateProgress';
+import { getUpdateState, subscribeUpdate, markUpdateStep, finishUpdate, isPreReloadStep, UPDATE_STEPS, pctOf } from './lib/updateProgress';
 
 // Lazy-loaded route components. Each compiles into its own chunk, so a user
 // who only ever opens Login / Dashboard does not download the Repertorio
@@ -119,7 +119,9 @@ function App() {
     init();
   }, [initializeAuth, initializeApp]);
 
-  const updateStep = update.active ? UPDATE_STEPS[update.step] : null;
+  const updateStep = update.active && UPDATE_STEPS[update.step]
+    ? { pct: pctOf(update.step, update.mode), caption: UPDATE_STEPS[update.step].caption }
+    : null;
 
   if (!initialized || authLoading) {
     return updateStep
