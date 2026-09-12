@@ -5,6 +5,8 @@ import {
   uniqueSongIds,
   ensayometroPercent,
   pendingSongIds,
+  isSingerOnly,
+  milestonesPerSong,
 } from './ensayometro';
 
 const log = (o = {}) => ({
@@ -79,5 +81,36 @@ describe('pendingSongIds', () => {
   it('todas completas → []', () => {
     const full = log({ timesPracticed: 1, knowsLyrics: true, knowsStructure: true, knowsArrangements: true });
     expect(pendingSongIds(['a'], { a: full })).toEqual([]);
+  });
+});
+
+describe('Ensayómetro · quien solo canta (Voz/Coros) no mide "Frases y arreglos"', () => {
+  it('isSingerOnly: solo Voz/Coros → true; con cualquier instrumento → false; sin nada → false', () => {
+    expect(isSingerOnly(['Voz'])).toBe(true);
+    expect(isSingerOnly(['Coros'])).toBe(true);
+    expect(isSingerOnly(['Voz', 'Coros'])).toBe(true);
+    expect(isSingerOnly(['Voz', 'Guitarra Acústica'])).toBe(false);
+    expect(isSingerOnly(['Batería'])).toBe(false);
+    expect(isSingerOnly([])).toBe(false);
+    expect(isSingerOnly(null)).toBe(false);
+  });
+
+  it('hitos por canción: 3 para quien solo canta, 4 para músicos', () => {
+    expect(milestonesPerSong(true)).toBe(3);
+    expect(milestonesPerSong(false)).toBe(4);
+    const full = { timesPracticed: 2, knowsLyrics: true, knowsStructure: true, knowsArrangements: true };
+    expect(milestonesOf(full, true)).toBe(3);
+    expect(milestonesOf(full, false)).toBe(4);
+    const noArr = { timesPracticed: 1, knowsLyrics: true, knowsStructure: true, knowsArrangements: false };
+    expect(milestonesOf(noArr, true)).toBe(3);
+    expect(milestonesOf(noArr, false)).toBe(3);
+  });
+
+  it('el % de quien solo canta llega a 100 sin "Frases y arreglos"', () => {
+    const logs = { a: { timesPracticed: 1, knowsLyrics: true, knowsStructure: true, knowsArrangements: false } };
+    expect(ensayometroPercent(['a'], logs, true)).toBe(100);
+    expect(ensayometroPercent(['a'], logs, false)).toBe(75);
+    expect(pendingSongIds(['a'], logs, true)).toEqual([]);
+    expect(pendingSongIds(['a'], logs, false)).toEqual(['a']);
   });
 });

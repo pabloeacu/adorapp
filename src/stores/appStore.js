@@ -1161,6 +1161,44 @@ export const useAppStore = create((set, get) => ({
   // pastor ve todo. Se usa SOLO para suprimir el modal ("¿ya envié yo?"). Lectura
   // on-demand, no-throw. El envío NO pasa por acá: va por la Edge Function
   // send-service-feedback (service_role) vía callAdminFunction.
+  // ---------- "¿Con qué ministramos?" — canción de ministración durante el servicio ----------
+  // Va por la RPC add_ministration_songs (gate + ventana + validación + aviso server-side).
+  // songs = [{ songId, key, directorId|null }]. Devuelve el jsonb de la RPC o { error }.
+  addMinistrationSongs: async (orderId, songs) => {
+    try {
+      const { data, error } = await supabase.rpc('add_ministration_songs', { p_order_id: orderId, p_songs: songs });
+      if (error) return { error: error.message || 'error' };
+      if (!data || data.ok !== true) return { error: data?.error || 'Respuesta inválida del servidor.' };
+      // Parche optimista: las canciones ya están al final del orden en la base.
+      if (Array.isArray(data.songs) && data.songs.length > 0) {
+        set((state) => {
+          const orders = state.orders.map((o) => (o.id === orderId ? { ...o, songs: [...(o.songs || []), ...data.songs] } : o));
+          try { localStorage.setItem('appOrders', JSON.stringify(orders)); } catch { /* non-fatal */ }
+          return { orders };
+        });
+      }
+      get().refetchOrder(orderId);
+      return data;
+    } catch (err) {
+      console.error('addMinistrationSongs error:', err);
+      return { error: err.message || 'error' };
+    }
+  },
+
+  // Relee UN orden desde la base y lo funde en el store (best-effort, sin throw).
+  refetchOrder: async (id) => {
+    try {
+      const { data } = await supabase.from('orders').select('*').eq('id', id).maybeSingle();
+      if (!data) return;
+      const fresh = convertOrderFromDB(data);
+      set((state) => {
+        const orders = state.orders.some((o) => o.id === id) ? state.orders.map((o) => (o.id === id ? fresh : o)) : [fresh, ...state.orders];
+        try { localStorage.setItem('appOrders', JSON.stringify(orders)); } catch { /* non-fatal */ }
+        return { orders };
+      });
+    } catch { /* non-fatal */ }
+  },
+
   fetchServiceFeedbackForOrder: async (orderId) => {
     try {
       const { data, error } = await supabase

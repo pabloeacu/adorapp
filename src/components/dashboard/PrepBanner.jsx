@@ -3,7 +3,8 @@ import { Link } from 'react-router-dom';
 import { Music2, CalendarClock, Clock, ChevronRight } from 'lucide-react';
 import { useAppStore } from '../../stores/appStore';
 import { Badge } from '../ui/Badge';
-import { uniqueSongIds, ensayometroPercent, pendingSongIds } from '../../lib/ensayometro';
+import { uniqueSongIds, ensayometroPercent, pendingSongIds, isSingerOnly } from '../../lib/ensayometro';
+import { lineupInstrumentsFor } from '../../lib/lineup';
 
 // Banner de PREPARACIÓN — SOLO LECTURA y CONDICIONAL: aparece únicamente si el
 // miembro participa (su banda) en un orden PROGRAMADO próximo con canciones. Si no
@@ -79,8 +80,10 @@ export const PrepBanner = ({ member, todayART }) => {
         const logsById = {};
         (rows || []).forEach((r) => { if (r?.songId) logsById[r.songId] = r; });
         const ids = uniqueSongIds(activeOrder);
-        const percent = ensayometroPercent(ids, logsById);
-        const missing = pendingSongIds(ids, logsById)
+        // Quien solo canta mide 3 hitos por canción (sin "Frases y arreglos"), igual que Mi Ensayo.
+        const singer = isSingerOnly(lineupInstrumentsFor(activeOrder, member));
+        const percent = ensayometroPercent(ids, logsById, singer);
+        const missing = pendingSongIds(ids, logsById, singer)
           .map((id) => getSongById(id)?.title)
           .filter(Boolean);
         setPrep({ percent, missing });
@@ -89,7 +92,7 @@ export const PrepBanner = ({ member, todayART }) => {
       }
     })();
     return () => { alive = false; };
-  }, [activeOrder, fetchPracticeLogs, getSongById]);
+  }, [activeOrder, fetchPracticeLogs, getSongById, member]);
 
   if (!activeOrder || !prep) return null;
 
