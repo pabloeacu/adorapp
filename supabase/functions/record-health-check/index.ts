@@ -33,10 +33,22 @@ Deno.serve(async (req: Request) => {
   const url = Deno.env.get("SUPABASE_URL")!;
   const serviceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
 
-  // (a) Solo con una clave del proyecto (el runner manda la anon key).
+  // (a) Solo con una clave del proyecto (el runner manda la anon key). OJO: en el
+  // runtime de las EFs `SUPABASE_ANON_KEY` puede ser la clave publishable nueva
+  // (`sb_publishable_…`) mientras el runner manda la anon key legacy (JWT): por eso,
+  // si no coincide con las del entorno, se valida contra el gateway del proyecto
+  // (`/rest/v1/` con `apikey` → 401 si la clave no es de este proyecto).
   const auth = req.headers.get("Authorization") || "";
   const token = auth.startsWith("Bearer ") ? auth.slice(7).trim() : "";
-  if (!token || (token !== anon && token !== serviceKey)) return json({ error: "Unauthorized" }, 401);
+  if (!token) return json({ error: "Unauthorized" }, 401);
+  let keyOk = token === anon || token === serviceKey;
+  if (!keyOk && token.length < 2048) {
+    try {
+      const probe = await fetch(`${url}/rest/v1/`, { method: "HEAD", headers: { apikey: token } });
+      keyOk = probe.status !== 401 && probe.status !== 403;
+    } catch { keyOk = false; }
+  }
+  if (!keyOk) return json({ error: "Unauthorized" }, 401);
 
   // (c) Freno de volumen (best-effort en memoria; el firme es el trigger en la base).
   const now = Date.now();
