@@ -39,7 +39,7 @@ export function pickObserverFocus(area, orders, todayART, changedSinceART) {
   if (serviceToday) return { state: 'service', order: serviceToday };
   if (area === 'sonido') {
     const ensambleToday = sched.find((o) => rehearsalOf(o) === todayART);
-    if (ensambleToday) return { state: 'ensamble', order: ensambleToday };
+    if (ensambleToday) return { state: ensambleToday.rehearsalSuspended ? 'ensamble_suspendido' : 'ensamble', order: ensambleToday };
   }
   if (nextFuture) return { state: 'new', order: nextFuture };
   return null;
@@ -57,6 +57,10 @@ const CONTENT = {
     ensamble: {
       title: '¡Hoy hay ensamble!',
       message: '¿Ya está listo el operador? Mirá la banda y el repertorio del orden.',
+    },
+    ensamble_suspendido: {
+      title: 'Ensamble suspendido',
+      message: 'El ensamble de hoy se suspendió. El servicio sigue en pie — revisá el orden.',
     },
     service: {
       title: '¡Hoy hay servicio!',

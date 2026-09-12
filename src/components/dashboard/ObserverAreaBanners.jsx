@@ -48,7 +48,8 @@ const AreaBanner = ({ area, order, state }) => {
   const fecha = parseLocalDate(order.date).toLocaleDateString('es-ES', {
     weekday: 'long', day: 'numeric', month: 'long',
   });
-  const hora = state === 'ensamble'
+  const isEnsambleState = state === 'ensamble' || state === 'ensamble_suspendido';
+  const hora = isEnsambleState
     ? (order.rehearsalTime ? `Ensamble ${order.rehearsalTime}` : null)
     : (order.time || null);
 

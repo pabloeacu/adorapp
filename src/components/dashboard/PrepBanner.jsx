@@ -144,10 +144,17 @@ export const PrepBanner = ({ member, todayART }) => {
           {/* Horarios */}
           <div className="mt-3 flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-gray-400">
             {hasRehearsal && (
-              <span className="inline-flex items-center gap-1.5">
-                <CalendarClock size={13} className="text-gold-400" />
-                Ensamble: {fmtDate(activeOrder.rehearsalDate)}{activeOrder.rehearsalTime ? ` · ${activeOrder.rehearsalTime}` : ''}
-              </span>
+              activeOrder.rehearsalSuspended ? (
+                <span className="inline-flex items-center gap-1.5 text-rose-300">
+                  <CalendarClock size={13} className="text-rose-400" />
+                  Ensamble suspendido <span className="line-through text-rose-300/70">{fmtDate(activeOrder.rehearsalDate)}{activeOrder.rehearsalTime ? ` · ${activeOrder.rehearsalTime}` : ''}</span>
+                </span>
+              ) : (
+                <span className="inline-flex items-center gap-1.5">
+                  <CalendarClock size={13} className="text-gold-400" />
+                  Ensamble: {fmtDate(activeOrder.rehearsalDate)}{activeOrder.rehearsalTime ? ` · ${activeOrder.rehearsalTime}` : ''}
+                </span>
+              )
             )}
             <span className="inline-flex items-center gap-1.5">
               <Clock size={13} className="text-gold-400" />

@@ -6,7 +6,7 @@ import {
   MessageSquare, Eye, Trash2, Search, Check, X,
   User, Zap, AlertCircle, ChevronDown, FileDown, History, Award,
   FileText, Printer, Copy as CopyIcon,
-  Edit, CheckCircle, XCircle, RotateCcw, Target, ChevronRight, ListChecks, Play, CalendarClock, SlidersHorizontal
+  Edit, CheckCircle, XCircle, RotateCcw, Target, ChevronRight, ListChecks, Play, CalendarClock, SlidersHorizontal, Ban
 } from 'lucide-react';
 import {
   CalendarDots,
@@ -39,6 +39,7 @@ import { SelectMenu } from '../components/ui/SelectMenu';
 import { LineupEditor } from '../components/orders/LineupEditor';
 import { LineupSummary } from '../components/orders/LineupSummary';
 import { LineupModal } from '../components/orders/LineupModal';
+import { RehearsalActionModal } from '../components/orders/RehearsalActionModal';
 import { buildLineup, lineupSummaryText, isCustomLineup } from '../lib/lineup';
 
 // Parsear 'YYYY-MM-DD' como fecha LOCAL (no UTC). `new Date('2026-09-11')` se
@@ -47,6 +48,11 @@ import { buildLineup, lineupSummaryText, isCustomLineup } from '../lib/lineup';
 const parseLocalDate = (dateStr) => {
   const s = String(dateStr || '').slice(0, 10);
   return /^\d{4}-\d{2}-\d{2}$/.test(s) ? new Date(`${s}T00:00:00`) : new Date(dateStr);
+};
+// Hoy en formato YYYY-MM-DD (zona local del dispositivo = ART para el ministerio).
+const localTodayStr = () => {
+  const d = new Date();
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
 };
 import {
   DndContext,
@@ -132,6 +138,8 @@ export const Ordenes = () => {
   const [lineupDraft, setLineupDraft] = useState({ mode: 'all', members: [] });
   const [lineupSaving, setLineupSaving] = useState(false);
   const [lineupModal, setLineupModal] = useState({ isOpen: false, order: null });
+  const [rehearsalModal, setRehearsalModal] = useState({ isOpen: false, order: null, mode: null });
+  const [rehearsalReasonOpen, setRehearsalReasonOpen] = useState(false);
 
   const [formData, setFormData] = useState({
     date: '',
@@ -1912,17 +1920,56 @@ export const Ordenes = () => {
               </Card>
             </div>
 
-            {/* Ensamble programado (antes el detalle no lo mostraba, aunque la
-                card del inicio mandaba acá "para ver el orden"). */}
-            {viewingOrder.rehearsalDate && (
-              <div className="flex items-center gap-3 rounded-xl border border-amber-500/30 bg-amber-500/[0.07] p-3" data-testid="detail-rehearsal">
-                <div className="p-2 rounded-lg bg-amber-500/15 text-amber-300 shrink-0"><CalendarClock size={18} /></div>
-                <div className="min-w-0">
-                  <p className="text-[11px] uppercase tracking-wide text-amber-300/80 font-medium">Ensamble</p>
-                  <p className="text-sm font-medium">{formatDate(viewingOrder.rehearsalDate)}{viewingOrder.rehearsalTime ? ` · ${viewingOrder.rehearsalTime}` : ''}</p>
+            {/* Ensamble: estado (activo / suspendido) + acciones Suspender/Reactivar/Reprogramar
+                (pastor/líder, solo en órdenes programados y con ensamble hoy o a futuro). */}
+            {viewingOrder.rehearsalDate && (() => {
+              const suspended = viewingOrder.rehearsalSuspended;
+              // Líder: solo su banda (miembro permanente) — espeja el gate de la RPC.
+              const canManage = (isPastor
+                || (isLeader && getBandById(viewingOrder.bandId)?.members?.includes(currentMember?.id)))
+                && viewingOrder.status === 'scheduled'
+                && viewingOrder.rehearsalDate >= localTodayStr();
+              return (
+                <div
+                  className={`rounded-xl border p-3 ${suspended ? 'border-rose-500/40 bg-rose-500/[0.07]' : 'border-amber-500/30 bg-amber-500/[0.07]'}`}
+                  data-testid="detail-rehearsal"
+                >
+                  <div className="flex items-start gap-3">
+                    <div className={`p-2 rounded-lg shrink-0 ${suspended ? 'bg-rose-500/15 text-rose-300' : 'bg-amber-500/15 text-amber-300'}`}>
+                      {suspended ? <Ban size={18} /> : <CalendarClock size={18} />}
+                    </div>
+                    <div className="min-w-0 flex-1">
+                      <p className={`text-[11px] uppercase tracking-wide font-medium ${suspended ? 'text-rose-300/90' : 'text-amber-300/80'}`}>
+                        {suspended ? 'Ensamble suspendido' : 'Ensamble'}
+                      </p>
+                      <p className={`text-sm font-medium ${suspended ? 'line-through text-gray-400' : ''}`}>
+                        {formatDate(viewingOrder.rehearsalDate)}{viewingOrder.rehearsalTime ? ` · ${viewingOrder.rehearsalTime}` : ''}
+                      </p>
+                      {suspended && viewingOrder.rehearsalSuspendedReason && (
+                        <div className="mt-1">
+                          <button type="button" className="text-xs text-rose-300 underline" onClick={() => setRehearsalReasonOpen((v) => !v)}>
+                            {rehearsalReasonOpen ? 'Ocultar motivo' : 'Ver más'}
+                          </button>
+                          {rehearsalReasonOpen && (
+                            <p className="mt-1 text-sm text-gray-300 whitespace-pre-wrap">{viewingOrder.rehearsalSuspendedReason}</p>
+                          )}
+                        </div>
+                      )}
+                      {canManage && (
+                        <div className="mt-2.5 flex flex-wrap gap-2">
+                          {suspended ? (
+                            <Button variant="secondary" size="sm" icon={RotateCcw} onClick={() => setRehearsalModal({ isOpen: true, order: viewingOrder, mode: 'resume' })}>Reactivar</Button>
+                          ) : (
+                            <Button variant="secondary" size="sm" icon={Ban} onClick={() => setRehearsalModal({ isOpen: true, order: viewingOrder, mode: 'suspend' })}>Suspender ensamble</Button>
+                          )}
+                          <Button variant="secondary" size="sm" icon={CalendarClock} onClick={() => setRehearsalModal({ isOpen: true, order: viewingOrder, mode: 'reschedule' })}>Reprogramar</Button>
+                        </div>
+                      )}
+                    </div>
+                  </div>
                 </div>
-              </div>
-            )}
+              );
+            })()}
 
             {/* Formación del servicio */}
             <div data-testid="detail-lineup">
@@ -2031,6 +2078,23 @@ export const Ordenes = () => {
         order={lineupModal.order}
         onClose={() => setLineupModal({ isOpen: false, order: null })}
         onSaved={(fresh) => setViewingOrder((prev) => (prev && prev.id === fresh.id ? { ...prev, lineup: fresh.lineup } : prev))}
+      />
+
+      <RehearsalActionModal
+        order={rehearsalModal.order}
+        mode={rehearsalModal.mode}
+        isOpen={rehearsalModal.isOpen}
+        onClose={() => setRehearsalModal({ isOpen: false, order: null, mode: null })}
+        onDone={({ mode, reason, date, time }) => {
+          setRehearsalReasonOpen(false);
+          setViewingOrder((prev) => {
+            if (!prev || !rehearsalModal.order || prev.id !== rehearsalModal.order.id) return prev;
+            if (mode === 'suspend') return { ...prev, rehearsalSuspended: true, rehearsalSuspendedReason: reason, rehearsalSuspendedAt: new Date().toISOString() };
+            if (mode === 'resume') return { ...prev, rehearsalSuspended: false, rehearsalSuspendedReason: null, rehearsalSuspendedAt: null };
+            if (mode === 'reschedule') return { ...prev, rehearsalDate: date, rehearsalTime: time, rehearsalSuspended: false, rehearsalSuspendedReason: null, rehearsalSuspendedAt: null };
+            return prev;
+          });
+        }}
       />
 
       {/* Radiografía del repertorio (solo lectura) */}

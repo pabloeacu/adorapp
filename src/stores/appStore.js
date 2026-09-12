@@ -236,6 +236,14 @@ const convertOrderFromDB = (o) => ({
   // "¡Ojo! Hubo cambios" de los banners de área). Lo escribe SOLO la base — nunca
   // el cliente — así que NO va en convertOrderToDB (mismo patrón que rehearsal_reminder_sent).
   contentChangedAt: o.content_changed_at,
+  // Suspensión del ENSAMBLE (server-owned: las escriben SOLO las RPCs suspend/resume/
+  // reschedule + el trigger enforce_order_rehearsal_rules; NUNCA el cliente → NO van en
+  // convertOrderToDB, mismo patrón que rehearsal_reminder_sent). `rehearsalSuspended` es
+  // el booleano derivado para leer limpio en la UI.
+  rehearsalSuspendedAt: o.rehearsal_suspended_at,
+  rehearsalSuspendedReason: o.rehearsal_suspended_reason,
+  rehearsalSuspendedBy: o.rehearsal_suspended_by,
+  rehearsalSuspended: !!o.rehearsal_suspended_at,
 });
 
 // ⚠️ DATA-LOSS LANDMINE — convertXToDB shape and contract ⚠️
@@ -999,14 +1007,79 @@ export const useAppStore = create((set, get) => ({
         status: 'scheduled',
         feedback: '',
         // El clon arranca sin ensamble (la fecha vieja no tiene sentido) y sin
-        // formación (se define para el servicio nuevo).
+        // formación (se define para el servicio nuevo). Tampoco hereda la suspensión.
         rehearsalDate: null,
         rehearsalTime: null,
         lineup: null,
+        rehearsalSuspendedAt: null,
+        rehearsalSuspendedReason: null,
+        rehearsalSuspendedBy: null,
+        rehearsalSuspended: false,
       };
       return get().addOrder(newOrder);
     }
     return null;
+  },
+
+  // --- Ensamble: suspender / reactivar / reprogramar ----------------------
+  // Van por RPCs SECURITY DEFINER (no por updateOrder): la autorización + el fan-out de
+  // avisos + la escritura de columnas server-owned viven en la base. Parcheo optimista del
+  // array `orders` (SOLO los campos de suspensión, nunca un convertOrderToDB parcial — regla
+  // #8) para que el card del Inicio / calendario / banners reflejen el cambio al instante,
+  // sin esperar el realtime (que en móvil puede demorar). El realtime confirma después.
+  suspendRehearsal: async (id, reason) => {
+    try {
+      const { data, error } = await supabase.rpc('suspend_order_rehearsal', { p_order_id: id, p_reason: reason || null });
+      if (error) throw error;
+      if (data?.ok) {
+        const nowIso = new Date().toISOString();
+        set((state) => ({
+          orders: state.orders.map((o) => o.id === id
+            ? { ...o, rehearsalSuspendedAt: nowIso, rehearsalSuspendedReason: (reason && reason.trim()) || null, rehearsalSuspended: true }
+            : o),
+        }));
+      }
+      return data || { ok: false };
+    } catch (err) {
+      console.error('Error suspending rehearsal:', err);
+      return { ok: false, error: err.message };
+    }
+  },
+
+  resumeRehearsal: async (id) => {
+    try {
+      const { data, error } = await supabase.rpc('resume_order_rehearsal', { p_order_id: id });
+      if (error) throw error;
+      if (data?.ok) {
+        set((state) => ({
+          orders: state.orders.map((o) => o.id === id
+            ? { ...o, rehearsalSuspendedAt: null, rehearsalSuspendedReason: null, rehearsalSuspendedBy: null, rehearsalSuspended: false }
+            : o),
+        }));
+      }
+      return data || { ok: false };
+    } catch (err) {
+      console.error('Error resuming rehearsal:', err);
+      return { ok: false, error: err.message };
+    }
+  },
+
+  rescheduleRehearsal: async (id, date, time, reason) => {
+    try {
+      const { data, error } = await supabase.rpc('reschedule_order_rehearsal', { p_order_id: id, p_date: date, p_time: time, p_reason: reason || null });
+      if (error) throw error;
+      if (data?.ok) {
+        set((state) => ({
+          orders: state.orders.map((o) => o.id === id
+            ? { ...o, rehearsalDate: date, rehearsalTime: time, rehearsalSuspendedAt: null, rehearsalSuspendedReason: null, rehearsalSuspendedBy: null, rehearsalSuspended: false }
+            : o),
+        }));
+      }
+      return data || { ok: false };
+    } catch (err) {
+      console.error('Error rescheduling rehearsal:', err);
+      return { ok: false, error: err.message };
+    }
   },
 
   // --- Ensayómetro (personal practice logs) -------------------------------

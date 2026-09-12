@@ -177,13 +177,14 @@ export function OrderCalendar({ orders, getBandById, onSelectOrder }) {
               )}
               {(rehearsalsByDay.get(k) || []).map((o) => {
                 const band = getBandById(o.bandId);
+                const suspended = o.rehearsalSuspended;
                 return (
                   <button
                     key={`reh-${o.id}`}
                     type="button"
                     onClick={() => onSelectOrder?.(o)}
-                    title={`Ensamble · ${band?.name || 'Banda'}${o.rehearsalTime ? ' · ' + o.rehearsalTime : ''}`}
-                    className="text-left text-[10px] px-1.5 py-0.5 rounded border truncate bg-gold-500/15 text-gold-200 border-gold-500/40 hover:brightness-125 focus:outline-none focus:ring-2 focus:ring-gold-500/40"
+                    title={`${suspended ? 'Ensamble suspendido' : 'Ensamble'} · ${band?.name || 'Banda'}${o.rehearsalTime ? ' · ' + o.rehearsalTime : ''}`}
+                    className={`text-left text-[10px] px-1.5 py-0.5 rounded border truncate hover:brightness-125 focus:outline-none focus:ring-2 ${suspended ? 'bg-rose-500/15 text-rose-200 border-rose-500/40 line-through focus:ring-rose-500/40' : 'bg-gold-500/15 text-gold-200 border-gold-500/40 focus:ring-gold-500/40'}`}
                   >
                     {o.rehearsalTime ? `${o.rehearsalTime.slice(0, 5)} ` : ''}Ensamble · {band?.name || 'Banda'}
                   </button>
