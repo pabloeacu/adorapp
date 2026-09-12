@@ -9,8 +9,22 @@ export const useAuthStore = create((set, get) => ({
   error: null,
   isRefreshing: false, // Prevent multiple simultaneous refreshes
 
-  // Initialize auth state
+  // Initialize auth state (sesión + ficha, en serie). Se conserva por
+  // compatibilidad; el arranque de App usa restoreSession + bootProfile para
+  // pedir la ficha EN PARALELO con los datos (ver App.jsx).
   initialize: async () => {
+    const user = await get().restoreSession();
+    if (user) await get().bootProfile(user.id);
+  },
+
+  // Paso 1 del arranque: restaurar la sesión guardada en el dispositivo.
+  // Es local (no viaja al servidor salvo que el token esté vencido y haya que
+  // refrescarlo). Deja `user` listo, con la credencial cargada en el cliente
+  // de Supabase, para que TODO pedido posterior (ficha y tablas) salga
+  // autenticado. Con sesión: `loading` queda en true hasta bootProfile.
+  // Sin sesión: `loading` false (irá al login). Devuelve el user o null.
+  restoreSession: async () => {
+    let user = null;
     try {
       // Clear ALL cached auth data first
       localStorage.removeItem('user_profile');
@@ -20,16 +34,35 @@ export const useAuthStore = create((set, get) => ({
       const { data: { session } } = await supabase.auth.getSession();
 
       if (session?.user) {
-        set({ user: session.user, loading: true });
-        await get().fetchProfile(session.user.id);
+        user = session.user;
+        set({ user, loading: true });
+      } else {
+        set({ loading: false });
       }
     } catch (err) {
       console.error('Auth initialization error:', err);
-    } finally {
       set({ loading: false });
     }
 
     // Listen for auth changes - ONLY handle sign out events, not refreshes
+    get()._listenAuthChanges();
+    return user;
+  },
+
+  // Paso 2 del arranque: la ficha del miembro (1 viaje). Pase lo que pase,
+  // suelta `loading` (la pantalla de carga se gatea con él).
+  bootProfile: async (userId) => {
+    try {
+      await get().fetchProfile(userId);
+    } finally {
+      set({ loading: false });
+    }
+  },
+
+  _authListenerBound: false,
+  _listenAuthChanges: () => {
+    if (get()._authListenerBound) return;
+    set({ _authListenerBound: true });
     supabase.auth.onAuthStateChange(async (event, session) => {
       // Only process SIGNED_IN and SIGNED_OUT events, ignore TOKEN_REFRESHED
       if (event === 'SIGNED_OUT' || event === 'INITIAL_SESSION') {

@@ -6,6 +6,7 @@ import { useAuthStore } from './stores/authStore';
 import { useAppStore } from './stores/appStore';
 import { useCurrentRole } from './hooks/useCurrentMember';
 import { getUpdateState, subscribeUpdate, markUpdateStep, finishUpdate, isPreReloadStep, UPDATE_STEPS, pctOf } from './lib/updateProgress';
+import { runBoot } from './lib/boot';
 
 // Lazy-loaded route components. Each compiles into its own chunk, so a user
 // who only ever opens Login / Dashboard does not download the Repertorio
@@ -50,6 +51,10 @@ const MembersOnlyRoles = ({ children }) => {
 //     on members/bands/songs/orders, mounted from Layout).
 const REFRESH_THROTTLE_MS = 15_000;
 let lastRefreshAt = 0;
+// El arranque (App.init) ya trae ficha + tablas; lo marca acá para que el
+// primer montaje de RouteSync no vuelva a pedir todo por segunda (y tercera)
+// vez dentro de la ventana de throttle.
+const markRefreshed = () => { lastRefreshAt = Date.now(); };
 
 const RouteSync = ({ children }) => {
   const location = useLocation();
@@ -95,16 +100,23 @@ const useUpdateProgress = () => {
 
 function App() {
   const [initialized, setInitialized] = useState(false);
-  const initializeAuth = useAuthStore((state) => state.initialize);
+  const restoreSession = useAuthStore((state) => state.restoreSession);
+  const bootProfile = useAuthStore((state) => state.bootProfile);
   const initializeApp = useAppStore((state) => state.initialize);
   const authLoading = useAuthStore((state) => state.loading);
   const update = useUpdateProgress();
 
   useEffect(() => {
     const init = async () => {
-      await initializeAuth();
-      if (getUpdateState().active) markUpdateStep('session');
-      await initializeApp();
+      // Sesión (local) → ficha y tablas EN PARALELO → espera a las dos.
+      // Ver src/lib/boot.js. El Inicio se pinta recién con todo fresco.
+      await runBoot({
+        restoreSession,
+        bootProfile,
+        initializeApp,
+        onSession: () => { if (getUpdateState().active) markUpdateStep('session'); },
+      });
+      markRefreshed();
       if (getUpdateState().active) {
         // Segunda carga de una actualización: cerramos la barra con "Listo" un
         // instante antes de entrar, y limpiamos la marca.
@@ -117,7 +129,7 @@ function App() {
       setInitialized(true);
     };
     init();
-  }, [initializeAuth, initializeApp]);
+  }, [restoreSession, bootProfile, initializeApp]);
 
   const updateStep = update.active && UPDATE_STEPS[update.step]
     ? { pct: pctOf(update.step, update.mode), caption: UPDATE_STEPS[update.step].caption }
