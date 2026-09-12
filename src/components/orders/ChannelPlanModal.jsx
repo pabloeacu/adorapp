@@ -14,6 +14,7 @@ export const ChannelPlanModal = ({ order, isOpen, onClose, canEdit = false }) =>
   const getOrderLineupGroups = useAppStore((s) => s.getOrderLineupGroups);
   const getBandById = useAppStore((s) => s.getBandById);
   const [overrides, setOverrides] = useState({});
+  const [drafts, setDrafts] = useState({}); // key -> texto crudo mientras se edita (permite vaciar)
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
@@ -23,6 +24,7 @@ export const ChannelPlanModal = ({ order, isOpen, onClose, canEdit = false }) =>
     let alive = true;
     setLoading(true);
     setError('');
+    setDrafts({});
     (async () => {
       try {
         const { data } = await supabase
@@ -43,12 +45,34 @@ export const ChannelPlanModal = ({ order, isOpen, onClose, canEdit = false }) =>
   const band = order?.bandId ? getBandById?.(order.bandId) : null;
   const fecha = order?.date ? parseLocalDate(order.date).toLocaleDateString('es-ES', { weekday: 'long', day: 'numeric', month: 'long' }) : '';
 
-  const setChannel = (key, value) => {
-    const n = parseInt(value, 10);
-    setOverrides((prev) => ({ ...prev, [key]: Number.isFinite(n) && n > 0 ? n : undefined }));
+  // Mientras se edita guardamos el texto crudo (incluido ''), sin tocar los overrides:
+  // así la fila no salta al autonumerado ni se reordena hasta que el operador termina.
+  const handleChannelChange = (key, value) => setDrafts((prev) => ({ ...prev, [key]: value }));
+
+  // Al salir del campo, el texto se resuelve: número válido → override; vacío/ inválido → auto.
+  const handleChannelBlur = (key) => {
+    const raw = drafts[key];
+    setDrafts((prev) => { const { [key]: _omit, ...rest } = prev; return rest; });
+    if (raw === undefined) return;
+    const n = parseInt(raw, 10);
+    setOverrides((prev) => {
+      if (Number.isFinite(n) && n > 0) return { ...prev, [key]: n };
+      const { [key]: _o, ...rest } = prev;
+      return rest;
+    });
   };
 
-  const handleReset = () => setOverrides({});
+  // Overrides efectivos incluyendo ediciones aún sin blur (para que "Guardar" nunca las pierda).
+  const resolveOverrides = () => {
+    const out = { ...overrides };
+    for (const [key, raw] of Object.entries(drafts)) {
+      const n = parseInt(raw, 10);
+      if (Number.isFinite(n) && n > 0) out[key] = n; else delete out[key];
+    }
+    return out;
+  };
+
+  const handleReset = () => { setOverrides({}); setDrafts({}); };
 
   const handleSave = async () => {
     if (saving) return;
@@ -56,7 +80,7 @@ export const ChannelPlanModal = ({ order, isOpen, onClose, canEdit = false }) =>
     setError('');
     try {
       const full = {};
-      rows.forEach((r) => { full[r.key] = r.channel; });
+      buildChannelRows(groups, resolveOverrides()).forEach((r) => { full[r.key] = r.channel; });
       const { error: upErr } = await supabase
         .from('order_channel_plans')
         .upsert({ order_id: order.id, plan: full, updated_at: new Date().toISOString() }, { onConflict: 'order_id' });
@@ -120,8 +144,9 @@ export const ChannelPlanModal = ({ order, isOpen, onClose, canEdit = false }) =>
                   <input
                     type="number"
                     min="1"
-                    value={r.channel}
-                    onChange={(e) => setChannel(r.key, e.target.value)}
+                    value={drafts[r.key] !== undefined ? drafts[r.key] : r.channel}
+                    onChange={(e) => handleChannelChange(r.key, e.target.value)}
+                    onBlur={() => handleChannelBlur(r.key)}
                     className="shrink-0 h-10 w-12 rounded-lg text-center font-bold text-black border-0 focus:ring-2 focus:ring-white/40"
                     style={{ background: r.color }}
                     aria-label={`Canal de ${r.instrument} (${r.name})`}

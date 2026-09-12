@@ -21,7 +21,7 @@ const BY_SLUG = Object.fromEntries(AREAS.map((a) => [a.slug, a]));
 
 // Capacidades por área (espejo exacto de los helpers SQL).
 export const EMAIL_AREAS = ['multimedia', 'sonido']; // reciben mail de TODOS los órdenes
-export const FORMATION_AREAS = ['sonido']; // reciben el aviso de cambio SOLO de formación
+export const FORMATION_AREAS = ['multimedia', 'sonido']; // reciben el aviso de cambio SOLO de formación
 export const PRESENTER_AREAS = ['multimedia', 'sonido']; // pueden abrir el presentador
 
 // Áreas seleccionables en el formulario (todas las conocidas y activas).
