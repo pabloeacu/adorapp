@@ -4,6 +4,7 @@ import { useAppStore, MUSICAL_KEYS } from '../../stores/appStore';
 import { supabase } from '../../lib/supabase';
 import { resolveMinistrationOrder, ministrationWindow, isMinistrationSong } from '../../lib/ministration';
 import { suggestDirectorForSong } from '../../lib/orders';
+import { matchesSearch as matchesSearchText } from '../../lib/searchText';
 import { Modal } from '../ui/Modal';
 import { Button } from '../ui/Button';
 import { SelectMenu } from '../ui/SelectMenu';
@@ -34,7 +35,6 @@ const errorCopy = (msg) => {
 const fmtDate = (d) => {
   try { return new Date(`${d}T00:00:00`).toLocaleDateString('es-ES', { weekday: 'long', day: 'numeric', month: 'long' }); } catch { return ''; }
 };
-const norm = (s) => String(s || '').toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '');
 
 export const MinistrationBanner = ({ member, role }) => {
   const orders = useAppStore((s) => s.orders);
@@ -81,11 +81,10 @@ export const MinistrationBanner = ({ member, role }) => {
   const singerIds = useMemo(() => new Set(singers.map((s) => s.id)), [singers]);
 
   const results = useMemo(() => {
-    const q = norm(query.trim());
-    if (!q) return [];
+    if (!query.trim()) return [];
     const taken = new Set(picked.map((p) => p.songId));
     return songs
-      .filter((s) => !taken.has(s.id) && (norm(s.title).includes(q) || norm(s.artist).includes(q)))
+      .filter((s) => !taken.has(s.id) && matchesSearchText(query, s.title, s.artist))
       .slice(0, 8);
   }, [query, songs, picked]);
 

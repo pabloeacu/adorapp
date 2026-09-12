@@ -1,4 +1,5 @@
 import React, { useState, useMemo } from 'react';
+import { matchesSearch as matchesSearchText } from '../lib/searchText';
 import { useDocumentTitle } from '../hooks/useDocumentTitle';
 import {
   Search, Mail, Phone, Shield,
@@ -113,8 +114,7 @@ export const Solicitudes = () => {
 
   const filteredRequests = useMemo(() => {
     return pendingRequests.filter(request => {
-      const matchesSearch = request.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        request.email?.toLowerCase().includes(searchTerm.toLowerCase());
+      const matchesSearch = matchesSearchText(searchTerm, request.name, request.email);
 
       const matchesStatus = filterStatus === 'all' || request.status === filterStatus;
 

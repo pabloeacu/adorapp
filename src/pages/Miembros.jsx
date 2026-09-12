@@ -1,4 +1,5 @@
 import React, { useState, useMemo, useEffect } from 'react';
+import { matchesSearch as matchesSearchText } from '../lib/searchText';
 import { useDocumentTitle } from '../hooks/useDocumentTitle';
 import { useSearchParams } from 'react-router-dom';
 import {
@@ -151,9 +152,8 @@ export const Miembros = () => {
 
   const filteredMembers = useMemo(() => {
     const list = members.filter(member => {
-      const matchesSearch = member.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        (isPastor && member.email?.toLowerCase().includes(searchTerm.toLowerCase())) ||
-        member.instruments?.some(i => i.toLowerCase().includes(searchTerm.toLowerCase()));
+      // Indistinto a tildes y mayúsculas (src/lib/searchText.js): "santillan" encuentra "Santillán".
+      const matchesSearch = matchesSearchText(searchTerm, member.name, isPastor ? member.email : null, member.instruments);
 
       const matchesRole = filterRole === 'all' || member.role === filterRole;
       const matchesActive = filterActive === 'all' || member.active === (filterActive === 'true');

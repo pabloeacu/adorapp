@@ -6,6 +6,7 @@
 // Navigation goes through react-router so the SPA stays in-app.
 
 import React, { useState, useEffect, useMemo } from 'react';
+import { commandFilter } from '../lib/searchText';
 import { useNavigate } from 'react-router-dom';
 import { Command } from 'cmdk';
 import { useCurrentRole } from '../hooks/useCurrentMember';
@@ -104,6 +105,7 @@ export function CommandPalette() {
           <Command
             className="w-full max-w-xl rounded-2xl bg-neutral-900 border border-neutral-800 shadow-2xl overflow-hidden"
             label="Búsqueda global"
+            filter={commandFilter}
           >
             <div className="flex items-center gap-2 px-4 border-b border-neutral-800">
               <Search size={18} className="text-gray-500 shrink-0" />

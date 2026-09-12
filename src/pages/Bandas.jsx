@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { matchesSearch as matchesSearchText } from '../lib/searchText';
 import { useDocumentTitle } from '../hooks/useDocumentTitle';
 import {
   Plus, Calendar, Clock, Edit, Trash2,
@@ -570,9 +571,7 @@ export const Bandas = () => {
                 return <p className="text-sm text-gray-500">Todos los miembros activos ya integran esta banda.</p>;
               }
               // Filtro por nombre, insensible a mayúsculas y acentos (con muchos miembros, sobre todo en móvil).
-              const norm = (s) => (s || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase();
-              const q = norm(addSearch.trim());
-              const candidates = q ? allCandidates.filter(m => norm(m.name).includes(q)) : allCandidates;
+              const candidates = allCandidates.filter(m => matchesSearchText(addSearch, m.name));
               return (
                 <>
                   <div className="relative mb-2">
