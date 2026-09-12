@@ -29,9 +29,10 @@ DECLARE
   v_stats jsonb; v_periodo text; v_member record; v_items text; v_bandrec record; v_relevant jsonb;
 BEGIN
   v_today := (p_now AT TIME ZONE 'America/Argentina/Buenos_Aires')::date;
-  -- Cadencia: solo días que son múltiplo de 90 desde el ancla (1/10/2026). p_force salta el gate (QA).
+  -- Cadencia: el conteo ARRANCA el 1/10; el PRIMER reporte es 90 días después (~30/12) y luego cada
+  -- 90 días. NUNCA dispara el 1/10 (evita cifras de un período previo a la función). p_force salta el gate (QA).
   IF NOT p_force THEN
-    IF v_today < v_anchor OR ((v_today - v_anchor) % 90) <> 0 THEN RETURN; END IF;
+    IF v_today < v_anchor + 90 OR ((v_today - v_anchor) % 90) <> 0 THEN RETURN; END IF;
   END IF;
   -- Dedup del día (idempotente si el cron corre dos veces).
   INSERT INTO public.email_throttle (key, last_sent_at) VALUES ('ensamble_health:' || v_today::text, now())
@@ -39,7 +40,8 @@ BEGIN
   GET DIAGNOSTICS v_n = ROW_COUNT;
   IF v_n = 0 THEN RETURN; END IF;
 
-  v_start := v_today - 90;
+  -- La ventana nunca empieza antes del ancla (1/10): el primer reporte cubre [1/10, hoy).
+  v_start := GREATEST(v_today - 90, v_anchor);
   v_periodo := to_char(v_start, 'DD/MM/YYYY') || ' al ' || to_char(v_today - 1, 'DD/MM/YYYY');
 
   -- Stats por banda (solo bandas con >=1 servicio no-cancelado en la ventana).
