@@ -1921,8 +1921,9 @@ export const Ordenes = () => {
             </div>
 
             {/* Ensamble: estado (activo / suspendido) + acciones Suspender/Reactivar/Reprogramar
-                (pastor/líder, solo en órdenes programados y con ensamble hoy o a futuro). */}
-            {viewingOrder.rehearsalDate && (() => {
+                (pastor/líder, solo en órdenes programados y con ensamble hoy o a futuro).
+                No se muestra en un orden cancelado (cancelar arrastra el ensamble). */}
+            {viewingOrder.rehearsalDate && viewingOrder.status !== 'cancelled' && (() => {
               const suspended = viewingOrder.rehearsalSuspended;
               // Líder: solo su banda (miembro permanente) — espeja el gate de la RPC.
               const canManage = (isPastor
