@@ -9,7 +9,7 @@ import {
 } from 'lucide-react';
 import { MusicNotes } from '@phosphor-icons/react';
 import { useAppStore, SONG_CATEGORIES, MUSICAL_KEYS, transposeSongStructure } from '../stores/appStore';
-import { useCurrentMember } from '../hooks/useCurrentMember';
+import { useCurrentMember, useCurrentRole } from '../hooks/useCurrentMember';
 import { Card } from '../components/ui/Card';
 import { Button } from '../components/ui/Button';
 import { Badge } from '../components/ui/Badge';
@@ -89,7 +89,7 @@ export const Repertorio = () => {
   useDocumentTitle('Repertorio');
   const { songs, addSong, updateSong, deleteSong, getUnusedSongs } = useAppStore();
   const currentMember = useCurrentMember();
-  const userRole = currentMember?.role || 'member';
+  const userRole = useCurrentRole();
   const isPastor = userRole === 'pastor';
   const isLeader = userRole === 'leader';
 
@@ -852,24 +852,27 @@ export const Repertorio = () => {
                   PDF
                 </Button>
                 {(isPastor || isLeader || currentMember?.editor) && (
-                  <>
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      icon={Edit}
-                      onClick={() => handleOpenModal(song)}
-                    >
-                      Editar
-                    </Button>
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      icon={Trash2}
-                      onClick={() => handleDelete(song)}
-                    >
-                      Eliminar
-                    </Button>
-                  </>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    icon={Edit}
+                    onClick={() => handleOpenModal(song)}
+                  >
+                    Editar
+                  </Button>
+                )}
+                {/* Eliminar: solo pastor/líder (RLS songs_delete_pastor_or_leader). Un miembro
+                    EDITOR puede editar, no borrar (antes veía el botón y la app le decía
+                    "eliminada" aunque la base no borraba nada). */}
+                {(isPastor || isLeader) && (
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    icon={Trash2}
+                    onClick={() => handleDelete(song)}
+                  >
+                    Eliminar
+                  </Button>
                 )}
               </div>
             </Card>
@@ -955,22 +958,22 @@ export const Repertorio = () => {
                           <FileDown size={14} />
                         </button>
                         {(isPastor || isLeader || currentMember?.editor) && (
-                          <>
-                            <button
-                              onClick={() => handleOpenModal(song)}
-                              className="p-1.5 rounded hover:bg-neutral-800 transition-colors text-gray-400"
-                              title="Editar"
-                            >
-                              <Edit size={14} />
-                            </button>
-                            <button
-                              onClick={() => handleDelete(song)}
-                              className="p-1.5 rounded hover:bg-neutral-800 transition-colors text-gray-400 hover:text-red-400"
-                              title="Eliminar"
-                            >
-                              <Trash2 size={14} />
-                            </button>
-                          </>
+                          <button
+                            onClick={() => handleOpenModal(song)}
+                            className="p-1.5 rounded hover:bg-neutral-800 transition-colors text-gray-400"
+                            title="Editar"
+                          >
+                            <Edit size={14} />
+                          </button>
+                        )}
+                        {(isPastor || isLeader) && (
+                          <button
+                            onClick={() => handleDelete(song)}
+                            className="p-1.5 rounded hover:bg-neutral-800 transition-colors text-gray-400 hover:text-red-400"
+                            title="Eliminar"
+                          >
+                            <Trash2 size={14} />
+                          </button>
                         )}
                       </div>
                     </td>

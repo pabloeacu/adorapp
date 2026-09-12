@@ -4,7 +4,7 @@ import React, { useState, useMemo, useEffect, useCallback, useRef } from 'react'
 import { useDocumentTitle } from '../hooks/useDocumentTitle';
 import { Send, X, Check, Loader2, AlertCircle, Mail, ChevronLeft, Save, Bell, Bold, Italic, Underline, Smile } from 'lucide-react';
 import { EnvelopeSimple, MicrophoneStage, UsersThree, IdentificationBadge, UsersFour } from '@phosphor-icons/react';
-import { useAuthStore } from '../stores/authStore';
+import { useCurrentRole } from '../hooks/useCurrentMember';
 import { useAppStore } from '../stores/appStore';
 import { callAdminFunction, supabase } from '../lib/supabase';
 import { Card } from '../components/ui/Card';
@@ -38,9 +38,9 @@ const EDITABLE_FIELDS = [
 
 export const Comunicaciones = () => {
   useDocumentTitle('Comunicaciones');
-  const { profile } = useAuthStore();
+  const role = useCurrentRole();
   const { bands, members, bandTemporaryMembers, getEffectiveBandMemberIds } = useAppStore();
-  const isPastor = profile?.role === 'pastor';
+  const isPastor = role === 'pastor'; // misma fuente de verdad que la navegación (useCurrentRole)
 
   // Form state
   const [recipientType, setRecipientType] = useState(''); // 'bands' | 'users' | 'roles' | 'all'

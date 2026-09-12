@@ -632,8 +632,9 @@ export const Ordenes = () => {
       doc.line(20, y - 3, 190, y - 3);
     });
 
-    // Feedback section
-    if (order.feedback) {
+    // Feedback section — SOLO para el pastor (en pantalla ya estaba reservado con isPastor;
+    // el PDF lo filtraba a cualquier rol: auditoría de roles 2026-09-12).
+    if (order.feedback && isPastor) {
       if (y > 230) {
         doc.addPage();
         addDarkBackground();
@@ -1853,7 +1854,7 @@ export const Ordenes = () => {
             {/* Ensayómetro: acceso al ensayo personal (glosario: el "ensamble"
                 es el encuentro de la banda; el "ensayo" es la práctica personal
                 previa). Solo tiene sentido para órdenes aún programados. */}
-            {viewingOrder.status === 'scheduled' && (
+            {viewingOrder.status === 'scheduled' && (isPastor || (currentMember?.id && getEffectiveBandMemberIds(viewingOrder.bandId).has(currentMember.id))) && (
               <Link
                 to={`/practica/${viewingOrder.id}`}
                 className="flex items-center gap-3 rounded-xl p-4 bg-gold-gradient text-black shadow-lg hover:brightness-105 transition-all"

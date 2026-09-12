@@ -159,16 +159,22 @@ function b64urlRaw(bytes: Uint8Array): string {
   for (const b of bytes) bin += String.fromCharCode(b);
   return btoa(bin).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "");
 }
+// Auditoría 2026-09-12: NINGÚN valor de cabecera puede llevar CR/LF ni otros caracteres de
+// control (inyección de cabeceras: un "nombre" con "\r\nBcc: …" agregaba destinatarios al
+// MIME crudo). Se eliminan siempre; y si quedan caracteres fuera del ASCII imprimible
+// seguro, se codifica RFC 2047.
+// deno-lint-ignore no-control-regex
+const stripControl = (s: string): string => String(s ?? "").replace(/[\x00-\x1F\x7F]+/g, " ").trim();
 function encodeHeader(s: string): string {
+  const clean = stripControl(s);
   // RFC 2047 para asuntos con acentos/ñ.
-  // deno-lint-ignore no-control-regex
-  if (/^[\x00-\x7F]*$/.test(s)) return s;
-  const b = btoa(unescape(encodeURIComponent(s)));
+  if (/^[\x20-\x7E]*$/.test(clean)) return clean;
+  const b = btoa(unescape(encodeURIComponent(clean)));
   return `=?UTF-8?B?${b}?=`;
 }
 function encodeName(name: string): string {
-  // deno-lint-ignore no-control-regex
-  return /^[\x00-\x7F]*$/.test(name) ? name : encodeHeader(name);
+  const clean = stripControl(name).replace(/["<>]/g, "");
+  return /^[A-Za-z0-9 .'\-]*$/.test(clean) ? clean : encodeHeader(clean);
 }
 
 function buildMime(opts: {

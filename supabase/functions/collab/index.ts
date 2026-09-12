@@ -51,6 +51,12 @@ async function pushNotify(admin: any, rows: Array<{ user_id: string | null; titl
   if (!valid.length) return;
   try { await admin.from("notifications").insert(valid); } catch (_) { /* best-effort */ }
 }
+// Las plantillas renderizan cuerpo_html RAW → todo dato de usuario (nombre de banda,
+// nombre del voluntario, categorías) va escapado (auditoría de roles 2026-09-12).
+function escapeHtml(s: unknown): string {
+  return String(s ?? "").replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+}
+
 async function mail(admin: any, slug: string, email: string | null, name: string | null, vars: Record<string, string>) {
   if (!email) return;
   try {
@@ -108,7 +114,7 @@ Deno.serve(async (req: Request) => {
     })));
     for (const m of invited) {
       await mail(admin, "colaboracion-solicitud", m.email, m.name, {
-        nombre: firstName(m.name), banda: band.name, categorias: cats, fecha,
+        nombre: escapeHtml(firstName(m.name)), banda: escapeHtml(band.name), categorias: escapeHtml(cats), fecha,
       });
     }
     return json({ ok: true, requestId: res?.request_id, invitedCount: invited.length });
@@ -133,7 +139,7 @@ Deno.serve(async (req: Request) => {
         message: `${res.volunteer_name} se ofreció para tu solicitud de ${cats} en ${bandName}.`,
       }]);
       await mail(admin, "colaboracion-voluntario", res.requester.email, res.requester.name, {
-        nombre: firstName(res.requester.name), voluntario: res.volunteer_name, categorias: cats, banda: bandName,
+        nombre: escapeHtml(firstName(res.requester.name)), voluntario: escapeHtml(res.volunteer_name), categorias: escapeHtml(cats), banda: escapeHtml(bandName),
       });
     }
     return json({ ok: true, alreadyOffered: !!res?.already_offered });

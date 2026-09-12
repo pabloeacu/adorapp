@@ -6,7 +6,7 @@ import {
   Cross, Clock, AlertTriangle
 } from 'lucide-react';
 import { UserPlus } from '@phosphor-icons/react';
-import { useAuthStore } from '../stores/authStore';
+import { useCurrentRole } from '../hooks/useCurrentMember';
 import { PageLoader } from '../components/ui/PageLoader';
 import { useAppStore, MEMBER_ROLES } from '../stores/appStore';
 import { SELECTABLE_AREAS } from '../lib/areas';
@@ -34,9 +34,9 @@ const formatDateLocal = (dateStr) => {
 
 export const Solicitudes = () => {
   useDocumentTitle('Solicitudes');
-  const { profile } = useAuthStore();
+  const role = useCurrentRole();
   const { initialize, bands, addPermanentBandMember } = useAppStore();
-  const isPastor = profile?.role === 'pastor';
+  const isPastor = role === 'pastor'; // misma fuente de verdad que la navegación (useCurrentRole)
 
   const [searchTerm, setSearchTerm] = useState('');
   const [filterStatus, setFilterStatus] = useState('pending');

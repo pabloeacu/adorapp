@@ -20,7 +20,7 @@ import { MusicNotes, MusicNotesSimple } from '@phosphor-icons/react';
 import { useAppStore, transposeSongStructure } from '../stores/appStore';
 import { milestonesOf, ensayometroPercent } from '../lib/ensayometro';
 import { useDocumentTitle } from '../hooks/useDocumentTitle';
-import { useCurrentMember } from '../hooks/useCurrentMember';
+import { useCurrentMember, useCurrentRole } from '../hooks/useCurrentMember';
 import { Card } from '../components/ui/Card';
 import { Badge } from '../components/ui/Badge';
 import { Button } from '../components/ui/Button';
@@ -173,6 +173,7 @@ export const Practica = () => {
   const { orderId } = useParams();
   const { orders, loading, getSongById, getBandById, getMemberById, fetchPracticeLogs, upsertPracticeLog, fetchPracticeAlarm, setPracticeAlarm, isOrderParticipant, getEffectiveBandMemberIds } = useAppStore();
   const currentMember = useCurrentMember();
+  const role = useCurrentRole();
 
   const order = orders.find(o => o.id === orderId);
   const band = order ? getBandById(order.bandId) : null;
@@ -325,6 +326,13 @@ export const Practica = () => {
   // está (borrado, id inválido), volver a Órdenes.
   if (!order) {
     if (loading || orders.length === 0) return <PageLoader />;
+    return <Navigate to="/ordenes" replace />;
+  }
+
+  // "Mi Ensayo" es para la banda del orden (efectiva: permanentes ∪ temporales) y los
+  // pastores. Un miembro de otra banda / observador que llegue por URL vuelve a Órdenes
+  // (auditoría de roles 2026-09-12; antes cualquiera podía "practicar" cualquier orden).
+  if (currentMember?.id && role !== 'pastor' && !getEffectiveBandMemberIds(order.bandId).has(currentMember.id)) {
     return <Navigate to="/ordenes" replace />;
   }
 

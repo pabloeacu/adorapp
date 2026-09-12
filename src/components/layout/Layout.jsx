@@ -26,6 +26,17 @@ export const Layout = () => {
     return () => stopRealtimeSync();
   }, [user]);
 
+  // Cuenta DESACTIVADA por un pastor pero con sesión viva en el teléfono: la base ya la
+  // frena (auth_role() exige active=true) pero el cliente seguía mostrando toda la app
+  // con su rol viejo. Se cierra la sesión y Login lo explica (auditoría de roles 2026-09-12).
+  const logout = useAuthStore((state) => state.logout);
+  const inactive = currentMember?.active === false;
+  useEffect(() => {
+    if (!inactive) return;
+    try { sessionStorage.setItem('adorapp:inactive', '1'); } catch { /* noop */ }
+    logout();
+  }, [inactive, logout]);
+
   // Registra la actividad del miembro para la ficha del pastor: "última conexión"
   // (cada apertura de la app) y "app instalada" (si corre en modo standalone).
   // Va por la RPC record_member_activity (SECURITY DEFINER): actualiza SOLO la

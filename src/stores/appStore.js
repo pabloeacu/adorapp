@@ -623,18 +623,11 @@ export const useAppStore = create((set, get) => ({
 
         return true;
       } else {
-        // Soft delete - just deactivate
-        const { error } = await supabase
-          .from('members')
-          .update({ active: false })
-          .eq('id', id);
-
-        if (error) throw error;
-
-        set((state) => ({
-          members: state.members.map(m => m.id === id ? { ...m, active: false } : m),
-        }));
-
+        // Soft delete = desactivar. Va por la EF admin-update-member (pastor-only): además de
+        // active=false, BANEA la cuenta de auth y revoca sesiones → el desactivado deja de
+        // entrar de verdad (auditoría de roles 2026-09-12; antes solo se ponía la bandera).
+        const res = await get().updateMemberViaAdmin(id, { active: false });
+        if (res?.error) throw new Error(res.error);
         return true;
       }
     } catch (err) {
@@ -646,10 +639,10 @@ export const useAppStore = create((set, get) => ({
 
   toggleMemberActive: async (id) => {
     const member = get().members.find(m => m.id === id);
-    if (member) {
-      return get().updateMember(id, { ...member, active: !member.active });
-    }
-    return false;
+    if (!member) return false;
+    // Por la EF (pastor-only): (des)activar también banea/desbanea la cuenta de auth.
+    const res = await get().updateMemberViaAdmin(id, { active: !member.active });
+    return !res?.error;
   },
 
   // Band CRUD
@@ -714,12 +707,18 @@ export const useAppStore = create((set, get) => ({
 
   deleteBand: async (id) => {
     try {
-      const { error } = await supabase
+      // count exacto: si la RLS no deja borrar (rol sin permiso, cuenta inactiva) el
+      // DELETE "no falla" pero afecta 0 filas → devolver false, no mentir "eliminado".
+      const { error, count } = await supabase
         .from('bands')
-        .delete()
+        .delete({ count: 'exact' })
         .eq('id', id);
 
       if (error) throw error;
+      if (!count) {
+        set({ error: 'No tenés permiso para eliminar esto.' });
+        return false;
+      }
 
       set((state) => ({
         bands: state.bands.filter(b => b.id !== id),
@@ -890,12 +889,18 @@ export const useAppStore = create((set, get) => ({
 
   deleteSong: async (id) => {
     try {
-      const { error } = await supabase
+      // count exacto: si la RLS no deja borrar (rol sin permiso, cuenta inactiva) el
+      // DELETE "no falla" pero afecta 0 filas → devolver false, no mentir "eliminado".
+      const { error, count } = await supabase
         .from('songs')
-        .delete()
+        .delete({ count: 'exact' })
         .eq('id', id);
 
       if (error) throw error;
+      if (!count) {
+        set({ error: 'No tenés permiso para eliminar esto.' });
+        return false;
+      }
 
       set((state) => ({
         songs: state.songs.filter(s => s.id !== id),
@@ -978,12 +983,18 @@ export const useAppStore = create((set, get) => ({
 
   deleteOrder: async (id) => {
     try {
-      const { error } = await supabase
+      // count exacto: si la RLS no deja borrar (rol sin permiso, cuenta inactiva) el
+      // DELETE "no falla" pero afecta 0 filas → devolver false, no mentir "eliminado".
+      const { error, count } = await supabase
         .from('orders')
-        .delete()
+        .delete({ count: 'exact' })
         .eq('id', id);
 
       if (error) throw error;
+      if (!count) {
+        set({ error: 'No tenés permiso para eliminar esto.' });
+        return false;
+      }
 
       set((state) => ({
         orders: state.orders.filter(o => o.id !== id),
