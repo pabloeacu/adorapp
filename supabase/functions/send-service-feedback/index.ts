@@ -4,9 +4,13 @@ import { createClient } from "jsr:@supabase/supabase-js@2";
 // send-service-feedback — envía la devolución post-servicio ("¿Cómo estuvimos?")
 // por correo a la banda que tocó, con COPIA a los pastores. Chunk 3.
 //
-// Quién puede enviar: un PASTOR (cualquier banda) o el LÍDER integrante de la banda
-// del orden. La identidad del remitente se toma del JWT server-side (NUNCA del
-// cliente) → la firma del correo no se puede falsificar.
+// Quién puede enviar (regla de Paul, 2026-09-12): SOLO el LÍDER de la banda del orden
+// (rol 'leader' + integrante PERMANENTE de bands.members), y solo durante las 48 h
+// siguientes a la hora del servicio (ART). Ni miembros, ni pastores, ni líderes de
+// otras bandas, ni temporales. La identidad del remitente se toma del JWT server-side
+// (NUNCA del cliente) → la firma del correo no se puede falsificar. El cliente aplica
+// la misma regla para MOSTRAR la tarjeta (src/lib/serviceFeedback.js); acá es la
+// frontera real.
 //
 // Seguridad:
 //  * Valida rol + pertenencia a la banda con service_role (el rol NO se confía al
@@ -58,10 +62,15 @@ function fechaLegible(dateStr: string): string {
   }
 }
 
-// Fecha de hoy en ART (YYYY-MM-DD) para el guard "el servicio ya ocurrió".
-function todayART(): string {
-  const now = new Date(new Date().toLocaleString("en-US", { timeZone: "America/Argentina/Buenos_Aires" }));
-  return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}-${String(now.getDate()).padStart(2, "0")}`;
+// Ventana de envío: [inicio del servicio, inicio + 48 h). Inicio = fecha + hora del orden
+// en hora de Argentina (UTC-3, sin DST → UTC = ART + 3 h). Espejo exacto de
+// serviceStartEpoch/feedbackWindow del cliente.
+const FEEDBACK_WINDOW_MS = 48 * 3600 * 1000;
+function serviceStartEpoch(date: string, time: string | null): number | null {
+  const [Y, M, D] = String(date || "").slice(0, 10).split("-").map(Number);
+  if (!Y || !M || !D) return null;
+  const [h, mi] = String(time || "00:00").split(":").map(Number);
+  return Date.UTC(Y, M - 1, D, (h || 0) + 3, mi || 0);
 }
 
 Deno.serve(async (req: Request) => {
@@ -89,7 +98,7 @@ Deno.serve(async (req: Request) => {
     .maybeSingle();
   if (cErr) return json({ error: "Auth lookup failed", detail: cErr.message }, 500);
   if (!caller || caller.active === false) return json({ error: "Forbidden" }, 403);
-  if (caller.role !== "pastor" && caller.role !== "leader") return json({ error: "Forbidden" }, 403);
+  if (caller.role !== "leader") return json({ error: "Forbidden" }, 403);
 
   let body: any;
   try { body = await req.json(); } catch { return json({ error: "Invalid JSON" }, 400); }
@@ -129,12 +138,16 @@ Deno.serve(async (req: Request) => {
   if (!band) return json({ error: "la banda del orden ya no existe" }, 400);
 
   const bandMemberIds: string[] = Array.isArray(band.members) ? band.members.map(String) : [];
-  const isPastor = caller.role === "pastor";
   const isLeaderOfBand = caller.role === "leader" && bandMemberIds.includes(String(caller.id));
-  if (!isPastor && !isLeaderOfBand) return json({ error: "Forbidden" }, 403);
+  if (!isLeaderOfBand) return json({ error: "Forbidden" }, 403);
+  if (order.status === "cancelled") return json({ error: "el servicio está cancelado" }, 400);
 
-  // Defensa en profundidad: el servicio ya ocurrió (el cliente además exige +4h).
-  if (String(order.date) > todayART()) return json({ error: "el servicio todavía no ocurrió" }, 400);
+  // Ventana: desde la hora del servicio y por 48 h (misma regla que la tarjeta).
+  const start = serviceStartEpoch(String(order.date), order.time ?? null);
+  if (start == null) return json({ error: "el orden no tiene fecha válida" }, 400);
+  const now = Date.now();
+  if (now < start) return json({ error: "el servicio todavía no empezó" }, 400);
+  if (now >= start + FEEDBACK_WINDOW_MS) return json({ error: "ventana_vencida" }, 400);
 
   // Anti doble-envío: insertar el registro PRIMERO (unique order_id+autor). Si ya
   // existe, cortar con 409 antes de encolar ningún correo.
