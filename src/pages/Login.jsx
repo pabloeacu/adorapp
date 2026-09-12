@@ -17,6 +17,7 @@ export const Login = () => {
   const [showRegisterModal, setShowRegisterModal] = useState(false);
   const [showSuccessModal, setShowSuccessModal] = useState(false);
   const [emailChangedNotice, setEmailChangedNotice] = useState(''); // aviso tras auto-cambio de correo
+  const [inactiveNotice, setInactiveNotice] = useState(false); // la sesión se cerró porque la cuenta está desactivada
 
   const login = useAuthStore((state) => state.login);
   const loading = useAuthStore((state) => state.loading);
@@ -34,6 +35,14 @@ export const Login = () => {
 
     // Si el usuario acaba de cambiar su PROPIO correo (se lo deslogueó a propósito),
     // avisarle y prellenar el correo NUEVO para que no intente entrar con el viejo.
+    // Cuenta desactivada por un pastor: el Layout cerró la sesión y dejó la marca.
+    try {
+      if (sessionStorage.getItem('adorapp:inactive')) {
+        sessionStorage.removeItem('adorapp:inactive');
+        // eslint-disable-next-line react-hooks/set-state-in-effect
+        setInactiveNotice(true);
+      }
+    } catch { /* sessionStorage no disponible */ }
     let noticedEmail = '';
     try {
       noticedEmail = sessionStorage.getItem('emailChangedNotice') || '';
@@ -130,6 +139,12 @@ export const Login = () => {
           <div className="gold-hairline absolute inset-x-0 top-0 h-px" aria-hidden="true" />
           <div className="gold-radial-glow pointer-events-none absolute -right-16 -top-16 h-40 w-40 rounded-full" aria-hidden="true" />
           <h2 className="relative text-xl font-semibold mb-6 text-center">Iniciar Sesión</h2>
+
+          {inactiveNotice && (
+            <div className="relative mb-5 rounded-xl border border-gold-500/30 bg-gold-500/10 px-4 py-3 text-sm text-gold-200" data-testid="inactive-notice">
+              Tu cuenta está <span className="font-semibold">desactivada</span>, por eso se cerró la sesión. Si creés que es un error, hablá con un pastor.
+            </div>
+          )}
 
           {emailChangedNotice && (
             <div className="relative mb-5 rounded-xl border border-gold-500/30 bg-gold-500/10 px-4 py-3 text-sm text-gold-200">

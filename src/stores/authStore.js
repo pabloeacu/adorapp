@@ -177,47 +177,8 @@ export const useAuthStore = create((set, get) => ({
   },
 
   // Sign up new user
-  signUp: async (email, password, name) => {
-    set({ error: null, loading: true });
-
-    try {
-      const { data, error } = await supabase.auth.signUp({
-        email,
-        password,
-        options: {
-          data: { name },
-        },
-      });
-
-      if (error) {
-        set({ error: error.message, loading: false });
-        return false;
-      }
-
-      // Create member profile if signup successful
-      if (data?.user) {
-        await supabase.from('members').insert({
-          id: data.user.id,
-          name,
-          email,
-          user_id: data.user.id,
-          role: 'member',
-          active: true,
-        });
-
-        set({ user: data.user });
-        await get().fetchProfile(data.user.id);
-        set({ loading: false });
-        return true;
-      }
-    } catch (err) {
-      set({ error: err.message, loading: false });
-      return false;
-    }
-
-    set({ loading: false });
-    return false;
-  },
+  // (signUp eliminado: nadie lo usaba y escribía `members` desde el cliente; el alta va
+  //  SOLO por pending_registrations + EF admin-approve-registration. Landmine #41.)
 
   // Sign out — wipe every trace of the previous user from this device:
   // Supabase session, app caches, per-user keys, sessionStorage. Anything

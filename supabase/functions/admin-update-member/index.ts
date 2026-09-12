@@ -143,5 +143,20 @@ Deno.serve(async (req: Request) => {
     try { await admin.rpc("revoke_user_sessions", { p_user_id: target.user_id }); } catch (_) { /* no bloquea */ }
   }
 
-  return json({ ok: true, member, emailChanged });
+  // 4) Desactivar/reactivar (solo pastor, ya gateado arriba): la ficha inactiva ya no pasa la
+  //    RLS, pero el refresh token seguía emitiendo JWTs → se BANEA la cuenta de auth y se
+  //    revocan las sesiones (auditoría de roles 2026-09-12). Al reactivar se levanta el ban.
+  //    Best-effort: si falla, la RLS igual la frena y el cliente cierra la sesión al ver
+  //    active=false (Layout).
+  let banned: boolean | null = null;
+  if (isPastor && "active" in updates && target.user_id) {
+    const deactivate = db.active === false;
+    try {
+      await admin.auth.admin.updateUserById(target.user_id, { ban_duration: deactivate ? "876000h" : "none" });
+      if (deactivate) { try { await admin.rpc("revoke_user_sessions", { p_user_id: target.user_id }); } catch (_) { /* no bloquea */ } }
+      banned = deactivate;
+    } catch (_) { /* no bloquea */ }
+  }
+
+  return json({ ok: true, member, emailChanged, banned });
 });

@@ -152,7 +152,7 @@ export const Miembros = () => {
   const filteredMembers = useMemo(() => {
     const list = members.filter(member => {
       const matchesSearch = member.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        member.email?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        (isPastor && member.email?.toLowerCase().includes(searchTerm.toLowerCase())) ||
         member.instruments?.some(i => i.toLowerCase().includes(searchTerm.toLowerCase()));
 
       const matchesRole = filterRole === 'all' || member.role === filterRole;

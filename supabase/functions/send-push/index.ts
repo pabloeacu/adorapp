@@ -192,12 +192,14 @@ Deno.serve(async (req) => {
     const internalSecret = cfg.push_internal_secret;
     const isInternal = internalSecret && token === internalSecret;
 
-    // ---- Auth path B: pastor/leader JWT ----
+    // ---- Auth path B: SOLO pastor ACTIVO con JWT (auditoría 2026-09-12: un líder podía
+    //      mandar un push con título/cuerpo arbitrarios a TODOS con `to: 'all'`). El cliente
+    //      no usa esta ruta (los push nacen en triggers con el secreto interno). ----
     if (!isInternal) {
       const { data: userRes, error: uErr } = await sb.auth.getUser(token);
       if (uErr || !userRes?.user) return jres({ error: 'invalid_jwt' }, 401);
-      const { data: caller } = await sb.from('members').select('id, role').eq('user_id', userRes.user.id).maybeSingle();
-      if (!caller || !['pastor', 'leader'].includes(caller.role)) return jres({ error: 'forbidden' }, 403);
+      const { data: caller } = await sb.from('members').select('id, role, active').eq('user_id', userRes.user.id).maybeSingle();
+      if (!caller || caller.role !== 'pastor' || caller.active === false) return jres({ error: 'forbidden' }, 403);
     }
 
     const body = await req.json().catch(() => ({}));
