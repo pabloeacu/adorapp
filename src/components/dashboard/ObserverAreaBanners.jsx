@@ -2,7 +2,7 @@ import React, { useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { ChevronRight, MonitorPlay, FileText, Loader2, SlidersHorizontal } from 'lucide-react';
 import { useAppStore, MEETING_TYPES } from '../../stores/appStore';
-import { memberAreas } from '../../lib/areas';
+import { effectiveAreas } from '../../lib/areas';
 import { pickObserverFocus, observerBannerContent } from '../../lib/observerBanners';
 import { downloadOrderLyricsDocx } from '../../lib/lyricsDocx';
 import { isChunkLoadError, recoverFromStaleChunk } from '../../lib/chunkRecovery';
@@ -73,6 +73,8 @@ const AreaBanner = ({ area, order, state }) => {
 
   return (
     <div
+      data-testid="area-banner"
+      data-area={area}
       className="relative overflow-hidden rounded-2xl p-4 sm:p-5 border bg-gradient-to-br from-neutral-900 via-neutral-950 to-neutral-900"
       style={{ borderColor: `${st.accent}40`, borderLeftWidth: 4, borderLeftColor: st.accent }}
     >
@@ -156,9 +158,12 @@ const AreaBanner = ({ area, order, state }) => {
   );
 };
 
-export const ObserverAreaBanners = ({ member, todayART }) => {
+// `role`: el PASTOR es multiárea por rol → ve los banners de TODAS las áreas observadoras
+// aunque su ficha no tenga áreas cargadas (regla de Paul, 2026-09-13). Quien tiene más
+// de un área en la ficha ve un banner por cada una (apilados: Multimedia arriba, Sonido abajo).
+export const ObserverAreaBanners = ({ member, role, todayART }) => {
   const orders = useAppStore((s) => s.orders);
-  const areas = memberAreas(member);
+  const areas = effectiveAreas(member, role);
   const mine = STACK_ORDER.filter((a) => areas.includes(a));
 
   const changedSinceART = useMemo(() => {

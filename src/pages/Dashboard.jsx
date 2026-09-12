@@ -220,7 +220,7 @@ export const Dashboard = () => {
           Van DESPUÉS de todo lo de Adoración (prioridad). Se auto-ocultan si el miembro
           no es de esas áreas o si no hay órdenes relevantes. En SilentBoundary. */}
       <SilentBoundary>
-        <ObserverAreaBanners member={member} todayART={todayART} />
+        <ObserverAreaBanners member={member} role={role} todayART={todayART} />
       </SilentBoundary>
 
       {/* Stats Grid — each card links to its section when the role can access it */}

@@ -57,6 +57,21 @@ const overlaps = (member, slugs) => {
   return slugs.some((s) => set.has(s));
 };
 
+// Áreas OBSERVADORAS (con banner propio en el Inicio).
+export const OBSERVER_AREAS = ['multimedia', 'sonido'];
+
+// Áreas EFECTIVAS de una persona para lo que se le muestra en el cliente: las de su ficha
+// y, si es PASTOR, además TODAS las observadoras (el pastor es multiárea por rol — regla de
+// Paul: "el que tiene más de un área ve todo lo que compete a cada área; como pastor
+// multiárea, todos los cards de todas las áreas"). Puro; no toca la ficha ni la base.
+export function effectiveAreas(member, role) {
+  const mine = memberAreas(member);
+  if (role !== 'pastor') return mine;
+  const set = new Set(mine);
+  for (const a of OBSERVER_AREAS) set.add(a);
+  return AREAS.map((a) => a.slug).filter((slug) => set.has(slug));
+}
+
 // Espejo de can_open_service_presenter(): el miembro tiene un área que abre el presentador.
 export const canOpenPresenter = (member) => overlaps(member, PRESENTER_AREAS);
 
