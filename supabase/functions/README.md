@@ -13,8 +13,8 @@ original, sin bundlear) para que el repo sea la fuente de verdad completa.
 | `admin-approve-registration` | ✅ | `pending_registrations` → auth user + `members` (flujo real de alta). |
 | `admin-reject-registration` | ✅ | Marca la solicitud como `rejected`. |
 | `admin-send-communication` | ✅ | Inserta `communications` + fan-out a `communication_notifications` (rollback si falla). |
-| `log-error` | ❌ | Recibe errores del cliente → `error_log`. Anon-callable (captura errores pre-login). |
-| `record-health-check` | ❌ | Recibe pings de uptime de GitHub Actions → `health_checks`. |
+| `log-error` | ❌ | Recibe errores del cliente → `error_log`. Anon-callable (captura errores pre-login). `context` ≤ 8 KB, cuerpo ≤ 64 KB, freno 30/min por IP + trigger `rate_limit_error_log` (300/min). |
+| `record-health-check` | ❌ | Recibe pings de uptime de GitHub Actions → `health_checks`. Exige una clave del proyecto en `Authorization` (el runner manda la anon key), payload estricto, freno 10/min + trigger `rate_limit_health_checks` (30/min). |
 | `send-push` | ❌ | Envía Web Push (VAPID). Invocada por triggers vía pg_net. |
 
 ## Secretos

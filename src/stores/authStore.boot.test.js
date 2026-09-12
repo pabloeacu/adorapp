@@ -35,7 +35,7 @@ describe('authStore arranque', () => {
     expect(useAuthStore.getState().loading).toBe(true);
     expect(state.calls).toEqual([]); // restoreSession NO pide la ficha
     await useAuthStore.getState().bootProfile('u1');
-    expect(state.calls).toEqual(['members']);
+    expect(state.calls).toEqual(['members_directory']); // la ficha se lee por la VISTA (landmine #73)
     expect(useAuthStore.getState().profile?.name).toBe('Ana');
     expect(useAuthStore.getState().loading).toBe(false);
   });
@@ -52,7 +52,7 @@ describe('authStore arranque', () => {
     state.session = { user: { id: 'u1' } };
     state.profileRow = { id: 'm1', user_id: 'u1', name: 'Ana', role: 'pastor' };
     await useAuthStore.getState().initialize();
-    expect(state.calls).toEqual(['members']);
+    expect(state.calls).toEqual(['members_directory']); // la ficha se lee por la VISTA (landmine #73)
     expect(useAuthStore.getState().loading).toBe(false);
   });
 });

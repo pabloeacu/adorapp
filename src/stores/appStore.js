@@ -131,6 +131,19 @@ const convertMemberFromDB = (m) => ({
   updatedAt: m.updated_at,
 });
 
+// Funde una fila realtime de `members` (que NO trae email/phone/birthdate: Realtime respeta
+// los privilegios de columna, landmine #73) sobre la ficha ya cargada: solo pisa las claves
+// que vienen en la fila, así el pastor no pierde el correo/teléfono que ya tenía en memoria.
+export const mergeMemberRealtimeRow = (existing, row) => {
+  const incoming = convertMemberFromDB(row);
+  const merged = { ...existing };
+  for (const [k, v] of Object.entries(incoming)) {
+    if (v !== undefined) merged[k] = v;
+  }
+  if (!('avatar_url' in row)) { merged.avatar_url = existing.avatar_url; merged.avatarUrl = existing.avatarUrl; }
+  return merged;
+};
+
 const convertBandFromDB = (b) => ({
   id: b.id,
   name: b.name,
@@ -399,7 +412,9 @@ export const useAppStore = create((set, get) => ({
 
     try {
       const [membersRes, bandsRes, songsRes, ordersRes, tempRes, collabReqRes, collabPartRes, schemasRes, templatesRes] = await Promise.all([
-        supabase.from('members').select('*').order('name'),
+        // Miembros: por la VISTA members_directory (landmine #73): correo/teléfono/cumpleaños
+        // vienen con valor solo para el pastor y para la propia ficha; el resto en null.
+        supabase.from('members_directory').select('*').order('name'),
         supabase.from('bands').select('*').order('name'),
         supabase.from('songs').select('*').order('title'),
         supabase.from('orders').select('*').order('date', { ascending: false }),
@@ -544,17 +559,22 @@ export const useAppStore = create((set, get) => ({
       }
       const merged = { ...current, ...updates };
 
-      const { data, error } = await supabase
+      const { error } = await supabase
         .from('members')
         .update(convertMemberToDB(merged))
-        .eq('id', id)
-        .select()
-        .single();
+        .eq('id', id);
 
       if (error) throw error;
 
-      // Get the updated member with any preserved fields
-      const updatedData = convertMemberFromDB(data);
+      // La tabla ya no devuelve correo/teléfono/cumpleaños al cliente (landmine #73):
+      // se relee la ficha desde la vista (para el pastor y la propia ficha vienen con
+      // valor). Si la relectura falla, se conserva el merge local.
+      const { data } = await supabase
+        .from('members_directory')
+        .select('*')
+        .eq('id', id)
+        .maybeSingle();
+      const updatedData = data ? convertMemberFromDB(data) : merged;
 
       set((state) => ({
         members: state.members.map(m => m.id === id ? updatedData : m),
@@ -1363,13 +1383,33 @@ export const useAppStore = create((set, get) => ({
         next = [spec.from(newRow), ...list];
       } else {
         // UPDATE
-        const updated = spec.from(newRow);
         const idx = list.findIndex((r) => r.id === id);
+        const updated = table === 'members' && idx >= 0 ? mergeMemberRealtimeRow(list[idx], newRow) : spec.from(newRow);
         next = idx >= 0 ? list.map((r, i) => (i === idx ? updated : r)) : [updated, ...list];
       }
       try { localStorage.setItem(spec.lsKey, JSON.stringify(next)); } catch { /* non-fatal */ }
       return { [spec.key]: next };
     });
+
+    // Los eventos realtime de `members` llegan SIN correo/teléfono/cumpleaños (Realtime
+    // respeta los privilegios de columna, landmine #73). Para que el pastor (y cada uno
+    // sobre su ficha) vea el dato fresco, se relee esa ficha desde la vista.
+    if (table === 'members' && eventType !== 'DELETE') get().refetchMemberFromDirectory(id);
+  },
+
+  // Relee UNA ficha desde members_directory y la funde en el store (best-effort, sin throw).
+  refetchMemberFromDirectory: async (id) => {
+    try {
+      const { data } = await supabase.from('members_directory').select('*').eq('id', id).maybeSingle();
+      if (!data) return;
+      const fresh = convertMemberFromDB(data);
+      set((state) => {
+        const idx = state.members.findIndex((m) => m.id === id);
+        const members = idx >= 0 ? state.members.map((m, i) => (i === idx ? fresh : m)) : [fresh, ...state.members];
+        try { localStorage.setItem('appMembers', JSON.stringify(members)); } catch { /* non-fatal */ }
+        return { members };
+      });
+    } catch { /* non-fatal */ }
   },
 
   // Reset all data on logout. Also clears the localStorage caches that
