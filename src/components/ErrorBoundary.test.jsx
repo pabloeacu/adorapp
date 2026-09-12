@@ -65,6 +65,17 @@ describe('ErrorBoundary', () => {
     expect(reportError).not.toHaveBeenCalled();
   });
 
+  it('chunk que falla SIN conexión → copy "Sin conexión" + Reintentar, sin recarga automática', () => {
+    Object.defineProperty(navigator, 'onLine', { configurable: true, value: false });
+    render(<ErrorBoundary><Boom message="Failed to fetch dynamically imported module: /assets/Bandas-x.js" /></ErrorBoundary>);
+    Object.defineProperty(navigator, 'onLine', { configurable: true, value: true });
+    expect(screen.getByTestId('error-boundary').dataset.kind).toBe('offline');
+    expect(screen.getByText(COPY.offline.title)).toBeTruthy();
+    expect(screen.getByRole('button', { name: COPY.offline.button })).toBeTruthy();
+    expect(reloadSpy).not.toHaveBeenCalled();
+    expect(reportError).toHaveBeenCalledWith(expect.objectContaining({ severity: 'warning', context: { boundary: 'top-level', kind: 'offline-chunk' } }));
+  });
+
   it('sin error renderiza los hijos', () => {
     render(<ErrorBoundary><p>todo bien</p></ErrorBoundary>);
     expect(screen.getByText('todo bien')).toBeTruthy();

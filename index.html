@@ -58,6 +58,30 @@
   </script>
 
   <title>AdorAPP — La plataforma de Adoración CAF</title>
+
+  <!-- Red de seguridad del ARRANQUE: si el script o el CSS de entrada (con el hash de esta
+       versión) ya no existe porque se acaba de publicar otra, sin React no hay quien lo
+       atrape y la app quedaría en negro. Recarga UNA vez (la recarga trae el index.html nuevo)
+       compartiendo la marca anti-loop con src/lib/chunkRecovery.js y avisando a la pantalla
+       "Actualizando a la nueva versión". -->
+  <script>
+  (function () {
+    try {
+      var K = 'adorapp:chunk-retry', U = 'adorapp:update', R = 'adorapp:chunk-recovered';
+      window.addEventListener('error', function (e) {
+        var t = e && e.target; if (!t || !t.tagName) return;
+        var src = t.tagName === 'SCRIPT' ? t.src : (t.tagName === 'LINK' && t.rel === 'stylesheet' ? t.href : '');
+        if (!src || src.indexOf('/assets/') < 0) return;
+        var now = Date.now(), at = Number(sessionStorage.getItem(K)) || 0;
+        if (now - at < 60000) return;
+        sessionStorage.setItem(K, String(now));
+        sessionStorage.setItem(U, JSON.stringify({ at: now, step: 'reloading' }));
+        sessionStorage.setItem(R, JSON.stringify({ at: now, kind: 'entry', path: location.pathname, asset: src.slice(src.indexOf('/assets/')) }));
+        location.reload();
+      }, true);
+    } catch (_) { /* noop */ }
+  })();
+  </script>
 </head>
 <body>
   <div id="root"></div>

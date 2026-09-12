@@ -19,9 +19,16 @@
 // botón "Actualizar la app".
 
 import { markUpdateStep } from './updateProgress';
+import { reportError } from './errorReporter';
 
 const RETRY_KEY = 'adorapp:chunk-retry';
+const RECOVERED_KEY = 'adorapp:chunk-recovered'; // la lee la carga siguiente para dejar constancia
 const RETRY_TTL_MS = 60_000;
+const BUILD_ID = import.meta.env.VITE_BUILD_ID || '';
+
+// Sin conexión, recargar no trae ninguna versión nueva: el error va al ErrorBoundary, que
+// lo explica como "Sin conexión" con "Reintentar" (en vez de "hay una versión nueva").
+export const isOffline = () => typeof navigator !== 'undefined' && navigator.onLine === false;
 
 const PATTERNS = [
   /importing a module script failed/i,          // Safari / iOS
@@ -68,9 +75,11 @@ export const _resetReloadPendingForTests = () => { reloadPending = false; };
 export const recoverFromStaleChunk = ({ reload = () => window.location.reload(), now = Date.now() } = {}) => {
   if (typeof window === 'undefined') return false;
   if (reloadPending) return true;
+  if (isOffline()) return false;
   if (recentlyRetried(now)) return false;
   markRetryNow(now);
   reloadPending = true;
+  try { sessionStorage.setItem(RECOVERED_KEY, JSON.stringify({ at: now, kind: 'lazy', build: BUILD_ID, path: window.location.pathname })); } catch { /* noop */ }
   // La recarga que viene ES la versión nueva: que la pantalla de carga lo diga.
   try { markUpdateStep('reloading'); } catch { /* noop */ }
   try { reload(); } catch { /* noop */ }
@@ -91,6 +100,25 @@ export const withChunkRecovery = (importer) => () => importer().catch((err) => {
 
 // Vite dispara `vite:preloadError` cuando falla la precarga de las dependencias (CSS/JS)
 // de un import dinámico; por defecto luego lanza el error. Acá lo interceptamos.
+// Si esta carga viene de una recarga de recuperación (marca dejada por la carga anterior o
+// por el script inline del index.html), deja constancia en error_log como 'info' — así se
+// puede ver cuántas veces pasa y en qué pantallas, sin que cuente como error de nadie.
+export const reportRecoveredIfAny = () => {
+  try {
+    const raw = sessionStorage.getItem(RECOVERED_KEY);
+    if (!raw) return null;
+    sessionStorage.removeItem(RECOVERED_KEY);
+    const info = JSON.parse(raw);
+    if (!info?.at || Date.now() - info.at > 5 * 60_000) return null;
+    reportError({
+      message: `Versión nueva: ${info.kind === 'entry' ? 'script de entrada' : 'chunk'} viejo recuperado con una recarga`,
+      severity: 'info',
+      context: { kind: 'stale-chunk-recovered', via: info.kind, fromBuild: info.build || null, toBuild: BUILD_ID || null, path: info.path || null, asset: info.asset || null },
+    });
+    return info;
+  } catch { return null; }
+};
+
 let installed = false;
 export const installChunkRecovery = () => {
   if (installed || typeof window === 'undefined') return;
@@ -98,4 +126,5 @@ export const installChunkRecovery = () => {
   window.addEventListener('vite:preloadError', (event) => {
     if (recoverFromStaleChunk()) event.preventDefault?.();
   });
+  reportRecoveredIfAny();
 };

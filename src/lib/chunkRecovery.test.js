@@ -1,9 +1,11 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest';
 
 vi.mock('./updateProgress', () => ({ markUpdateStep: vi.fn() }));
+vi.mock('./errorReporter', () => ({ reportError: vi.fn() }));
+import { reportError } from './errorReporter';
 
 import { markUpdateStep } from './updateProgress';
-import { isChunkLoadError, recoverFromStaleChunk, recentlyRetried, clearRetryMark, withChunkRecovery, isReloadPending, _resetReloadPendingForTests } from './chunkRecovery';
+import { isChunkLoadError, recoverFromStaleChunk, recentlyRetried, clearRetryMark, withChunkRecovery, isReloadPending, _resetReloadPendingForTests, reportRecoveredIfAny } from './chunkRecovery';
 
 describe('chunkRecovery', () => {
   beforeEach(() => { sessionStorage.clear(); vi.clearAllMocks(); _resetReloadPendingForTests(); });
@@ -87,6 +89,32 @@ describe('chunkRecovery', () => {
     const reload = vi.fn();
     expect(recoverFromStaleChunk({ reload, now: Date.now() })).toBe(true);
     expect(reload).not.toHaveBeenCalled();
+  });
+
+  it('sin conexión NO recarga (recargar no trae nada): el error va al boundary', () => {
+    const reload = vi.fn();
+    Object.defineProperty(navigator, 'onLine', { configurable: true, value: false });
+    expect(recoverFromStaleChunk({ reload, now: Date.now() })).toBe(false);
+    expect(reload).not.toHaveBeenCalled();
+    expect(isReloadPending()).toBe(false);
+    Object.defineProperty(navigator, 'onLine', { configurable: true, value: true });
+  });
+
+  it('deja la marca de recuperación y la carga siguiente la reporta como info (una sola vez)', () => {
+    recoverFromStaleChunk({ reload: () => {}, now: Date.now() });
+    expect(JSON.parse(sessionStorage.getItem('adorapp:chunk-recovered')).kind).toBe('lazy');
+    const info = reportRecoveredIfAny();
+    expect(info.kind).toBe('lazy');
+    expect(reportError).toHaveBeenCalledWith(expect.objectContaining({ severity: 'info', context: expect.objectContaining({ kind: 'stale-chunk-recovered', via: 'lazy' }) }));
+    expect(sessionStorage.getItem('adorapp:chunk-recovered')).toBeNull();
+    expect(reportRecoveredIfAny()).toBeNull();
+    expect(reportError).toHaveBeenCalledTimes(1);
+  });
+
+  it('la marca del script inline del index.html (kind entry) también se reporta', () => {
+    sessionStorage.setItem('adorapp:chunk-recovered', JSON.stringify({ at: Date.now(), kind: 'entry', path: '/', asset: '/assets/index-x.js' }));
+    reportRecoveredIfAny();
+    expect(reportError).toHaveBeenCalledWith(expect.objectContaining({ context: expect.objectContaining({ via: 'entry', asset: '/assets/index-x.js' }) }));
   });
 
   it('withChunkRecovery: el import exitoso pasa intacto', async () => {

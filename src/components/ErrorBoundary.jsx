@@ -10,7 +10,7 @@
 
 import React from 'react';
 import { reportError } from '../lib/errorReporter';
-import { isChunkLoadError, recoverFromStaleChunk, markRetryNow, isReloadPending } from '../lib/chunkRecovery';
+import { isChunkLoadError, recoverFromStaleChunk, markRetryNow, isReloadPending, isOffline } from '../lib/chunkRecovery';
 import { markUpdateStep } from '../lib/updateProgress';
 
 export const COPY = {
@@ -18,6 +18,11 @@ export const COPY = {
     title: '¡Hay una versión nueva!',
     body: 'El Pastor del área acaba de publicar cambios en AdorAPP y tu teléfono todavía tenía la versión anterior abierta. Tocá «Actualizar la app» para traer la nueva. Si vuelve a pasar, escribile a un pastor para que lo resolvamos a la brevedad.',
     button: 'Actualizar la app',
+  },
+  offline: {
+    title: 'Sin conexión',
+    body: 'Parece que el teléfono no tiene internet en este momento y esta pantalla todavía no se había descargado. Cuando vuelva la conexión, tocá «Reintentar».',
+    button: 'Reintentar',
   },
   generic: {
     title: 'Necesitamos recargar la app',
@@ -29,15 +34,20 @@ export const COPY = {
 export class ErrorBoundary extends React.Component {
   constructor(props) {
     super(props);
-    this.state = { hasError: false, message: '', stale: false };
+    this.state = { hasError: false, message: '', kind: 'generic' };
+  }
+
+  static kindOf(error) {
+    if (!isChunkLoadError(error)) return 'generic';
+    return isOffline() ? 'offline' : 'stale';
   }
 
   static getDerivedStateFromError(error) {
-    return { hasError: true, message: error?.message || 'Error', stale: isChunkLoadError(error) };
+    return { hasError: true, message: error?.message || 'Error', kind: ErrorBoundary.kindOf(error) };
   }
 
   componentDidCatch(error, info) {
-    const stale = isChunkLoadError(error);
+    const kind = ErrorBoundary.kindOf(error);
     // Si ya está disparada la recarga por versión nueva, este error es efecto colateral
     // de esos milisegundos: no se reporta (evita filas falsas en error_log).
     if (isReloadPending()) return;
@@ -45,12 +55,12 @@ export class ErrorBoundary extends React.Component {
       message: error?.message || 'React render error',
       stack: error?.stack,
       componentStack: info?.componentStack,
-      severity: 'fatal',
-      context: { boundary: 'top-level', kind: stale ? 'stale-chunk' : 'render' },
+      severity: kind === 'offline' ? 'warning' : 'fatal',
+      context: { boundary: 'top-level', kind: kind === 'stale' ? 'stale-chunk' : kind === 'offline' ? 'offline-chunk' : 'render' },
     });
     // Chunk viejo tras una publicación: recarga sola una vez (si no se recargó hace poco).
-    // Si ya se intentó, queda la pantalla con "Actualizar la app".
-    if (stale) recoverFromStaleChunk();
+    // Si ya se intentó, queda la pantalla con "Actualizar la app". Sin conexión no recarga.
+    if (kind === 'stale') recoverFromStaleChunk();
   }
 
   handleReload = () => {
@@ -64,10 +74,10 @@ export class ErrorBoundary extends React.Component {
 
   render() {
     if (!this.state.hasError) return this.props.children;
-    const copy = this.state.stale ? COPY.stale : COPY.generic;
+    const copy = COPY[this.state.kind] || COPY.generic;
 
     return (
-      <div className="min-h-screen bg-black text-white flex items-center justify-center p-6" data-testid="error-boundary" data-kind={this.state.stale ? 'stale' : 'generic'}>
+      <div className="min-h-screen bg-black text-white flex items-center justify-center p-6" data-testid="error-boundary" data-kind={this.state.kind}>
         <div className="max-w-md text-center space-y-6">
           <div className="w-20 h-20 mx-auto rounded-full bg-gold-500/15 border border-gold-500/30 flex items-center justify-center shadow-[0_0_28px_-6px_rgba(212,175,55,0.55)]">
             <span className="text-4xl" aria-hidden="true">✨</span>
