@@ -17,11 +17,46 @@ const corsHeaders = {
 };
 
 const MAX_FIELD_LEN = 8000;
+const MAX_CONTEXT_LEN = 8000;   // `context` serializado (antes no tenía tope)
+const MAX_BODY_BYTES = 64_000;  // cuerpo completo del pedido
 
 function trim(value: unknown, max = MAX_FIELD_LEN): string | null {
   if (value === null || value === undefined) return null;
   const s = typeof value === "string" ? value : JSON.stringify(value);
   return s.length > max ? s.slice(0, max) + "…" : s;
+}
+
+// `context` es un objeto libre del cliente: se guarda tal cual solo si entra en el tope;
+// si no, se reemplaza por un recorte marcado (nunca se rechaza el reporte por esto).
+function boundedContext(value: unknown): Record<string, unknown> {
+  if (!value || typeof value !== "object" || Array.isArray(value)) return {};
+  let serialized: string;
+  try { serialized = JSON.stringify(value); } catch { return { truncated: true }; }
+  if (serialized.length <= MAX_CONTEXT_LEN) return value as Record<string, unknown>;
+  return { truncated: true, preview: serialized.slice(0, MAX_CONTEXT_LEN) + "…" };
+}
+
+// Freno básico por origen (memoria del isolate; best-effort — el freno firme es el
+// trigger `rate_limit_error_log` en la base, 300/min global). Un teléfono con la app
+// rota manda unos pocos reportes por minuto; un bot, cientos.
+const RATE_WINDOW_MS = 60_000;
+const RATE_MAX_PER_IP = 30;
+const RATE_MAX_GLOBAL = 300;
+const hits = new Map<string, number[]>();
+let globalHits: number[] = [];
+function rateLimited(ip: string): boolean {
+  const now = Date.now();
+  globalHits = globalHits.filter((t) => now - t < RATE_WINDOW_MS);
+  if (globalHits.length >= RATE_MAX_GLOBAL) return true;
+  const mine = (hits.get(ip) || []).filter((t) => now - t < RATE_WINDOW_MS);
+  if (mine.length >= RATE_MAX_PER_IP) return true;
+  mine.push(now); hits.set(ip, mine); globalHits.push(now);
+  if (hits.size > 5000) hits.clear(); // higiene de memoria ante un enjambre de IPs
+  return false;
+}
+function clientIp(req: Request): string {
+  const fwd = req.headers.get("x-forwarded-for") || "";
+  return fwd.split(",")[0].trim() || req.headers.get("cf-connecting-ip") || "unknown";
 }
 
 Deno.serve(async (req: Request) => {
@@ -36,8 +71,22 @@ Deno.serve(async (req: Request) => {
   const anon = Deno.env.get("SUPABASE_ANON_KEY")!;
   const admin = createClient(url, serviceKey);
 
+  if (rateLimited(clientIp(req))) {
+    return new Response(JSON.stringify({ ok: false, error: "rate_limited" }), {
+      status: 429, headers: { "content-type": "application/json", "retry-after": "60", ...corsHeaders },
+    });
+  }
+
   let body: any;
-  try { body = await req.json(); } catch {
+  try {
+    const raw = await req.text();
+    if (raw.length > MAX_BODY_BYTES) {
+      return new Response(JSON.stringify({ error: "Payload too large" }), {
+        status: 413, headers: { "content-type": "application/json", ...corsHeaders },
+      });
+    }
+    body = JSON.parse(raw);
+  } catch {
     return new Response(JSON.stringify({ error: "Invalid JSON" }), {
       status: 400, headers: { "content-type": "application/json", ...corsHeaders },
     });
@@ -80,7 +129,7 @@ Deno.serve(async (req: Request) => {
     stack: trim(body.stack),
     component_stack: trim(body.componentStack),
     severity,
-    context: body.context && typeof body.context === "object" ? body.context : {},
+    context: boundedContext(body.context),
   });
 
   if (error) {

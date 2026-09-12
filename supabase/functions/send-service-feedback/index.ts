@@ -4,10 +4,11 @@ import { createClient } from "jsr:@supabase/supabase-js@2";
 // send-service-feedback — envía la devolución post-servicio ("¿Cómo estuvimos?")
 // por correo a la banda que tocó, con COPIA a los pastores. Chunk 3.
 //
-// Quién puede enviar (regla de Paul, 2026-09-12): SOLO el LÍDER de la banda del orden
-// (rol 'leader' + integrante PERMANENTE de bands.members), y solo durante las 48 h
-// siguientes a la hora del servicio (ART). Ni miembros, ni pastores, ni líderes de
-// otras bandas, ni temporales. La identidad del remitente se toma del JWT server-side
+// Quién puede enviar (regla de Paul, 2026-09-12): el LÍDER de la banda del orden
+// (rol 'leader' + integrante PERMANENTE de bands.members) o un PASTOR (cualquier banda:
+// "los pastores tienen que poder hacer y recibir todo"), y solo durante las 48 h
+// siguientes a la hora del servicio (ART). Ni miembros, ni líderes de otras bandas, ni
+// temporales. La identidad del remitente se toma del JWT server-side
 // (NUNCA del cliente) → la firma del correo no se puede falsificar. El cliente aplica
 // la misma regla para MOSTRAR la tarjeta (src/lib/serviceFeedback.js); acá es la
 // frontera real.
@@ -98,7 +99,7 @@ Deno.serve(async (req: Request) => {
     .maybeSingle();
   if (cErr) return json({ error: "Auth lookup failed", detail: cErr.message }, 500);
   if (!caller || caller.active === false) return json({ error: "Forbidden" }, 403);
-  if (caller.role !== "leader") return json({ error: "Forbidden" }, 403);
+  if (caller.role !== "leader" && caller.role !== "pastor") return json({ error: "Forbidden" }, 403);
 
   let body: any;
   try { body = await req.json(); } catch { return json({ error: "Invalid JSON" }, 400); }
@@ -138,8 +139,10 @@ Deno.serve(async (req: Request) => {
   if (!band) return json({ error: "la banda del orden ya no existe" }, 400);
 
   const bandMemberIds: string[] = Array.isArray(band.members) ? band.members.map(String) : [];
+  // Pastor (cualquier banda) o líder de ESTA banda (miembro permanente). Espejo exacto
+  // de canGiveFeedback en src/lib/serviceFeedback.js.
   const isLeaderOfBand = caller.role === "leader" && bandMemberIds.includes(String(caller.id));
-  if (!isLeaderOfBand) return json({ error: "Forbidden" }, 403);
+  if (caller.role !== "pastor" && !isLeaderOfBand) return json({ error: "Forbidden" }, 403);
   if (order.status === "cancelled") return json({ error: "el servicio está cancelado" }, 400);
 
   // Ventana: desde la hora del servicio y por 48 h (misma regla que la tarjeta).

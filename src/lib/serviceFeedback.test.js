@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { resolveFeedbackOrder, feedbackWindow, serviceStartEpoch, isBandLeader, FEEDBACK_WINDOW_MS } from './serviceFeedback';
+import { resolveFeedbackOrder, feedbackWindow, serviceStartEpoch, isBandLeader, canGiveFeedback, FEEDBACK_WINDOW_MS } from './serviceFeedback';
 
 const H = 3600 * 1000;
 const bands = {
@@ -43,8 +43,18 @@ describe('serviceFeedback · elegibilidad', () => {
     expect(resolveFeedbackOrder([order], { id: 'gus' }, 'member', getBandById, START + 2 * H)).toBeNull();
   });
 
-  it('un pastor NO la ve (regla: solo el líder de la banda)', () => {
-    expect(resolveFeedbackOrder([order], { id: 'ana' }, 'pastor', getBandById, START + 2 * H)).toBeNull();
+  it('un pastor SÍ la ve, de cualquier banda (regla: los pastores hacen y reciben todo)', () => {
+    expect(canGiveFeedback(bands['b-sab'], { id: 'ana' }, 'pastor')).toBe(true);
+    expect(isBandLeader(bands['b-sab'], { id: 'ana' }, 'pastor')).toBe(false);
+    expect(resolveFeedbackOrder([order], { id: 'ana' }, 'pastor', getBandById, START + 2 * H)?.id).toBe('o1');
+    // misma ventana que el líder: antes del inicio y a las 48 h no
+    expect(resolveFeedbackOrder([order], { id: 'ana' }, 'pastor', getBandById, START - 1)).toBeNull();
+    expect(resolveFeedbackOrder([order], { id: 'ana' }, 'pastor', getBandById, START + 48 * H)).toBeNull();
+  });
+
+  it('un pastor sin id o con orden sin banda tampoco', () => {
+    expect(canGiveFeedback(bands['b-sab'], null, 'pastor')).toBe(false);
+    expect(resolveFeedbackOrder([{ ...order, bandId: null }], { id: 'ana' }, 'pastor', getBandById, START + 2 * H)).toBeNull();
   });
 
   it('un líder de OTRA banda NO la ve', () => {

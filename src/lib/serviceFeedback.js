@@ -1,11 +1,12 @@
 // Feedback post-servicio ("¿Cómo estuvimos?") — regla de ELEGIBILIDAD (pura, testeable).
 //
-// Regla de Paul (2026-09-12): la tarjeta se le ofrece SOLO al LÍDER de la banda que tuvo
-// el servicio (rol 'leader' + integrante PERMANENTE de `bands.members`, igual que la
-// Edge Function `send-service-feedback`), durante las 48 horas siguientes a la hora del
-// servicio, y después desaparece sola. Ni miembros, ni pastores, ni líderes de otras
-// bandas, ni temporales. La Edge Function aplica exactamente la misma regla del lado
-// del servidor (el cliente solo decide si MOSTRAR la tarjeta).
+// Regla de Paul (2026-09-12): la tarjeta se le ofrece al LÍDER de la banda que tuvo el
+// servicio (rol 'leader' + integrante PERMANENTE de `bands.members`) y a los PASTORES
+// (cualquier banda: "los pastores tienen que poder hacer y recibir todo"), durante las
+// 48 horas siguientes a la hora del servicio, y después desaparece sola. Ni miembros, ni
+// líderes de otras bandas, ni temporales. La Edge Function `send-service-feedback`
+// aplica exactamente la misma regla del lado del servidor (el cliente solo decide si
+// MOSTRAR la tarjeta).
 
 export const FEEDBACK_WINDOW_MS = 48 * 3600 * 1000;
 
@@ -31,18 +32,23 @@ export const feedbackWindow = (order) => {
 export const isBandLeader = (band, member, role) =>
   role === 'leader' && !!member?.id && Array.isArray(band?.members) && band.members.includes(member.id);
 
+// ¿Puede esta persona dar la devolución de este orden? Pastor (cualquier banda) o líder
+// de la banda. Espejo exacto del gate de la Edge Function.
+export const canGiveFeedback = (band, member, role) =>
+  !!member?.id && (role === 'pastor' || isBandLeader(band, member, role));
+
 // Orden elegible para ofrecer feedback AHORA: el de inicio más reciente entre los que
-// están dentro de su ventana de 48 h y cuya banda lidera esta persona.
+// están dentro de su ventana de 48 h y que esta persona puede evaluar.
 export const resolveFeedbackOrder = (orders, member, role, getBandById, nowMs = Date.now()) => {
   try {
-    if (!Array.isArray(orders) || !member?.id || role !== 'leader') return null;
+    if (!Array.isArray(orders) || !member?.id || (role !== 'leader' && role !== 'pastor')) return null;
     let best = null, bestStart = -Infinity;
     for (const o of orders) {
       if (!o || o.status === 'cancelled' || !o.bandId) continue;
       const w = feedbackWindow(o);
       if (!w) continue;
       if (nowMs < w.start || nowMs >= w.end) continue;   // todavía no empezó / ya pasaron 48 h
-      if (!isBandLeader(getBandById?.(o.bandId), member, role)) continue;
+      if (!canGiveFeedback(getBandById?.(o.bandId), member, role)) continue;
       if (w.start > bestStart) { best = o; bestStart = w.start; }
     }
     return best;

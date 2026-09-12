@@ -99,8 +99,10 @@ export const useAuthStore = create((set, get) => ({
       localStorage.removeItem('user_profile');
 
       // First try to find by user_id
+      // Por la VISTA members_directory (landmine #73): la propia ficha viene completa
+      // (correo/teléfono/cumpleaños) aunque la tabla ya no exponga esas columnas.
       let { data, error } = await supabase
-        .from('members')
+        .from('members_directory')
         .select('*')
         .eq('user_id', userId)
         .single();
@@ -113,7 +115,7 @@ export const useAuthStore = create((set, get) => ({
           // Get fresh data from DB
           const memberId = memberFromAppStore.id;
           const { data: freshData } = await supabase
-            .from('members')
+            .from('members_directory')
             .select('*')
             .eq('id', memberId)
             .single();

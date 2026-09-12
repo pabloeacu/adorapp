@@ -642,7 +642,7 @@ Bloque de comentario clave en líneas 175-189 (regla #8, incidente 15-jun-2026 /
 
 ### CRUD Members (admin via Edge Functions)
 - `addMember(member)` (355) — async → objeto miembro o `null`. **No inserta directo:** llama `callAdminFunction('admin-create-member', {...})` (nunca SQL crudo, evita el "Database error querying schema"). Agrega al store y devuelve `{...newMember, generatedPassword}`.
-- `updateMember(id, updates)` (390) — async → data o `null`. **Merge-safe:** busca `current` en el store, aborta si no está, `merged = {...current, ...updates}`, `supabase.from('members').update(convertMemberToDB(merged)).eq('id',id).select().single()`. Actualiza store **y localStorage cache** (421-427).
+- `updateMember(id, updates)` (390) — async → data o `null`. **Merge-safe:** busca `current` en el store, aborta si no está, `merged = {...current, ...updates}`, `supabase.from('members').update(convertMemberToDB(merged)).eq('id',id)` (sin `RETURNING`: las columnas personales ya no son legibles en la tabla) y relee la ficha desde la vista `members_directory` (landmine #73). Actualiza store **y localStorage cache**.
 - `deleteMember(id, permanent=false)` (437) — async → `true/false`. Si `permanent`: `callAdminFunction('admin-delete-member', {memberId})` (borra auth user + fila server-side). Si no: soft-delete `update({active:false})`.
 - `toggleMemberActive(id)` (476) — async → rutea a `updateMember(id, {...member, active:!active})`.
 
@@ -684,7 +684,7 @@ Comentario 790-794: preferencia personal, push diario 18:00 ART lo manda el cron
 - `reset()` (926) — logout: borra las 4 caches de localStorage y vacía el store. Evita que el usuario siguiente vea datos del anterior.
 
 ### Flujo de datos (resumen)
-- **Tablas Supabase que toca directo:** `members`, `bands`, `songs`, `orders` (CRUD + realtime), `practice_logs`, `practice_alarms` (fetch/upsert). Todo por PostgREST (`supabase.from(...)`), sin SQL crudo.
+- **Tablas Supabase que toca directo:** `members` (lectura por la vista `members_directory`; escritura en la tabla), `bands`, `songs`, `orders` (CRUD + realtime), `practice_logs`, `practice_alarms` (fetch/upsert). Todo por PostgREST (`supabase.from(...)`), sin SQL crudo.
 - **Edge Functions (privilegiadas):** `admin-create-member`, `admin-delete-member` vía `callAdminFunction` (nunca `service_role` en cliente).
 - **localStorage:** mirror de las 4 colecciones globales (`appMembers/Bands/Songs/Orders`) escrito en `initialize`, `updateMember`, `mergeRealtimeChange`; borrado en `reset`. Practice queda fuera.
 - **Realtime:** entra por `realtimeSync.js` → `mergeRealtimeChange`.
@@ -714,7 +714,7 @@ Store Zustand (`useAuthStore`). Estado: `user` (objeto de `supabase.auth`), `pro
 
 - **`initialize()`** `async` — Limpia `user_profile`/`user` de localStorage, lee `supabase.auth.getSession()`; si hay sesión, setea `user` y llama `fetchProfile(session.user.id)`. Registra `supabase.auth.onAuthStateChange` que **sólo** actúa en `SIGNED_OUT`/`INITIAL_SESSION` sin sesión (limpia `user`/`profile`); ignora `TOKEN_REFRESHED` a propósito para evitar loops infinitos (`authStore.js:33-42`).
 - **`refreshProfile()`** `async` — Camino canónico para propagar un cambio de perfil/avatar/rol sin navegar: limpia cache, `fetchProfile(userId)` y luego `useAppStore.getState().initialize()` (`authStore.js:48-60`). **Cross-store**: authStore → appStore.
-- **`fetchProfile(userId)`** `async` — SIEMPRE lee fresco de DB (borra `user_profile` de localStorage). Query `members.select('*').eq('user_id', userId).single()`; si falla, fallback por email buscando en `appStore.members` y re-consultando por `id` (`authStore.js:63-92`). Nunca cachea en localStorage (evita datos stale). Loguea el rol/nombre cargado (`authStore.js:101`).
+- **`fetchProfile(userId)`** `async` — SIEMPRE lee fresco de DB (borra `user_profile` de localStorage). Query `members_directory.select('*').eq('user_id', userId).single()` (vista con correo/teléfono/cumpleaños solo para el pastor y la propia ficha, landmine #73); si falla, fallback por email buscando en `appStore.members` y re-consultando por `id` (`authStore.js:63-92`). Nunca cachea en localStorage (evita datos stale). Loguea el rol/nombre cargado (`authStore.js:101`).
 - **`login(email, password)`** `async → bool` — Limpia caches, `supabase.auth.signInWithPassword`, setea `user`, `fetchProfile`. Devuelve `true`/`false`; errores quedan en `error` (`authStore.js:112-144`).
 - **`signUp(email, password, name)`** `async → bool` — `supabase.auth.signUp` + INSERT directo en `members` (`role:'member'`, `active:true`, `id/user_id = data.user.id`) (`authStore.js:147-187`). Nota: inserta con `.from('members').insert(...)` crudo, no vía el store.
 - **`logout()`** `async` — `supabase.auth.signOut` + borrado exhaustivo de todo rastro del usuario en el device: lista de `staticKeys` (incluye claves legacy y `sb-gvsoexomzfaimagnaqzm-auth-token`), barre claves `readNotificationIds_*` por usuario, `sessionStorage.clear()`, y `useAppStore.getState().reset()` (`authStore.js:193-233`).
@@ -766,7 +766,7 @@ Nota: el gate de rol en `App.jsx` sólo existe para `/miembros`; el resto de la 
 
 ### Libs de arranque acopladas (contexto de flujo)
 
-- **`realtimeSync.js`** (`startRealtimeSync()`/`stopRealtimeSync()`) — un canal Supabase `app-data-sync` con `postgres_changes event:'*'` sobre `members/bands/songs/orders`; cada evento llama `appStore.mergeRealtimeChange({table,eventType,newRow,oldRow})` (patch in-place, sin refetch). En `visibilitychange→visible`, si `lastStatus !== 'SUBSCRIBED'`, detach+attach (móvil suspende WS). Idempotente. Se monta desde `Layout.jsx`.
+- **`realtimeSync.js`** (`startRealtimeSync()`/`stopRealtimeSync()`) — un canal Supabase `app-data-sync` con `postgres_changes event:'*'` sobre `members/bands/songs/orders`; cada evento llama `appStore.mergeRealtimeChange({table,eventType,newRow,oldRow})` (patch in-place; para `members` el evento llega sin las columnas personales → `mergeMemberRealtimeRow` conserva lo previo y `refetchMemberFromDirectory` relee la vista, landmine #73). En `visibilitychange→visible`, si `lastStatus !== 'SUBSCRIBED'`, detach+attach (móvil suspende WS). Idempotente. Se monta desde `Layout.jsx`.
 - **`registerSW.js`** — registra `/sw.js` sólo en prod; detecta SW `waiting` → dispara `CustomEvent('adorapp:sw-update-available')` (lo escucha `UpdateBanner.jsx`); `applyUpdate()` postea `SKIP_WAITING` y `controllerchange` recarga la página (`registerSW.js`).
 - **`errorReporter.js`** — `installGlobalErrorReporter()` cablea `window.onerror` + `unhandledrejection` → `reportError()` que invoca la Edge Function `log-error` (anon-callable, `verify_jwt:false`). Rate-limit por hash de mensaje: máx 5/min por key (`errorReporter.js:13-26`). Los fallos de logging se tragan para no re-disparar el handler global (riesgo de loop).
 
