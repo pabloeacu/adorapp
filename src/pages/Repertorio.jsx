@@ -34,6 +34,7 @@ import {
   useSortable,
 } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
+import { isChunkLoadError, recoverFromStaleChunk } from '../lib/chunkRecovery';
 
 // Wraps each song-structure section so it can be dragged to reorder. The
 // GripVertical handle (passed the drag listeners) is the only drag surface, so
@@ -1397,6 +1398,9 @@ export const Repertorio = () => {
                 await generateSongPDF(song, key);
                 setExportModalSong(null);
               } catch (err) {
+                // jsPDF va por import() dinámico: si el chunk es de una versión vieja
+                // (recién se publicó otra), recargar una vez en vez de "No se pudo".
+                if (isChunkLoadError(err) && recoverFromStaleChunk()) return;
                 console.error('Error generating PDF:', err);
                 setExportModalSong(null);
                 setErrorModal({

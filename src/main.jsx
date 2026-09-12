@@ -3,6 +3,7 @@ import ReactDOM from 'react-dom/client';
 import App from './App.jsx';
 import { ErrorBoundary } from './components/ErrorBoundary.jsx';
 import { installGlobalErrorReporter } from './lib/errorReporter.js';
+import { installChunkRecovery } from './lib/chunkRecovery.js';
 import { registerSW } from './lib/registerSW.js';
 import { initInstallPrompt } from './lib/installPrompt.js';
 import './index.css';
@@ -10,6 +11,8 @@ import './index.css';
 // Capture uncaught exceptions and unhandled promise rejections from the
 // whole document and ship them to the log-error edge function.
 installGlobalErrorReporter();
+// Si tras una publicación falla la precarga de un chunk viejo, recarga una vez (versión nueva).
+installChunkRecovery();
 registerSW();
 // Listen for `beforeinstallprompt` ASAP — Chrome can fire it before React mounts.
 initInstallPrompt();

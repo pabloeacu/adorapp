@@ -40,6 +40,7 @@ import { LineupEditor } from '../components/orders/LineupEditor';
 import { LineupSummary } from '../components/orders/LineupSummary';
 import { LineupModal } from '../components/orders/LineupModal';
 import { RehearsalActionModal } from '../components/orders/RehearsalActionModal';
+import { isChunkLoadError, recoverFromStaleChunk } from '../lib/chunkRecovery';
 import { CollapsibleSection } from '../components/ui/CollapsibleSection';
 import { buildLineup, lineupSummaryText, isCustomLineup } from '../lib/lineup';
 
@@ -485,6 +486,9 @@ export const Ordenes = () => {
   // silently (same class of bug fixed in the Repertorio export).
   const runPdfExport = (promise) => {
     Promise.resolve(promise).catch((err) => {
+      // jsPDF se carga por import() dinámico: tras una publicación el chunk viejo ya no
+      // existe → recargar una vez (versión nueva) en vez de "No se pudo generar el PDF".
+      if (isChunkLoadError(err) && recoverFromStaleChunk()) return;
       console.error('Error generating PDF:', err);
       setErrorModal({
         isOpen: true,
