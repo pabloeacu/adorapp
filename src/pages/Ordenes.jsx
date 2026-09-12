@@ -1897,7 +1897,7 @@ export const Ordenes = () => {
                   <div className="p-2 rounded-lg bg-gold-500/15 text-gold-200 shrink-0"><CalendarDots size={18} weight="duotone" /></div>
                   <div className="min-w-0 flex-1">
                     <p className="text-[11px] uppercase tracking-wide text-gold-300/80 font-medium">Día de servicio</p>
-                    <p className="text-sm font-medium capitalize">{formatDate(viewingOrder.date)}{viewingOrder.time ? ` · ${viewingOrder.time}` : ''}</p>
+                    <p className="text-sm font-medium first-letter:uppercase">{formatDate(viewingOrder.date)}{viewingOrder.time ? ` · ${viewingOrder.time}` : ''}</p>
                     <div className="mt-1.5 flex flex-wrap items-center gap-1.5">
                       <Badge className={statusConfig[viewingOrder.status]?.bg}>
                         <span className={statusConfig[viewingOrder.status]?.color}>{statusConfig[viewingOrder.status]?.label}</span>
@@ -1943,7 +1943,7 @@ export const Ordenes = () => {
                         <p className={`text-[11px] uppercase tracking-wide font-medium ${suspended ? 'text-rose-300/90' : 'text-amber-300/80'}`}>
                           {suspended ? 'Ensamble suspendido' : 'Día de ensamble'}
                         </p>
-                        <p className={`text-sm font-medium capitalize ${suspended ? 'line-through text-gray-400' : ''}`}>
+                        <p className={`text-sm font-medium first-letter:uppercase ${suspended ? 'line-through text-gray-400' : ''}`}>
                           {formatDate(viewingOrder.rehearsalDate)}{viewingOrder.rehearsalTime ? ` · ${viewingOrder.rehearsalTime}` : ''}
                         </p>
                         {suspended && viewingOrder.rehearsalSuspendedReason && (
