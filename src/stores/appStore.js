@@ -232,6 +232,10 @@ const convertOrderFromDB = (o) => ({
   lineup: o.lineup ?? null,
   createdAt: o.created_at,
   updatedAt: o.updated_at,
+  // Sello del trigger cuando cambia el CONTENIDO o la FORMACIÓN (para el nudge
+  // "¡Ojo! Hubo cambios" de los banners de área). Lo escribe SOLO la base — nunca
+  // el cliente — así que NO va en convertOrderToDB (mismo patrón que rehearsal_reminder_sent).
+  contentChangedAt: o.content_changed_at,
 });
 
 // ⚠️ DATA-LOSS LANDMINE — convertXToDB shape and contract ⚠️

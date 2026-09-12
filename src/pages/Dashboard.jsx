@@ -30,6 +30,7 @@ import { GoldWave } from '../components/ui/GoldWave';
 import { SilentBoundary } from '../components/ui/SilentBoundary';
 import { GreetingHeader } from '../components/dashboard/GreetingHeader';
 import { PrepBanner } from '../components/dashboard/PrepBanner';
+import { ObserverAreaBanners } from '../components/dashboard/ObserverAreaBanners';
 import { lineupInstrumentsFor } from '../lib/lineup';
 
 // Fecha `YYYY-MM-DD` parseada LOCAL (landmine #50: `new Date('2026-09-11')` es UTC
@@ -147,6 +148,13 @@ export const Dashboard = () => {
           </div>
         </Link>
       )}
+
+      {/* Banners de las áreas observadoras (Multimedia / Sonido) — identidad + atajos.
+          Van DESPUÉS de todo lo de Adoración (prioridad). Se auto-ocultan si el miembro
+          no es de esas áreas o si no hay órdenes relevantes. En SilentBoundary. */}
+      <SilentBoundary>
+        <ObserverAreaBanners member={member} todayART={todayART} />
+      </SilentBoundary>
 
       {/* Stats Grid — each card links to its section when the role can access it */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
