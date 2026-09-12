@@ -6,7 +6,7 @@ import {
   MessageSquare, Eye, Trash2, Search, Check, X,
   User, Zap, AlertCircle, ChevronDown, FileDown, History, Award,
   FileText, Printer, Copy as CopyIcon,
-  Edit, CheckCircle, XCircle, RotateCcw, Target, ChevronRight, ListChecks, Play, CalendarClock
+  Edit, CheckCircle, XCircle, RotateCcw, Target, ChevronRight, ListChecks, Play, CalendarClock, SlidersHorizontal
 } from 'lucide-react';
 import {
   CalendarDots,
@@ -18,7 +18,9 @@ import {
 // jspdf is loaded on demand inside generateOrderPDF / generateSongsPDF
 // (~140 KB; no need at first paint).
 import { useAppStore, MEETING_TYPES, MUSICAL_KEYS, transposeSongStructure } from '../stores/appStore';
-import { useCurrentRole } from '../hooks/useCurrentMember';
+import { useCurrentRole, useCurrentMember } from '../hooks/useCurrentMember';
+import { memberAreas } from '../lib/areas';
+import { ChannelPlanModal } from '../components/orders/ChannelPlanModal';
 import { supabase } from '../lib/supabase';
 import { Card } from '../components/ui/Card';
 import { Button } from '../components/ui/Button';
@@ -101,8 +103,11 @@ export const Ordenes = () => {
   const userRole = useCurrentRole();
   const isPastor = userRole === 'pastor';
   const isLeader = userRole === 'leader';
+  const currentMember = useCurrentMember();
+  const isSonido = memberAreas(currentMember).includes('sonido');
 
   const [schemaModal, setSchemaModal] = useState({ isOpen: false, order: null });
+  const [channelPlanOrder, setChannelPlanOrder] = useState(null);
   const [showTemplates, setShowTemplates] = useState(false);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [showInsights, setShowInsights] = useState(false); // Radiografía del repertorio (solo lectura)
@@ -1816,6 +1821,16 @@ export const Ordenes = () => {
                     {getServiceSchema(viewingOrder.id) ? 'Editar esquema' : 'Crear esquema'}
                   </Button>
                 )}
+                {(isPastor || isLeader || isSonido) && (
+                  <Button
+                    variant="secondary"
+                    size="sm"
+                    icon={SlidersHorizontal}
+                    onClick={() => { setIsDetailOpen(false); setChannelPlanOrder(viewingOrder); }}
+                  >
+                    Plan de canales
+                  </Button>
+                )}
                 <Badge className={statusConfig[viewingOrder.status]?.bg}>
                   <span className={statusConfig[viewingOrder.status]?.color}>
                     {statusConfig[viewingOrder.status]?.label}
@@ -2026,6 +2041,15 @@ export const Ordenes = () => {
           order={schemaModal.order}
           isOpen={schemaModal.isOpen}
           onClose={() => setSchemaModal({ isOpen: false, order: null })}
+        />
+      )}
+
+      {channelPlanOrder && (
+        <ChannelPlanModal
+          order={channelPlanOrder}
+          isOpen={!!channelPlanOrder}
+          onClose={() => setChannelPlanOrder(null)}
+          canEdit={isPastor || isLeader || isSonido}
         />
       )}
 

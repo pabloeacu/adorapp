@@ -1,10 +1,11 @@
 import React, { useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
-import { ChevronRight, MonitorPlay, FileText, Loader2 } from 'lucide-react';
+import { ChevronRight, MonitorPlay, FileText, Loader2, SlidersHorizontal } from 'lucide-react';
 import { useAppStore, MEETING_TYPES } from '../../stores/appStore';
 import { memberAreas } from '../../lib/areas';
 import { pickObserverFocus, observerBannerContent } from '../../lib/observerBanners';
 import { downloadOrderLyricsDocx } from '../../lib/lyricsDocx';
+import { ChannelPlanModal } from '../orders/ChannelPlanModal';
 
 // Banners premium de las áreas OBSERVADORAS (Multimedia / Sonido). Identidad (su logo),
 // orientación (qué hay hoy / qué se viene / si hubo cambios) y atajos directos. No
@@ -37,6 +38,7 @@ const AreaBanner = ({ area, order, state }) => {
   const getBandById = useAppStore((s) => s.getBandById);
   const getSongById = useAppStore((s) => s.getSongById);
   const [downloading, setDownloading] = useState(false);
+  const [planOpen, setPlanOpen] = useState(false);
   const st = AREA_STYLE[area];
   const content = observerBannerContent(area, state);
   if (!st || !content || !order) return null;
@@ -119,6 +121,17 @@ const AreaBanner = ({ area, order, state }) => {
               </button>
             )}
 
+            {area === 'sonido' && (
+              <button
+                type="button"
+                onClick={() => setPlanOpen(true)}
+                className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm font-medium border text-gray-200 transition-colors hover:bg-white/5"
+                style={{ borderColor: `${st.accent}66` }}
+              >
+                <SlidersHorizontal size={16} /> Plan de canales
+              </button>
+            )}
+
             {area === 'sonido' && hasSchema && (
               <Link
                 to={`/servicio/${order.id}`}
@@ -131,6 +144,10 @@ const AreaBanner = ({ area, order, state }) => {
           </div>
         </div>
       </div>
+
+      {area === 'sonido' && (
+        <ChannelPlanModal order={order} isOpen={planOpen} onClose={() => setPlanOpen(false)} canEdit />
+      )}
     </div>
   );
 };
