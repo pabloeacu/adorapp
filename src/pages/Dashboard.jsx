@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { Link } from 'react-router-dom';
 import { useDocumentTitle } from '../hooks/useDocumentTitle';
 import {
@@ -8,7 +8,9 @@ import {
   Mic2,
   Drum,
   Piano,
-  User
+  User,
+  Ban,
+  RotateCcw
 } from 'lucide-react';
 import {
   UsersThree,
@@ -31,6 +33,8 @@ import { SilentBoundary } from '../components/ui/SilentBoundary';
 import { GreetingHeader } from '../components/dashboard/GreetingHeader';
 import { PrepBanner } from '../components/dashboard/PrepBanner';
 import { ObserverAreaBanners } from '../components/dashboard/ObserverAreaBanners';
+import { RehearsalActionModal } from '../components/orders/RehearsalActionModal';
+import { Button } from '../components/ui/Button';
 import { lineupInstrumentsFor } from '../lib/lineup';
 
 // Fecha `YYYY-MM-DD` parseada LOCAL (landmine #50: `new Date('2026-09-11')` es UTC
@@ -73,12 +77,19 @@ export const Dashboard = () => {
   // mostraba a todo el mundo, fuera o no de la banda. El pastor la ve siempre.
   const todaysRehearsal = orders.find(
     (o) => o.rehearsalDate && String(o.rehearsalDate).slice(0, 10) === todayART
+      && o.status === 'scheduled'  // un orden cancelado no anuncia su ensamble (cancelar arrastra)
       && (role === 'pastor' || isOrderParticipant(o, member?.id))
   );
   const showRehearsalCard = !!todaysRehearsal && artHour >= 8 && artHour < 23;
   const rehearsalBand = todaysRehearsal
     ? bands.find((b) => b.id === todaysRehearsal.bandId)
     : null;
+  // Suspender/Reactivar/Reprogramar desde el card: pastor cualquiera; líder solo su banda
+  // (miembro permanente) — espeja el gate de la RPC.
+  const canManageRehearsal = role === 'pastor'
+    || (role === 'leader' && rehearsalBand?.members?.includes(member?.id));
+  const [rehearsalModal, setRehearsalModal] = useState({ isOpen: false, order: null, mode: null });
+  const [rehearsalReasonOpen, setRehearsalReasonOpen] = useState(false);
 
   // Each stat card doubles as a shortcut to its section — but only for roles
   // that can actually reach that section (mirrors the nav + route guards:
@@ -127,27 +138,69 @@ export const Dashboard = () => {
         <CollaborationBanner />
       </SilentBoundary>
 
-      {/* Hoy tenés ensayo — full-width highlight card, links to the order */}
-      {showRehearsalCard && todaysRehearsal && (
-        <Link
-          to={`/ordenes?order=${todaysRehearsal.id}`}
-          className="block rounded-2xl p-5 bg-gold-gradient text-black shadow-lg hover:brightness-105 transition-all"
-        >
-          <div className="flex items-center gap-4">
-            <div className="p-3 rounded-xl bg-black/10 shrink-0">
-              <CalendarClock size={28} className="text-black" />
+      {/* Hoy tenés ensamble — full-width highlight card. Si el ensamble está SUSPENDIDO,
+          cambia de color y lo dice, con "ver más" del motivo. Botones Suspender/Reactivar/
+          Reprogramar para pastor/líder de la banda. Ya no es un <Link> entero (un botón dentro
+          de un link es inválido y roba el tap): el link "Ver el orden" es interno. */}
+      {showRehearsalCard && todaysRehearsal && (() => {
+        const suspended = todaysRehearsal.rehearsalSuspended;
+        return (
+          <div className={`rounded-2xl p-5 shadow-lg ${suspended ? 'bg-rose-500/15 border border-rose-500/40 text-white' : 'bg-gold-gradient text-black'}`}>
+            <div className="flex items-center gap-4">
+              <div className={`p-3 rounded-xl shrink-0 ${suspended ? 'bg-rose-500/20 text-rose-200' : 'bg-black/10 text-black'}`}>
+                {suspended ? <Ban size={28} /> : <CalendarClock size={28} />}
+              </div>
+              <div className="flex-1 min-w-0">
+                <p className="text-lg font-bold">{suspended ? 'Ensamble suspendido' : '¡Hoy tenés ensamble!'}</p>
+                <p className={`text-sm font-medium truncate ${suspended ? 'text-rose-100/90' : 'text-black/80'}`}>
+                  {rehearsalBand?.name || 'Banda'}
+                  {todaysRehearsal.rehearsalTime ? ` · ${todaysRehearsal.rehearsalTime}` : ''}
+                  {suspended ? ' — el servicio sigue en pie' : ''}
+                </p>
+              </div>
             </div>
-            <div className="flex-1 min-w-0">
-              <p className="text-lg font-bold">¡Hoy tenés ensamble!</p>
-              <p className="text-sm font-medium text-black/80 truncate">
-                {rehearsalBand?.name || 'Banda'}
-                {todaysRehearsal.rehearsalTime ? ` · ${todaysRehearsal.rehearsalTime}` : ''} — tocá para ver el orden
-              </p>
+
+            {suspended && todaysRehearsal.rehearsalSuspendedReason && (
+              <div className="mt-2">
+                <button type="button" className="text-xs text-rose-200 underline" onClick={() => setRehearsalReasonOpen((v) => !v)}>
+                  {rehearsalReasonOpen ? 'Ocultar motivo' : 'Ver más'}
+                </button>
+                {rehearsalReasonOpen && (
+                  <p className="mt-1 text-sm text-rose-50/90 whitespace-pre-wrap">{todaysRehearsal.rehearsalSuspendedReason}</p>
+                )}
+              </div>
+            )}
+
+            <div className="mt-3 flex flex-wrap gap-2">
+              <Link
+                to={`/ordenes?order=${todaysRehearsal.id}`}
+                className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm font-semibold transition-all ${suspended ? 'bg-white/10 text-white hover:bg-white/15' : 'bg-black/10 text-black hover:bg-black/20'}`}
+              >
+                Ver el orden <ChevronRight size={16} />
+              </Link>
+              {canManageRehearsal && (suspended ? (
+                <>
+                  <Button variant="secondary" size="sm" icon={RotateCcw} onClick={() => setRehearsalModal({ isOpen: true, order: todaysRehearsal, mode: 'resume' })}>Reactivar</Button>
+                  <Button variant="secondary" size="sm" icon={CalendarClock} onClick={() => setRehearsalModal({ isOpen: true, order: todaysRehearsal, mode: 'reschedule' })}>Reprogramar</Button>
+                </>
+              ) : (
+                <>
+                  <Button variant="secondary" size="sm" icon={Ban} onClick={() => setRehearsalModal({ isOpen: true, order: todaysRehearsal, mode: 'suspend' })}>Suspender ensamble</Button>
+                  <Button variant="secondary" size="sm" icon={CalendarClock} onClick={() => setRehearsalModal({ isOpen: true, order: todaysRehearsal, mode: 'reschedule' })}>Reprogramar</Button>
+                </>
+              ))}
             </div>
-            <ChevronRight size={24} className="text-black/70 shrink-0" />
           </div>
-        </Link>
-      )}
+        );
+      })()}
+
+      <RehearsalActionModal
+        order={rehearsalModal.order}
+        mode={rehearsalModal.mode}
+        isOpen={rehearsalModal.isOpen}
+        onClose={() => setRehearsalModal({ isOpen: false, order: null, mode: null })}
+        onDone={() => setRehearsalReasonOpen(false)}
+      />
 
       {/* Banners de las áreas observadoras (Multimedia / Sonido) — identidad + atajos.
           Van DESPUÉS de todo lo de Adoración (prioridad). Se auto-ocultan si el miembro
