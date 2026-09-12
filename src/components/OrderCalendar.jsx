@@ -56,7 +56,8 @@ export function OrderCalendar({ orders, getBandById, onSelectOrder }) {
   const rehearsalsByDay = useMemo(() => {
     const map = new Map();
     orders.forEach((o) => {
-      if (!o.rehearsalDate) return;
+      // Un orden cancelado no muestra su ensamble (cancelar arrastra el ensamble).
+      if (!o.rehearsalDate || o.status === 'cancelled') return;
       const k = dayKey(o.rehearsalDate);
       if (!k) return;
       if (!map.has(k)) map.set(k, []);
