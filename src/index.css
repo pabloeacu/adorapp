@@ -332,3 +332,29 @@ button:disabled {
 .animate-metronome-beat {
   animation: metronome-beat 0.5s ease-out infinite;
 }
+
+/* Barra dorada de "Actualizando a la nueva versión" (PageLoader). El ancho lo
+   fija React por hito real; el brillo que recorre la barra es puramente
+   decorativo y se apaga con prefers-reduced-motion. */
+.update-bar {
+  background: linear-gradient(90deg, #b8860b 0%, #f2c94c 55%, #ffe9a8 100%);
+  box-shadow: 0 0 12px rgba(242, 201, 76, 0.45);
+  transition: width 0.6s cubic-bezier(0.22, 1, 0.36, 1);
+  position: relative;
+}
+.update-bar::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(90deg, transparent 0%, rgba(255, 255, 255, 0.55) 50%, transparent 100%);
+  transform: translateX(-100%);
+  animation: update-shimmer 1.6s ease-in-out infinite;
+}
+@keyframes update-shimmer {
+  to { transform: translateX(100%); }
+}
+@media (prefers-reduced-motion: reduce) {
+  .update-bar { transition: none; }
+  .update-bar::after { animation: none; }
+}
+
