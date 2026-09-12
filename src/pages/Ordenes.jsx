@@ -1887,39 +1887,44 @@ export const Ordenes = () => {
               </Link>
             )}
 
-            {/* Las DOS instancias del orden, lado a lado: DÍA DE SERVICIO y DÍA DE ENSAMBLE.
-                Así queda claro que "Marcar realizado / Cancelar" es del SERVICIO, y que
-                "Suspender / Reprogramar" es del ENSAMBLE (dos días y dos estados distintos). */}
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 items-start">
+            {/* Las DOS instancias del orden, APILADAS y COLAPSABLES en formato horizontal (tipo
+                "Practicar este orden"): "Día de servicio" y "Día de ensamble". Cada una se
+                despliega con sus opciones → mismo ancho y misma altura al colapsar, prolijo. */}
+            <div className="space-y-2.5">
               {/* DÍA DE SERVICIO */}
-              <div className="rounded-xl border border-gold-500/25 bg-gold-500/[0.04] p-4" data-testid="detail-service">
-                <div className="flex items-start gap-3">
-                  <div className="p-2 rounded-lg bg-gold-500/15 text-gold-200 shrink-0"><CalendarDots size={18} weight="duotone" /></div>
-                  <div className="min-w-0 flex-1">
-                    <p className="text-[11px] uppercase tracking-wide text-gold-300/80 font-medium">Día de servicio</p>
-                    <p className="text-sm font-medium first-letter:uppercase">{formatDate(viewingOrder.date)}{viewingOrder.time ? ` · ${viewingOrder.time}` : ''}</p>
-                    <div className="mt-1.5 flex flex-wrap items-center gap-1.5">
-                      <Badge className={statusConfig[viewingOrder.status]?.bg}>
-                        <span className={statusConfig[viewingOrder.status]?.color}>{statusConfig[viewingOrder.status]?.label}</span>
-                      </Badge>
-                      <span className="text-xs text-gray-400 truncate">{getBandById(viewingOrder.bandId)?.name || 'Banda eliminada'} · {getMeetingTypeLabel(viewingOrder.meetingType)}</span>
-                    </div>
-                    {(isPastor || isLeader) && (
-                      <div className="mt-2.5 flex flex-wrap gap-2">
-                        {viewingOrder.status !== 'completed' && (
-                          <Button variant="secondary" size="sm" icon={CheckCircle} onClick={() => handleChangeStatus(viewingOrder, 'completed')}>Marcar realizado</Button>
-                        )}
-                        {viewingOrder.status !== 'cancelled' && (
-                          <Button variant="secondary" size="sm" icon={XCircle} onClick={() => handleChangeStatus(viewingOrder, 'cancelled')}>Cancelar servicio</Button>
-                        )}
-                        {viewingOrder.status !== 'scheduled' && (
-                          <Button variant="secondary" size="sm" icon={RotateCcw} onClick={() => handleChangeStatus(viewingOrder, 'scheduled')}>Reabrir</Button>
-                        )}
+              <CollapsibleSection
+                testId="detail-service"
+                className="border-gold-500/25 bg-gold-500/[0.04]"
+                header={(
+                  <div className="flex items-center gap-3 flex-1 min-w-0">
+                    <div className="p-2 rounded-lg bg-gold-500/15 text-gold-200 shrink-0"><CalendarDots size={18} weight="duotone" /></div>
+                    <div className="min-w-0 flex-1">
+                      <p className="text-[11px] uppercase tracking-wide text-gold-300/80 font-medium">Día de servicio</p>
+                      <p className="text-sm font-medium first-letter:uppercase">{formatDate(viewingOrder.date)}{viewingOrder.time ? ` · ${viewingOrder.time}` : ''}</p>
+                      <div className="mt-0.5 flex flex-wrap items-center gap-1.5">
+                        <Badge className={statusConfig[viewingOrder.status]?.bg}>
+                          <span className={statusConfig[viewingOrder.status]?.color}>{statusConfig[viewingOrder.status]?.label}</span>
+                        </Badge>
+                        <span className="text-xs text-gray-400 truncate">{getBandById(viewingOrder.bandId)?.name || 'Banda eliminada'} · {getMeetingTypeLabel(viewingOrder.meetingType)}</span>
                       </div>
+                    </div>
+                  </div>
+                )}
+              >
+                {(isPastor || isLeader) ? (
+                  <div className="flex flex-wrap gap-2">
+                    {viewingOrder.status !== 'completed' && (
+                      <Button variant="secondary" size="sm" icon={CheckCircle} onClick={() => handleChangeStatus(viewingOrder, 'completed')}>Marcar realizado</Button>
+                    )}
+                    {viewingOrder.status !== 'cancelled' && (
+                      <Button variant="secondary" size="sm" icon={XCircle} onClick={() => handleChangeStatus(viewingOrder, 'cancelled')}>Cancelar servicio</Button>
+                    )}
+                    {viewingOrder.status !== 'scheduled' && (
+                      <Button variant="secondary" size="sm" icon={RotateCcw} onClick={() => handleChangeStatus(viewingOrder, 'scheduled')}>Reabrir</Button>
                     )}
                   </div>
-                </div>
-              </div>
+                ) : null}
+              </CollapsibleSection>
 
               {/* DÍA DE ENSAMBLE: estado (activo / suspendido) + Suspender/Reactivar/Reprogramar
                   (pastor/líder de su banda, solo programado y con ensamble hoy/futuro). No se
@@ -1930,26 +1935,33 @@ export const Ordenes = () => {
                   || (isLeader && getBandById(viewingOrder.bandId)?.members?.includes(currentMember?.id)))
                   && viewingOrder.status === 'scheduled'
                   && viewingOrder.rehearsalDate >= localTodayStr();
+                const hasContent = canManage || (suspended && viewingOrder.rehearsalSuspendedReason);
                 return (
-                  <div
-                    className={`rounded-xl border p-4 ${suspended ? 'border-rose-500/40 bg-rose-500/[0.07]' : 'border-amber-500/30 bg-amber-500/[0.07]'}`}
-                    data-testid="detail-rehearsal"
-                  >
-                    <div className="flex items-start gap-3">
-                      <div className={`p-2 rounded-lg shrink-0 ${suspended ? 'bg-rose-500/15 text-rose-300' : 'bg-amber-500/15 text-amber-300'}`}>
-                        {suspended ? <Ban size={18} /> : <CalendarClock size={18} />}
+                  <CollapsibleSection
+                    testId="detail-rehearsal"
+                    className={suspended ? 'border-rose-500/40 bg-rose-500/[0.07]' : 'border-amber-500/30 bg-amber-500/[0.07]'}
+                    header={(
+                      <div className="flex items-center gap-3 flex-1 min-w-0">
+                        <div className={`p-2 rounded-lg shrink-0 ${suspended ? 'bg-rose-500/15 text-rose-300' : 'bg-amber-500/15 text-amber-300'}`}>
+                          {suspended ? <Ban size={18} /> : <CalendarClock size={18} />}
+                        </div>
+                        <div className="min-w-0 flex-1">
+                          <p className={`text-[11px] uppercase tracking-wide font-medium ${suspended ? 'text-rose-300/90' : 'text-amber-300/80'}`}>
+                            {suspended ? 'Ensamble suspendido' : 'Día de ensamble'}
+                          </p>
+                          <p className={`text-sm font-medium first-letter:uppercase ${suspended ? 'line-through text-gray-400' : ''}`}>
+                            {formatDate(viewingOrder.rehearsalDate)}{viewingOrder.rehearsalTime ? ` · ${viewingOrder.rehearsalTime}` : ''}
+                          </p>
+                        </div>
                       </div>
-                      <div className="min-w-0 flex-1">
-                        <p className={`text-[11px] uppercase tracking-wide font-medium ${suspended ? 'text-rose-300/90' : 'text-amber-300/80'}`}>
-                          {suspended ? 'Ensamble suspendido' : 'Día de ensamble'}
-                        </p>
-                        <p className={`text-sm font-medium first-letter:uppercase ${suspended ? 'line-through text-gray-400' : ''}`}>
-                          {formatDate(viewingOrder.rehearsalDate)}{viewingOrder.rehearsalTime ? ` · ${viewingOrder.rehearsalTime}` : ''}
-                        </p>
+                    )}
+                  >
+                    {hasContent ? (
+                      <div className="space-y-2.5">
                         {suspended && viewingOrder.rehearsalSuspendedReason && (
-                          <div className="mt-1">
+                          <div>
                             <button type="button" className="text-xs text-rose-300 underline" onClick={() => setRehearsalReasonOpen((v) => !v)}>
-                              {rehearsalReasonOpen ? 'Ocultar motivo' : 'Ver más'}
+                              {rehearsalReasonOpen ? 'Ocultar motivo' : 'Ver motivo'}
                             </button>
                             {rehearsalReasonOpen && (
                               <p className="mt-1 text-sm text-gray-300 whitespace-pre-wrap">{viewingOrder.rehearsalSuspendedReason}</p>
@@ -1957,7 +1969,7 @@ export const Ordenes = () => {
                           </div>
                         )}
                         {canManage && (
-                          <div className="mt-2.5 flex flex-wrap gap-2">
+                          <div className="flex flex-wrap gap-2">
                             {suspended ? (
                               <Button variant="secondary" size="sm" icon={RotateCcw} onClick={() => setRehearsalModal({ isOpen: true, order: viewingOrder, mode: 'resume' })}>Reactivar</Button>
                             ) : (
@@ -1967,23 +1979,26 @@ export const Ordenes = () => {
                           </div>
                         )}
                       </div>
-                    </div>
-                  </div>
+                    ) : null}
+                  </CollapsibleSection>
                 );
               })() : (
-                <div className="rounded-xl border border-white/10 bg-white/[0.02] p-4" data-testid="detail-rehearsal-empty">
-                  <div className="flex items-start gap-3">
-                    <div className="p-2 rounded-lg bg-white/[0.04] text-gray-500 shrink-0"><CalendarClock size={18} /></div>
-                    <div className="min-w-0">
-                      <p className="text-[11px] uppercase tracking-wide text-gray-500 font-medium">Día de ensamble</p>
-                      <p className="text-sm text-gray-400">
-                        {viewingOrder.status === 'cancelled'
-                          ? 'El servicio está cancelado.'
-                          : `Sin ensamble programado${(isPastor || isLeader) ? ' · programalo desde “Editar”.' : '.'}`}
-                      </p>
+                <CollapsibleSection
+                  testId="detail-rehearsal-empty"
+                  header={(
+                    <div className="flex items-center gap-3 flex-1 min-w-0">
+                      <div className="p-2 rounded-lg bg-white/[0.04] text-gray-500 shrink-0"><CalendarClock size={18} /></div>
+                      <div className="min-w-0">
+                        <p className="text-[11px] uppercase tracking-wide text-gray-500 font-medium">Día de ensamble</p>
+                        <p className="text-sm text-gray-400">
+                          {viewingOrder.status === 'cancelled'
+                            ? 'El servicio está cancelado.'
+                            : `Sin ensamble programado${(isPastor || isLeader) ? ' · programalo desde “Editar”.' : '.'}`}
+                        </p>
+                      </div>
                     </div>
-                  </div>
-                </div>
+                  )}
+                />
               )}
             </div>
 
