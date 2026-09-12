@@ -40,6 +40,7 @@ import { LineupEditor } from '../components/orders/LineupEditor';
 import { LineupSummary } from '../components/orders/LineupSummary';
 import { LineupModal } from '../components/orders/LineupModal';
 import { RehearsalActionModal } from '../components/orders/RehearsalActionModal';
+import { CollapsibleSection } from '../components/ui/CollapsibleSection';
 import { buildLineup, lineupSummaryText, isCustomLineup } from '../lib/lineup';
 
 // Parsear 'YYYY-MM-DD' como fecha LOCAL (no UTC). `new Date('2026-09-11')` se
@@ -1226,16 +1227,19 @@ export const Ordenes = () => {
                       <Badge variant="primary">{band?.name || 'Banda eliminada'}</Badge>
                     </div>
                     <h3 className="text-lg font-semibold">{formatDate(order.date)}</h3>
+                    {/* En el celu se abrevia a ícono + número (evita que "canciones"
+                        y "en la formación" se corten en dos líneas); en compu se
+                        muestran las palabras. El title da el tooltip en escritorio. */}
                     <div className="flex items-center gap-3 text-sm text-gray-400 mt-1">
                       <span className="flex items-center gap-1">
                         <Clock size={14} /> {order.time}
                       </span>
-                      <span className="flex items-center gap-1">
-                        <Music size={14} /> {order.songs.length} canciones
+                      <span className="flex items-center gap-1 tabular-nums" title={`${order.songs.length} ${order.songs.length === 1 ? 'canción' : 'canciones'}`}>
+                        <Music size={14} /> {order.songs.length}<span className="hidden md:inline">&nbsp;{order.songs.length === 1 ? 'canción' : 'canciones'}</span>
                       </span>
                       {isCustomLineup(order) && (
-                        <span className="flex items-center gap-1 text-gold-300" data-testid="card-lineup-pill">
-                          <UsersThree size={14} weight="duotone" /> {getOrderParticipants(order).length} en la formación
+                        <span className="flex items-center gap-1 text-gold-300 tabular-nums" data-testid="card-lineup-pill" title={`${getOrderParticipants(order).length} en la formación`}>
+                          <UsersThree size={14} weight="duotone" /> {getOrderParticipants(order).length}<span className="hidden md:inline">&nbsp;en la formación</span>
                         </span>
                       )}
                     </div>
@@ -1839,11 +1843,6 @@ export const Ordenes = () => {
                     Plan de canales
                   </Button>
                 )}
-                <Badge className={statusConfig[viewingOrder.status]?.bg}>
-                  <span className={statusConfig[viewingOrder.status]?.color}>
-                    {statusConfig[viewingOrder.status]?.label}
-                  </span>
-                </Badge>
               </div>
             </div>
 
@@ -1888,105 +1887,120 @@ export const Ordenes = () => {
               </Link>
             )}
 
-            {(isPastor || isLeader) && (
-              <div className="flex flex-wrap items-center gap-2">
-                <span className="text-xs text-gray-400 uppercase tracking-wide">Estado:</span>
-                {viewingOrder.status !== 'completed' && (
-                  <Button variant="ghost" size="sm" icon={CheckCircle} onClick={() => handleChangeStatus(viewingOrder, 'completed')}>
-                    Marcar completado
-                  </Button>
-                )}
-                {viewingOrder.status !== 'cancelled' && (
-                  <Button variant="ghost" size="sm" icon={XCircle} onClick={() => handleChangeStatus(viewingOrder, 'cancelled')}>
-                    Cancelar
-                  </Button>
-                )}
-                {viewingOrder.status !== 'scheduled' && (
-                  <Button variant="ghost" size="sm" icon={RotateCcw} onClick={() => handleChangeStatus(viewingOrder, 'scheduled')}>
-                    Reabrir
-                  </Button>
-                )}
-              </div>
-            )}
-
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-              <Card className="p-4">
-                <p className="text-xs text-gray-400 uppercase mb-1">Banda</p>
-                <p className="font-medium">{getBandById(viewingOrder.bandId)?.name || 'Banda eliminada'}</p>
-              </Card>
-              <Card className="p-4">
-                <p className="text-xs text-gray-400 uppercase mb-1">Tipo de Reunión</p>
-                <p className="font-medium">{getMeetingTypeLabel(viewingOrder.meetingType)}</p>
-              </Card>
-            </div>
-
-            {/* Ensamble: estado (activo / suspendido) + acciones Suspender/Reactivar/Reprogramar
-                (pastor/líder, solo en órdenes programados y con ensamble hoy o a futuro).
-                No se muestra en un orden cancelado (cancelar arrastra el ensamble). */}
-            {viewingOrder.rehearsalDate && viewingOrder.status !== 'cancelled' && (() => {
-              const suspended = viewingOrder.rehearsalSuspended;
-              // Líder: solo su banda (miembro permanente) — espeja el gate de la RPC.
-              const canManage = (isPastor
-                || (isLeader && getBandById(viewingOrder.bandId)?.members?.includes(currentMember?.id)))
-                && viewingOrder.status === 'scheduled'
-                && viewingOrder.rehearsalDate >= localTodayStr();
-              return (
-                <div
-                  className={`rounded-xl border p-3 ${suspended ? 'border-rose-500/40 bg-rose-500/[0.07]' : 'border-amber-500/30 bg-amber-500/[0.07]'}`}
-                  data-testid="detail-rehearsal"
-                >
-                  <div className="flex items-start gap-3">
-                    <div className={`p-2 rounded-lg shrink-0 ${suspended ? 'bg-rose-500/15 text-rose-300' : 'bg-amber-500/15 text-amber-300'}`}>
-                      {suspended ? <Ban size={18} /> : <CalendarClock size={18} />}
+            {/* Las DOS instancias del orden, lado a lado: DÍA DE SERVICIO y DÍA DE ENSAMBLE.
+                Así queda claro que "Marcar realizado / Cancelar" es del SERVICIO, y que
+                "Suspender / Reprogramar" es del ENSAMBLE (dos días y dos estados distintos). */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 items-start">
+              {/* DÍA DE SERVICIO */}
+              <div className="rounded-xl border border-gold-500/25 bg-gold-500/[0.04] p-4" data-testid="detail-service">
+                <div className="flex items-start gap-3">
+                  <div className="p-2 rounded-lg bg-gold-500/15 text-gold-200 shrink-0"><CalendarDots size={18} weight="duotone" /></div>
+                  <div className="min-w-0 flex-1">
+                    <p className="text-[11px] uppercase tracking-wide text-gold-300/80 font-medium">Día de servicio</p>
+                    <p className="text-sm font-medium capitalize">{formatDate(viewingOrder.date)}{viewingOrder.time ? ` · ${viewingOrder.time}` : ''}</p>
+                    <div className="mt-1.5 flex flex-wrap items-center gap-1.5">
+                      <Badge className={statusConfig[viewingOrder.status]?.bg}>
+                        <span className={statusConfig[viewingOrder.status]?.color}>{statusConfig[viewingOrder.status]?.label}</span>
+                      </Badge>
+                      <span className="text-xs text-gray-400 truncate">{getBandById(viewingOrder.bandId)?.name || 'Banda eliminada'} · {getMeetingTypeLabel(viewingOrder.meetingType)}</span>
                     </div>
-                    <div className="min-w-0 flex-1">
-                      <p className={`text-[11px] uppercase tracking-wide font-medium ${suspended ? 'text-rose-300/90' : 'text-amber-300/80'}`}>
-                        {suspended ? 'Ensamble suspendido' : 'Ensamble'}
+                    {(isPastor || isLeader) && (
+                      <div className="mt-2.5 flex flex-wrap gap-2">
+                        {viewingOrder.status !== 'completed' && (
+                          <Button variant="secondary" size="sm" icon={CheckCircle} onClick={() => handleChangeStatus(viewingOrder, 'completed')}>Marcar realizado</Button>
+                        )}
+                        {viewingOrder.status !== 'cancelled' && (
+                          <Button variant="secondary" size="sm" icon={XCircle} onClick={() => handleChangeStatus(viewingOrder, 'cancelled')}>Cancelar servicio</Button>
+                        )}
+                        {viewingOrder.status !== 'scheduled' && (
+                          <Button variant="secondary" size="sm" icon={RotateCcw} onClick={() => handleChangeStatus(viewingOrder, 'scheduled')}>Reabrir</Button>
+                        )}
+                      </div>
+                    )}
+                  </div>
+                </div>
+              </div>
+
+              {/* DÍA DE ENSAMBLE: estado (activo / suspendido) + Suspender/Reactivar/Reprogramar
+                  (pastor/líder de su banda, solo programado y con ensamble hoy/futuro). No se
+                  muestra activo en un orden cancelado (cancelar arrastra el ensamble). */}
+              {viewingOrder.rehearsalDate && viewingOrder.status !== 'cancelled' ? (() => {
+                const suspended = viewingOrder.rehearsalSuspended;
+                const canManage = (isPastor
+                  || (isLeader && getBandById(viewingOrder.bandId)?.members?.includes(currentMember?.id)))
+                  && viewingOrder.status === 'scheduled'
+                  && viewingOrder.rehearsalDate >= localTodayStr();
+                return (
+                  <div
+                    className={`rounded-xl border p-4 ${suspended ? 'border-rose-500/40 bg-rose-500/[0.07]' : 'border-amber-500/30 bg-amber-500/[0.07]'}`}
+                    data-testid="detail-rehearsal"
+                  >
+                    <div className="flex items-start gap-3">
+                      <div className={`p-2 rounded-lg shrink-0 ${suspended ? 'bg-rose-500/15 text-rose-300' : 'bg-amber-500/15 text-amber-300'}`}>
+                        {suspended ? <Ban size={18} /> : <CalendarClock size={18} />}
+                      </div>
+                      <div className="min-w-0 flex-1">
+                        <p className={`text-[11px] uppercase tracking-wide font-medium ${suspended ? 'text-rose-300/90' : 'text-amber-300/80'}`}>
+                          {suspended ? 'Ensamble suspendido' : 'Día de ensamble'}
+                        </p>
+                        <p className={`text-sm font-medium capitalize ${suspended ? 'line-through text-gray-400' : ''}`}>
+                          {formatDate(viewingOrder.rehearsalDate)}{viewingOrder.rehearsalTime ? ` · ${viewingOrder.rehearsalTime}` : ''}
+                        </p>
+                        {suspended && viewingOrder.rehearsalSuspendedReason && (
+                          <div className="mt-1">
+                            <button type="button" className="text-xs text-rose-300 underline" onClick={() => setRehearsalReasonOpen((v) => !v)}>
+                              {rehearsalReasonOpen ? 'Ocultar motivo' : 'Ver más'}
+                            </button>
+                            {rehearsalReasonOpen && (
+                              <p className="mt-1 text-sm text-gray-300 whitespace-pre-wrap">{viewingOrder.rehearsalSuspendedReason}</p>
+                            )}
+                          </div>
+                        )}
+                        {canManage && (
+                          <div className="mt-2.5 flex flex-wrap gap-2">
+                            {suspended ? (
+                              <Button variant="secondary" size="sm" icon={RotateCcw} onClick={() => setRehearsalModal({ isOpen: true, order: viewingOrder, mode: 'resume' })}>Reactivar</Button>
+                            ) : (
+                              <Button variant="secondary" size="sm" icon={Ban} onClick={() => setRehearsalModal({ isOpen: true, order: viewingOrder, mode: 'suspend' })}>Suspender</Button>
+                            )}
+                            <Button variant="secondary" size="sm" icon={CalendarClock} onClick={() => setRehearsalModal({ isOpen: true, order: viewingOrder, mode: 'reschedule' })}>Reprogramar</Button>
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                );
+              })() : (
+                <div className="rounded-xl border border-white/10 bg-white/[0.02] p-4" data-testid="detail-rehearsal-empty">
+                  <div className="flex items-start gap-3">
+                    <div className="p-2 rounded-lg bg-white/[0.04] text-gray-500 shrink-0"><CalendarClock size={18} /></div>
+                    <div className="min-w-0">
+                      <p className="text-[11px] uppercase tracking-wide text-gray-500 font-medium">Día de ensamble</p>
+                      <p className="text-sm text-gray-400">
+                        {viewingOrder.status === 'cancelled'
+                          ? 'El servicio está cancelado.'
+                          : `Sin ensamble programado${(isPastor || isLeader) ? ' · programalo desde “Editar”.' : '.'}`}
                       </p>
-                      <p className={`text-sm font-medium ${suspended ? 'line-through text-gray-400' : ''}`}>
-                        {formatDate(viewingOrder.rehearsalDate)}{viewingOrder.rehearsalTime ? ` · ${viewingOrder.rehearsalTime}` : ''}
-                      </p>
-                      {suspended && viewingOrder.rehearsalSuspendedReason && (
-                        <div className="mt-1">
-                          <button type="button" className="text-xs text-rose-300 underline" onClick={() => setRehearsalReasonOpen((v) => !v)}>
-                            {rehearsalReasonOpen ? 'Ocultar motivo' : 'Ver más'}
-                          </button>
-                          {rehearsalReasonOpen && (
-                            <p className="mt-1 text-sm text-gray-300 whitespace-pre-wrap">{viewingOrder.rehearsalSuspendedReason}</p>
-                          )}
-                        </div>
-                      )}
-                      {canManage && (
-                        <div className="mt-2.5 flex flex-wrap gap-2">
-                          {suspended ? (
-                            <Button variant="secondary" size="sm" icon={RotateCcw} onClick={() => setRehearsalModal({ isOpen: true, order: viewingOrder, mode: 'resume' })}>Reactivar</Button>
-                          ) : (
-                            <Button variant="secondary" size="sm" icon={Ban} onClick={() => setRehearsalModal({ isOpen: true, order: viewingOrder, mode: 'suspend' })}>Suspender ensamble</Button>
-                          )}
-                          <Button variant="secondary" size="sm" icon={CalendarClock} onClick={() => setRehearsalModal({ isOpen: true, order: viewingOrder, mode: 'reschedule' })}>Reprogramar</Button>
-                        </div>
-                      )}
                     </div>
                   </div>
                 </div>
-              );
-            })()}
+              )}
+            </div>
 
-            {/* Formación del servicio */}
-            <div data-testid="detail-lineup">
-              <div className="flex flex-wrap items-center justify-between gap-2 mb-3">
-                <h4 className="text-sm font-medium text-gray-400">Formación</h4>
-                {(isPastor || isLeader) && getBandById(viewingOrder.bandId) && (
+            {/* Formación del servicio (colapsable) */}
+            <CollapsibleSection icon={UsersThree} title="Formación" count={getOrderParticipants(viewingOrder).length} testId="detail-lineup">
+              {(isPastor || isLeader) && getBandById(viewingOrder.bandId) && (
+                <div className="mb-3">
                   <Button variant="secondary" size="sm" icon={UsersThree} onClick={() => setLineupModal({ isOpen: true, order: viewingOrder })} data-testid="detail-lineup-edit">
                     {isCustomLineup(viewingOrder) ? 'Editar formación' : 'Definir formación'}
                   </Button>
-                )}
-              </div>
+                </div>
+              )}
               <LineupSummary order={viewingOrder} />
-            </div>
+            </CollapsibleSection>
 
-            <div>
-              <h4 className="text-sm font-medium text-gray-400 mb-3">Canciones</h4>
+            {/* Canciones (colapsable, abierta por defecto: es el corazón del orden) */}
+            <CollapsibleSection icon={Music} title="Canciones" count={viewingOrder.songs.length} defaultOpen>
               <div className="space-y-3">
                 {viewingOrder.songs.map((songRef, index) => {
                   const song = getSongById(songRef.songId);
@@ -2011,20 +2025,17 @@ export const Ordenes = () => {
                   );
                 })}
               </div>
-            </div>
+            </CollapsibleSection>
 
             {isPastor && (
-              <div>
-                <label className="text-xs text-gray-400 font-medium uppercase block mb-2">
-                  Devolución del Pastor
-                </label>
+              <CollapsibleSection title="Devolución del Pastor" defaultOpen={!!viewingOrder.feedback}>
                 <textarea
                   className="w-full h-24 bg-neutral-800 border border-neutral-700 rounded-xl px-4 py-3 resize-none focus:outline-none focus:ring-2 focus:ring-gold-500/40"
                   placeholder="Agregar comentarios sobre la ejecución del servicio..."
                   value={viewingOrder.feedback || ''}
                   onChange={(e) => handleUpdateFeedback(viewingOrder.id, e.target.value)}
                 />
-              </div>
+              </CollapsibleSection>
             )}
 
             {/* Pastor-only history timeline. RLS enforces the gate; the
