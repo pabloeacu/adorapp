@@ -14,7 +14,6 @@
 -- `members` para el cliente, que se aplica en la migración hermana
 -- `20260913_members_revoke_select.sql` DESPUÉS de publicar el cliente que lee la vista.
 
-BEGIN;
 
 -- ─────────────────────────────────────────────────────────────────────────────
 -- D5 · password_hash fuera (primero quien lo referencia, después la columna)
@@ -169,4 +168,3 @@ CREATE TRIGGER rate_limit_health_checks
   BEFORE INSERT ON public.health_checks
   FOR EACH ROW EXECUTE FUNCTION public.rate_limit_health_checks();
 
-COMMIT;

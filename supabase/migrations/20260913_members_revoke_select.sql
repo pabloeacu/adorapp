@@ -13,11 +13,9 @@
 -- todos (el cliente re-lee la ficha desde la vista al recibir un evento).
 -- Una columna NUEVA en `members` hay que sumarla acá (GRANT SELECT (col)) y en la vista.
 
-BEGIN;
 
 REVOKE SELECT ON public.members FROM anon, authenticated;
 GRANT SELECT (id, name, role, instruments, active, user_id, avatar_url, created_at,
               updated_at, pastor_area, leader_of, editor, onboarded, areas)
   ON public.members TO authenticated;
 
-COMMIT;
