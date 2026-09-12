@@ -35,12 +35,16 @@ import { PrepBanner } from '../components/dashboard/PrepBanner';
 import { ObserverAreaBanners } from '../components/dashboard/ObserverAreaBanners';
 import { RehearsalActionModal } from '../components/orders/RehearsalActionModal';
 import { lineupInstrumentsFor } from '../lib/lineup';
+import { rehearsalCardWindow, inWindow } from '../lib/bannerLifetime';
+import { useLifetimeTick } from '../hooks/useLifetimeTick';
 
 // Fecha `YYYY-MM-DD` parseada LOCAL (landmine #50: `new Date('2026-09-11')` es UTC
 // y en ART muestra el día anterior).
 const parseLocalDate = (d) => new Date(`${String(d).slice(0, 10)}T00:00:00`);
 import { ServiceFeedbackPrompt } from '../components/dashboard/ServiceFeedbackPrompt';
 import { MinistrationBanner } from '../components/dashboard/MinistrationBanner';
+import { MinistrationNotice } from '../components/dashboard/MinistrationNotice';
+import { OrderChangedBanner } from '../components/dashboard/OrderChangedBanner';
 import { CollaborationBanner } from '../components/dashboard/CollaborationBanner';
 
 const getInstrumentIcon = (instrument) => {
@@ -65,22 +69,31 @@ export const Dashboard = () => {
   const unusedSongs = getUnusedSongs(4);
   const recentSongs = songs.slice(0, 4);
 
-  // "Hoy tenés ensayo" card: shown only on the rehearsal day, between 08:00 and
-  // 23:00 ART. We read the current ART wall-clock via toLocaleString (ART is
-  // UTC-3, no DST) so date + hour are correct regardless of the device's TZ.
+  // Reloj de los banners con vencimiento: `nowMs` se actualiza solo en el próximo límite
+  // (o a medianoche ART), así "hoy" y las ventanas se recalculan sin recargar.
+  const rehearsalWindows = orders
+    .filter((o) => o?.status === 'scheduled' && o.rehearsalDate)
+    .map(rehearsalCardWindow);
+  const nowMs = useLifetimeTick(rehearsalWindows);
+
+  // Fecha/hora ART actuales (ART es UTC-3, sin DST) para "hoy" y el saludo, correctas
+  // sin importar la zona horaria del dispositivo. Derivadas de `nowMs` para que el tick
+  // las refresque.
   const artNow = new Date(
-    new Date().toLocaleString('en-US', { timeZone: 'America/Argentina/Buenos_Aires' })
+    new Date(nowMs).toLocaleString('en-US', { timeZone: 'America/Argentina/Buenos_Aires' })
   );
   const todayART = `${artNow.getFullYear()}-${String(artNow.getMonth() + 1).padStart(2, '0')}-${String(artNow.getDate()).padStart(2, '0')}`;
   const artHour = artNow.getHours();
-  // Solo se muestra a quien PARTICIPA del servicio (formación) — antes se la
-  // mostraba a todo el mundo, fuera o no de la banda. El pastor la ve siempre.
+  // "¡Hoy tenés ensamble!": el día del ensamble, desde las 08:00 ART y hasta 2 h después
+  // de la hora del ensamble (sin hora: hasta las 23:00) — ventana en bannerLifetime.js.
+  // Solo se muestra a quien PARTICIPA del servicio (formación). El pastor la ve siempre.
   const todaysRehearsal = orders.find(
     (o) => o.rehearsalDate && String(o.rehearsalDate).slice(0, 10) === todayART
       && o.status === 'scheduled'  // un orden cancelado no anuncia su ensamble (cancelar arrastra)
+      && inWindow(rehearsalCardWindow(o), nowMs)
       && (role === 'pastor' || isOrderParticipant(o, member?.id))
   );
-  const showRehearsalCard = !!todaysRehearsal && artHour >= 8 && artHour < 23;
+  const showRehearsalCard = !!todaysRehearsal;
   const rehearsalBand = todaysRehearsal
     ? bands.find((b) => b.id === todaysRehearsal.bandId)
     : null;
@@ -124,11 +137,24 @@ export const Dashboard = () => {
         <MinistrationBanner member={member} role={role} />
       </SilentBoundary>
 
-      {/* Preparación personal — CONDICIONAL: sólo si el miembro participa en un
-          orden programado próximo con canciones. En SilentBoundary para que, ante
-          cualquier problema, no muestre nada sin tumbar la app (el saludo queda). */}
+      {/* Aviso de ministración para quienes la RECIBEN (formación / áreas): "Ministración:
+          X en Dm", durante las 3 h del servicio. Quien la gestiona ve el banner de arriba. */}
       <SilentBoundary>
-        <PrepBanner member={member} todayART={todayART} />
+        <MinistrationNotice member={member} role={role} />
+      </SilentBoundary>
+
+      {/* "Hubo cambios en el orden" para la banda efectiva ∪ pastores (no para quien editó):
+          48 h desde el cambio y nunca después de la hora del servicio. */}
+      <SilentBoundary>
+        <OrderChangedBanner member={member} role={role} />
+      </SilentBoundary>
+
+      {/* Preparación personal — CONDICIONAL: sólo si el miembro participa en un
+          orden programado con canciones, desde 7 días antes y hasta la hora del servicio.
+          En SilentBoundary para que, ante cualquier problema, no muestre nada sin tumbar
+          la app (el saludo queda). */}
+      <SilentBoundary>
+        <PrepBanner member={member} />
       </SilentBoundary>
 
       {/* Feedback post-servicio — CONDICIONAL y OPTATIVO: sólo para pastor/líder de la

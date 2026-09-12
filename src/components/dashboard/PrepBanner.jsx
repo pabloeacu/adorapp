@@ -5,6 +5,8 @@ import { useAppStore } from '../../stores/appStore';
 import { Badge } from '../ui/Badge';
 import { uniqueSongIds, ensayometroPercent, pendingSongIds, isSingerOnly } from '../../lib/ensayometro';
 import { lineupInstrumentsFor } from '../../lib/lineup';
+import { prepWindow, inWindow } from '../../lib/bannerLifetime';
+import { useLifetimeTick } from '../../hooks/useLifetimeTick';
 
 // Banner de PREPARACIÓN — SOLO LECTURA y CONDICIONAL: aparece únicamente si el
 // miembro participa (su banda) en un orden PROGRAMADO próximo con canciones. Si no
@@ -24,10 +26,12 @@ const fmtDate = (d) => {
 };
 
 // Orden 'scheduled' más próximo del que el miembro PARTICIPA (formación del orden;
-// sin formación = toda la banda efectiva), con canciones. Mismo filtro que el cron
-// send_practice_reminders() (landmine #27), que usa order_participant_ids. Función
-// de módulo (pura) para que el useMemo del componente sea preservable por el compiler.
-const resolveActiveOrder = (orders, memberId, todayART, isOrderParticipant) => {
+// sin formación = toda la banda efectiva), con canciones, DENTRO de su ventana de
+// preparación: desde 7 días antes del servicio hasta la hora de inicio (bannerLifetime.js).
+// Mismo filtro de participación que el cron send_practice_reminders() (landmine #27), que
+// usa order_participant_ids. Función de módulo (pura) para que el useMemo del componente
+// sea preservable por el compiler.
+const resolveActiveOrder = (orders, memberId, nowMs, isOrderParticipant) => {
   try {
     if (!memberId || !Array.isArray(orders)) return null;
     const cmp = (a, b) => {
@@ -38,7 +42,7 @@ const resolveActiveOrder = (orders, memberId, todayART, isOrderParticipant) => {
     };
     return orders.reduce((best, o) => {
       const ok = o?.status === 'scheduled' &&
-        o?.date && String(o.date).slice(0, 10) >= todayART &&
+        o?.date && inWindow(prepWindow(o), nowMs) &&
         Array.isArray(o.songs) && o.songs.length > 0 &&
         isOrderParticipant(o, memberId);
       if (!ok) return best;
@@ -49,7 +53,7 @@ const resolveActiveOrder = (orders, memberId, todayART, isOrderParticipant) => {
   }
 };
 
-export const PrepBanner = ({ member, todayART }) => {
+export const PrepBanner = ({ member }) => {
   const orders = useAppStore((s) => s.orders);
   const getBandById = useAppStore((s) => s.getBandById);
   const getSongById = useAppStore((s) => s.getSongById);
@@ -57,12 +61,19 @@ export const PrepBanner = ({ member, todayART }) => {
   const isOrderParticipant = useAppStore((s) => s.isOrderParticipant);
   const bandTemporaryMembers = useAppStore((s) => s.bandTemporaryMembers);
 
+  // Reloj: el banner aparece 7 días antes y se va a la hora del servicio, solo.
+  const windows = useMemo(
+    () => (Array.isArray(orders) ? orders.filter((o) => o?.status === 'scheduled').map(prepWindow) : []),
+    [orders]
+  );
+  const nowMs = useLifetimeTick(windows);
+
   // El orden 'scheduled' más próximo del que el miembro participa (formación;
-  // sin formación = banda efectiva), con canciones. Mismo filtro que el cron
-  // send_practice_reminders() (landmine #27).
+  // sin formación = banda efectiva), con canciones y en ventana. Mismo filtro de
+  // participación que el cron send_practice_reminders() (landmine #27).
   const activeOrder = useMemo(
-    () => resolveActiveOrder(orders, member?.id, todayART, isOrderParticipant),
-    [orders, member?.id, todayART, isOrderParticipant, bandTemporaryMembers]
+    () => resolveActiveOrder(orders, member?.id, nowMs, isOrderParticipant),
+    [orders, member?.id, nowMs, isOrderParticipant, bandTemporaryMembers]
   );
 
   const [prep, setPrep] = useState(null);
@@ -104,6 +115,7 @@ export const PrepBanner = ({ member, todayART }) => {
   return (
     <Link
       to={`/practica/${activeOrder.id}`}
+      data-testid="prep-banner"
       className="block rounded-2xl p-5 border border-gold-500/25 bg-gradient-to-br from-gold-600/[0.28] via-neutral-900 to-gold-300/[0.10] hover:border-gold-500/50 transition-colors"
     >
       <div className="flex items-start gap-4">

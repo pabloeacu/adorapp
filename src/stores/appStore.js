@@ -249,6 +249,9 @@ const convertOrderFromDB = (o) => ({
   // "¡Ojo! Hubo cambios" de los banners de área). Lo escribe SOLO la base — nunca
   // el cliente — así que NO va en convertOrderToDB (mismo patrón que rehearsal_reminder_sent).
   contentChangedAt: o.content_changed_at,
+  // Quién hizo ese último cambio (member id, o null si fue un cron): sirve para que el
+  // propio editor no vea el aviso "Hubo cambios". Server-owned → tampoco va en ToDB.
+  contentChangedBy: o.content_changed_by ?? null,
   // Suspensión del ENSAMBLE (server-owned: las escriben SOLO las RPCs suspend/resume/
   // reschedule + el trigger enforce_order_rehearsal_rules; NUNCA el cliente → NO van en
   // convertOrderToDB, mismo patrón que rehearsal_reminder_sent). `rehearsalSuspended` es
@@ -1524,7 +1527,8 @@ export const useAppStore = create((set, get) => ({
         else if (mine && mine.status === 'offered') offered.push(r);
         if (r.requestedBy === memberId && (offersByReq.get(r.id) || 0) > 0) managing.push(r);
       } else if (r.status === 'covered' && mine && (mine.status === 'accepted' || mine.status === 'declined')) {
-        results.push({ request: r, outcome: mine.status });
+        // decidedAt = cuándo se cubrió (fecha de la decisión) para el vencimiento del banner.
+        results.push({ request: r, outcome: mine.status, decidedAt: r.coveredAt || mine.updatedAt || null });
       }
     }
     return { invited, offered, managing, results };
