@@ -18,7 +18,8 @@ import {
 } from 'lucide-react';
 import { MusicNotes, MusicNotesSimple } from '@phosphor-icons/react';
 import { useAppStore, transposeSongStructure } from '../stores/appStore';
-import { milestonesOf, ensayometroPercent } from '../lib/ensayometro';
+import { milestonesOf, ensayometroPercent, isSingerOnly, milestonesPerSong } from '../lib/ensayometro';
+import { lineupInstrumentsFor } from '../lib/lineup';
 import { useDocumentTitle } from '../hooks/useDocumentTitle';
 import { useCurrentMember, useCurrentRole } from '../hooks/useCurrentMember';
 import { Card } from '../components/ui/Card';
@@ -299,9 +300,17 @@ export const Practica = () => {
     [order]
   );
 
+  // Quien SOLO canta (Voz/Coros en ESTE orden: formación cerrada → sus instrumentos ahí;
+  // si no, los de su ficha) mide 3 hitos por canción: "Frases y arreglos" no cuenta.
+  // Espejo de _singer_only() en el cron send_practice_reminders (landmine #27).
+  const singer = useMemo(
+    () => isSingerOnly(lineupInstrumentsFor(order, currentMember)),
+    [order, currentMember]
+  );
+
   const percent = useMemo(
-    () => ensayometroPercent(uniqueSongIds, logs),
-    [uniqueSongIds, logs]
+    () => ensayometroPercent(uniqueSongIds, logs, singer),
+    [uniqueSongIds, logs, singer]
   );
 
   const totalPasses = useMemo(
@@ -461,7 +470,7 @@ export const Practica = () => {
           if (!song) return null;
           const log = logs[songRef.songId] || emptyLog(orderId, songRef.songId);
           const director = getMemberById(songRef.directorId);
-          const done = milestonesOf(log) === 4;
+          const done = milestonesOf(log, singer) === milestonesPerSong(singer);
 
           return (
             <Card
@@ -479,6 +488,7 @@ export const Practica = () => {
                     <div className="flex flex-wrap items-center gap-2 mt-1 text-sm text-gray-400">
                       {song.artist && <span className="truncate">{song.artist}</span>}
                       <Badge size="sm" variant="primary">Tono: {songRef.key}</Badge>
+                      {songRef.ministracion && <Badge size="sm" variant="warning">Ministración</Badge>}
                       {song.bpm && <Badge size="sm" variant="secondary">BPM: {song.bpm}</Badge>}
                       {director && (
                         <span className="flex items-center gap-1"><User size={12} /> {director.name}</span>
@@ -517,7 +527,10 @@ export const Practica = () => {
 
                 {/* Checks de dominio */}
                 <div className="flex flex-wrap gap-2">
-                  {MASTERY_CHECKS.map(({ field, label, icon: CheckIcon }) => {
+                  {singer && (
+                    <p className="w-full text-[11px] text-gray-500" data-testid="singer-note">Como cantás, «Frases y arreglos» no cuenta en tu progreso.</p>
+                  )}
+                  {MASTERY_CHECKS.filter(({ field }) => !(singer && field === 'knowsArrangements')).map(({ field, label, icon: CheckIcon }) => {
                     const active = !!log[field];
                     return (
                       <button

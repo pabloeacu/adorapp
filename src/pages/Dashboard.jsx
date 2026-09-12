@@ -40,6 +40,7 @@ import { lineupInstrumentsFor } from '../lib/lineup';
 // y en ART muestra el día anterior).
 const parseLocalDate = (d) => new Date(`${String(d).slice(0, 10)}T00:00:00`);
 import { ServiceFeedbackPrompt } from '../components/dashboard/ServiceFeedbackPrompt';
+import { MinistrationBanner } from '../components/dashboard/MinistrationBanner';
 import { CollaborationBanner } from '../components/dashboard/CollaborationBanner';
 
 const getInstrumentIcon = (instrument) => {
@@ -115,6 +116,13 @@ export const Dashboard = () => {
         artHour={artHour}
         profileName={profile?.name}
       />
+
+      {/* ¿Con qué ministramos? — CONDICIONAL: servicio EN EJECUCIÓN (desde la hora de
+          inicio y por 3 h), solo líder de la banda del orden y pastores. Va primero:
+          es lo más urgente mientras el servicio está ocurriendo. En SilentBoundary. */}
+      <SilentBoundary>
+        <MinistrationBanner member={member} role={role} />
+      </SilentBoundary>
 
       {/* Preparación personal — CONDICIONAL: sólo si el miembro participa en un
           orden programado próximo con canciones. En SilentBoundary para que, ante

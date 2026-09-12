@@ -330,6 +330,16 @@ export const Ordenes = () => {
     e.preventDefault();
     if (!formData.date || !formData.bandId) return;
 
+    // La hora del servicio es obligatoria (la base también la exige: NOT NULL).
+    if (!formData.time || !/^([01][0-9]|2[0-3]):[0-5][0-9]$/.test(formData.time)) {
+      setErrorModal({
+        isOpen: true,
+        title: 'Falta la hora',
+        message: 'Indicá la hora de inicio del servicio: los avisos y el banner de ministración dependen de ella.',
+      });
+      return;
+    }
+
     // Un orden no se puede guardar sin repertorio: al menos una canción.
     if (!formData.songs || formData.songs.length === 0) {
       setErrorModal({
@@ -605,6 +615,17 @@ export const Ordenes = () => {
       doc.setFont('helvetica', 'normal');
       doc.setFontSize(11);
       doc.text(song?.title || 'Sin título', 35, y);
+      if (songRef.ministracion) {
+        // Etiqueta "Ministración" a continuación del título (misma fila).
+        const w = doc.getTextWidth(song?.title || 'Sin título');
+        doc.setFontSize(8);
+        doc.setTextColor(...purple);
+        doc.setFont('helvetica', 'bold');
+        doc.text('MINISTRACIÓN', 35 + w + 3, y);
+        doc.setTextColor(...white);
+        doc.setFont('helvetica', 'normal');
+        doc.setFontSize(11);
+      }
       if (song?.artist) {
         doc.setFontSize(9);
         doc.setTextColor(...mediumGray);
@@ -2044,8 +2065,9 @@ export const Ordenes = () => {
                       </span>
                       <div className="flex-1">
                         <p className="font-medium">{song?.title}</p>
-                        <div className="flex items-center gap-2 text-sm text-gray-400">
+                        <div className="flex flex-wrap items-center gap-2 text-sm text-gray-400">
                           <Badge size="sm" variant="primary">Tono: {songRef.key}</Badge>
+                          {songRef.ministracion && <Badge size="sm" variant="warning">Ministración</Badge>}
                           {director && (
                             <span className="flex items-center gap-1">
                               <User size={12} /> {director.name}
