@@ -36,16 +36,19 @@ Deno.serve(async (req: Request) => {
   // (a) Solo con una clave del proyecto (el runner manda la anon key). OJO: en el
   // runtime de las EFs `SUPABASE_ANON_KEY` puede ser la clave publishable nueva
   // (`sb_publishable_…`) mientras el runner manda la anon key legacy (JWT): por eso,
-  // si no coincide con las del entorno, se valida contra el gateway del proyecto
-  // (`/rest/v1/` con `apikey` → 401 si la clave no es de este proyecto).
+  // si no coincide con las del entorno, se valida contra el gateway del proyecto:
+  // `GET /auth/v1/settings` con `apikey` responde 200 a la anon/publishable de ESTE
+  // proyecto y 401 a cualquier otra cosa (verificado: legacy 200, publishable 200,
+  // basura 401, JWT forjado con el mismo ref 401). `/rest/v1/` NO sirve: hoy exige
+  // service_role para el OpenAPI.
   const auth = req.headers.get("Authorization") || "";
   const token = auth.startsWith("Bearer ") ? auth.slice(7).trim() : "";
   if (!token) return json({ error: "Unauthorized" }, 401);
   let keyOk = token === anon || token === serviceKey;
   if (!keyOk && token.length < 2048) {
     try {
-      const probe = await fetch(`${url}/rest/v1/`, { method: "HEAD", headers: { apikey: token } });
-      keyOk = probe.status !== 401 && probe.status !== 403;
+      const probe = await fetch(`${url}/auth/v1/settings`, { headers: { apikey: token } });
+      keyOk = probe.status === 200;
     } catch { keyOk = false; }
   }
   if (!keyOk) return json({ error: "Unauthorized" }, 401);
