@@ -8,9 +8,8 @@ import { IconBadge } from '../ui/IconBadge';
 import {
   directorIdsOf, coverageGaps, suggestRotation, lineupEntries, sortInstruments, instrumentRank, formatShortDate,
 } from '../../lib/lineup';
+import { matchesSearch as matchesSearchText } from '../../lib/searchText';
 
-// Normaliza acentos/mayúsculas para el buscador (mismo criterio que Bandas).
-const norm = (s) => (s || '').normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase();
 
 const ROLE_LABEL = { pastor: 'Pastor', leader: 'Líder', member: 'Miembro' };
 
@@ -138,8 +137,7 @@ export const LineupEditor = ({ bandId, songs = [], orderDate = null, excludeOrde
       return byName(a, b);
     });
   }, [bandMembers, directorIds]);
-  const q = norm(search.trim());
-  const visible = q ? sorted.filter((m) => norm(m.name).includes(q)) : sorted;
+  const visible = sorted.filter((m) => matchesSearchText(search, m.name));
 
   const nameOf = (id) => membersById.get(id)?.name || 'alguien';
 

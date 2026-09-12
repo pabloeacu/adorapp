@@ -1,4 +1,5 @@
 import React, { useState, useMemo, useEffect, useRef } from 'react';
+import { matchesSearch as matchesSearchText } from '../lib/searchText';
 import { useSearchParams, Link } from 'react-router-dom';
 import { useDocumentTitle } from '../hooks/useDocumentTitle';
 import {
@@ -224,12 +225,8 @@ export const Ordenes = () => {
   // crash the whole Ordenes page with "Cannot read properties of null".
   const filteredSongsForDropdown = useMemo(() => {
     if (!songSearchTerm.trim()) return songs.slice(0, 10);
-    const search = songSearchTerm.toLowerCase();
-    return songs.filter(song =>
-      (song.title || '').toLowerCase().includes(search) ||
-      (song.artist || '').toLowerCase().includes(search) ||
-      (song.key || '').toLowerCase().includes(search)
-    ).slice(0, 15);
+    // Indistinto a tildes y mayúsculas (src/lib/searchText.js).
+    return songs.filter(song => matchesSearchText(songSearchTerm, song.title, song.artist, song.key)).slice(0, 15);
   }, [songs, songSearchTerm]);
 
   const handleOpenModal = (order = null) => {
