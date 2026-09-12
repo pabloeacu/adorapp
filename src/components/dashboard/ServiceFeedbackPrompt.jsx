@@ -5,15 +5,15 @@ import { Modal } from '../ui/Modal';
 import { callAdminFunction } from '../../lib/supabase';
 
 // Feedback post-servicio ("¿Cómo estuvimos?") — CONDICIONAL y OPTATIVO. Aparece en
-// "Mi Adorapp" para un PASTOR (cualquier banda) o el LÍDER integrante de la banda de
-// un servicio que ya ocurrió (≥ 4 h después de la hora del servicio, dentro de las
-// últimas 2 semanas). Si no hay nada que ofrecer, o ya envié, o lo descarté →
-// renderiza null (va en SilentBoundary desde el Dashboard). El envío va SOLO por la
-// Edge Function send-service-feedback (valida rol server-side + manda por correo a la
-// banda con copia a pastores).
+// "Mi Adorapp" SOLO para el LÍDER de la banda que tuvo el servicio (rol líder +
+// integrante permanente), durante las 48 h siguientes a la hora del servicio, y
+// después desaparece sola (regla de Paul, 2026-09-12; antes cualquier integrante de la
+// banda la veía porque no se chequeaba el rol — lo reportó Gustavo, que es miembro).
+// La regla vive en src/lib/serviceFeedback.js (pura, testeada) y la Edge Function
+// send-service-feedback aplica la misma del lado del servidor. Si no hay nada que
+// ofrecer, o ya envié, o lo descarté → renderiza null (va en SilentBoundary).
 
-const FOUR_H_MS = 4 * 3600 * 1000;
-const RECENCY_MS = 14 * 86400 * 1000;
+import { resolveFeedbackOrder, feedbackWindow } from '../../lib/serviceFeedback';
 
 const fmtDate = (d) => {
   try {
@@ -25,47 +25,12 @@ const fmtDate = (d) => {
   }
 };
 
-// Epoch (ms, UTC) del inicio del servicio expresado en hora de Argentina (UTC-3, sin
-// DST → UTC = ART + 3 h). Permite comparar contra Date.now() sin depender de la TZ
-// del dispositivo.
-const serviceStartEpoch = (date, time) => {
-  if (!date) return null;
-  const [Y, M, D] = String(date).slice(0, 10).split('-').map(Number);
-  if (!Y || !M || !D) return null;
-  const [h, mi] = String(time || '00:00').split(':').map(Number);
-  return Date.UTC(Y, M - 1, D, (h || 0) + 3, mi || 0);
-};
-
-// Orden elegible más reciente para pedir feedback. Función de módulo (pura) para que
-// el useMemo del componente sea preservable por el React Compiler (como PrepBanner).
-const resolveFeedbackOrder = (orders, memberId, role, getEffectiveBandMemberIds, nowMs) => {
-  try {
-    if (!Array.isArray(orders) || !memberId) return null;
-    const isPastor = role === 'pastor';
-    let best = null, bestS = -Infinity;
-    for (const o of orders) {
-      if (!o || o.status === 'cancelled' || !o.bandId) continue;
-      const s = serviceStartEpoch(o.date, o.time);
-      if (s == null) continue;
-      if (nowMs < s + FOUR_H_MS) continue;      // todavía no pasaron 4 h del servicio
-      if (nowMs > s + RECENCY_MS) continue;     // demasiado viejo (no molestar)
-      const inBand = getEffectiveBandMemberIds(o.bandId).has(memberId);
-      if (!isPastor && !inBand) continue;       // pastor: cualquiera; líder: su banda (efectiva)
-      if (s > bestS) { best = o; bestS = s; }   // el más reciente
-    }
-    return best;
-  } catch {
-    return null;
-  }
-};
-
 const dismissKey = (orderId) => `adorapp_fb_dismissed_${orderId}`;
 
 export const ServiceFeedbackPrompt = ({ member, role }) => {
   const orders = useAppStore((s) => s.orders);
+  const bands = useAppStore((s) => s.bands);
   const getBandById = useAppStore((s) => s.getBandById);
-  const getEffectiveBandMemberIds = useAppStore((s) => s.getEffectiveBandMemberIds);
-  const bandTemporaryMembers = useAppStore((s) => s.bandTemporaryMembers);
   const fetchServiceFeedbackForOrder = useAppStore((s) => s.fetchServiceFeedbackForOrder);
 
   const [order, setOrder] = useState(null);
@@ -79,14 +44,21 @@ export const ServiceFeedbackPrompt = ({ member, role }) => {
   // Resolvemos el orden elegible DENTRO del effect (ahí Date.now() es válido) y lo
   // guardamos en estado. Luego consultamos si ya envié / lo descarté para decidir si
   // mostrar la tarjeta.
+  // `tick` fuerza una re-evaluación cuando vence la ventana de 48 h con la pantalla
+  // abierta: la tarjeta desaparece sola, sin recargar.
+  const [tick, setTick] = useState(0);
   useEffect(() => {
     let alive = true;
-    const o = resolveFeedbackOrder(orders, member?.id, role, getEffectiveBandMemberIds, Date.now());
+    const now = Date.now();
+    const o = resolveFeedbackOrder(orders, member, role, getBandById, now);
     setOrder(o);
     if (!o?.id) { setStatus('hidden'); return () => { alive = false; }; }
+    const w = feedbackWindow(o);
+    const msLeft = w ? Math.max(0, w.end - now) : 0;
+    const timer = setTimeout(() => { if (alive) setTick((t) => t + 1); }, Math.min(msLeft + 250, 2 ** 31 - 1));
     let dismissed = false;
     try { dismissed = !!localStorage.getItem(dismissKey(o.id)); } catch { /* bloqueado → mostrar igual */ }
-    if (dismissed) { setStatus('hidden'); return () => { alive = false; }; }
+    if (dismissed) { setStatus('hidden'); return () => { alive = false; clearTimeout(timer); }; }
     (async () => {
       try {
         const rows = await fetchServiceFeedbackForOrder(o.id);
@@ -97,8 +69,8 @@ export const ServiceFeedbackPrompt = ({ member, role }) => {
         if (alive) setStatus('hidden');
       }
     })();
-    return () => { alive = false; };
-  }, [orders, member?.id, member?.userId, role, getEffectiveBandMemberIds, bandTemporaryMembers, fetchServiceFeedbackForOrder]);
+    return () => { alive = false; clearTimeout(timer); };
+  }, [orders, bands, member, role, getBandById, fetchServiceFeedbackForOrder, tick]);
 
   const dismiss = () => {
     try { if (order?.id) localStorage.setItem(dismissKey(order.id), '1'); } catch { /* noop */ }
@@ -122,6 +94,7 @@ export const ServiceFeedbackPrompt = ({ member, role }) => {
     if (err) {
       // Si ya se había enviado (otra pestaña/dispositivo), tratarlo como éxito.
       if (err === 'ya_enviado') { finishSent(); return; }
+      if (err === 'ventana_vencida') { setError('Pasaron más de 48 horas del servicio: la devolución ya no está disponible.'); return; }
       setError(err || 'No se pudo enviar. Probá de nuevo.');
       return;
     }
@@ -151,7 +124,7 @@ export const ServiceFeedbackPrompt = ({ member, role }) => {
   // status === 'prompt'
   return (
     <>
-      <div className="rounded-2xl p-5 border border-gold-500/25 bg-gradient-to-br from-gold-600/[0.28] via-neutral-900 to-gold-300/[0.10]">
+      <div className="rounded-2xl p-5 border border-gold-500/25 bg-gradient-to-br from-gold-600/[0.28] via-neutral-900 to-gold-300/[0.10]" data-testid="feedback-prompt">
         <div className="flex items-start gap-4">
           <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-gold-500/15 ring-1 ring-gold-500/25 text-gold-300">
             <MessageSquare size={22} />
