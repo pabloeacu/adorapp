@@ -6,6 +6,8 @@ import { Button } from '../ui/Button';
 import { Avatar } from '../ui/Avatar';
 import { Modal } from '../ui/Modal';
 import { SuccessModal, ErrorModal } from '../ui/ConfirmModal';
+import { collabResultWindow, inWindow } from '../../lib/bannerLifetime';
+import { useLifetimeTick } from '../../hooks/useLifetimeTick';
 
 const loadDismissed = () => {
   try { return new Set(JSON.parse(localStorage.getItem('adorapp_collab_dismissed') || '[]')); } catch { return new Set(); }
@@ -72,6 +74,13 @@ export const CollaborationBanner = () => {
     () => (member?.id ? getCollaborationFeed(member.id) : { invited: [], offered: [], managing: [], results: [] }),
     [member?.id, getCollaborationFeed, reqs, parts],
   );
+  // Resultado (aceptado/no aceptado): 48 h desde la decisión y nunca después de la hora
+  // del servicio (bannerLifetime.js); sin fecha de decisión no vence. La ✕ sigue.
+  const resultWindows = useMemo(
+    () => feed.results.map((x) => collabResultWindow(x.decidedAt, orders.find((o) => o.id === x.request.orderId))),
+    [feed.results, orders],
+  );
+  const nowMs = useLifetimeTick(resultWindows);
 
   if (!member?.id) return null;
 
@@ -83,7 +92,7 @@ export const CollaborationBanner = () => {
   // "ofrecido" incluye los que acabo de ofrecer (optimista) aunque el realtime tarde.
   const invited = feed.invited.filter((r) => !justOffered.has(r.id));
   const offered = [...feed.offered, ...feed.invited.filter((r) => justOffered.has(r.id))];
-  const results = feed.results.filter((x) => !dismissed.has(x.request.id));
+  const results = feed.results.filter((x, i) => !dismissed.has(x.request.id) && (!resultWindows[i] || inWindow(resultWindows[i], nowMs)));
 
   const nothing = !invited.length && !offered.length && !feed.managing.length && !results.length;
   if (nothing) return null;

@@ -3,7 +3,8 @@ import { Link } from 'react-router-dom';
 import { ChevronRight, MonitorPlay, FileText, Loader2, SlidersHorizontal } from 'lucide-react';
 import { useAppStore, MEETING_TYPES } from '../../stores/appStore';
 import { effectiveAreas } from '../../lib/areas';
-import { pickObserverFocus, observerBannerContent } from '../../lib/observerBanners';
+import { pickObserverFocus, observerBannerContent, observerWindows } from '../../lib/observerBanners';
+import { useLifetimeTick } from '../../hooks/useLifetimeTick';
 import { downloadOrderLyricsDocx } from '../../lib/lyricsDocx';
 import { isChunkLoadError, recoverFromStaleChunk } from '../../lib/chunkRecovery';
 import { ChannelPlanModal } from '../orders/ChannelPlanModal';
@@ -163,20 +164,36 @@ const AreaBanner = ({ area, order, state }) => {
 // de un área en la ficha ve un banner por cada una (apilados: Multimedia arriba, Sonido abajo).
 export const ObserverAreaBanners = ({ member, role, todayART }) => {
   const orders = useAppStore((s) => s.orders);
+  const getEffectiveBandMemberIds = useAppStore((s) => s.getEffectiveBandMemberIds);
+  useAppStore((s) => s.bandTemporaryMembers); // pertenencia efectiva (coveredElsewhere)
   const areas = effectiveAreas(member, role);
   const mine = STACK_ORDER.filter((a) => areas.includes(a));
 
-  const changedSinceART = useMemo(() => {
-    const d = new Date(`${todayART}T00:00:00`);
-    d.setDate(d.getDate() - 7);
-    return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
-  }, [todayART]);
+  // Reloj: cada estado tiene su ventana (bannerLifetime.js); el banner cambia/desaparece
+  // solo al vencer, sin recargar.
+  const windows = useMemo(() => observerWindows(orders), [orders]);
+  const nowMs = useLifetimeTick(windows);
+
+  // El "¡Ojo! Hubo cambios" NO se repite acá si esta persona ya recibe el aviso de la
+  // banda por ese orden (OrderChangedBanner: banda efectiva ∪ pastores).
+  const memberId = member?.id;
+  const ctx = useMemo(() => ({
+    nowMs,
+    todayART,
+    memberId,
+    coveredElsewhere: (o) => {
+      if (!memberId || !o?.bandId) return false;
+      if (role === 'pastor') return true;
+      const ids = getEffectiveBandMemberIds?.(o.bandId);
+      return !!ids && ids.has(memberId);
+    },
+  }), [nowMs, todayART, memberId, role, getEffectiveBandMemberIds]);
 
   if (!mine.length) return null;
 
   const banners = mine
     .map((area) => {
-      const focus = pickObserverFocus(area, orders, todayART, changedSinceART);
+      const focus = pickObserverFocus(area, orders, ctx);
       return focus ? { area, order: focus.order, state: focus.state } : null;
     })
     .filter(Boolean);
