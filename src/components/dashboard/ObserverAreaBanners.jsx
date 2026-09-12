@@ -5,6 +5,7 @@ import { useAppStore, MEETING_TYPES } from '../../stores/appStore';
 import { memberAreas } from '../../lib/areas';
 import { pickObserverFocus, observerBannerContent } from '../../lib/observerBanners';
 import { downloadOrderLyricsDocx } from '../../lib/lyricsDocx';
+import { isChunkLoadError, recoverFromStaleChunk } from '../../lib/chunkRecovery';
 import { ChannelPlanModal } from '../orders/ChannelPlanModal';
 
 // Banners premium de las áreas OBSERVADORAS (Multimedia / Sonido). Identidad (su logo),
@@ -61,8 +62,10 @@ const AreaBanner = ({ area, order, state }) => {
         || MEETING_TYPES.find((m) => m.id === order.meetingType)?.label
         || 'Servicio';
       await downloadOrderLyricsDocx(order, getSongById, meetingLabel);
-    } catch {
-      /* si falla, no rompe nada; el usuario puede reintentar */
+    } catch (err) {
+      // `docx` se carga por import() dinámico: si el chunk quedó viejo por una publicación
+      // nueva, recargar una vez. Cualquier otro fallo no rompe nada; se puede reintentar.
+      if (isChunkLoadError(err)) recoverFromStaleChunk();
     } finally {
       setDownloading(false);
     }

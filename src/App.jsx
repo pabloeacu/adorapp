@@ -7,6 +7,7 @@ import { useAppStore } from './stores/appStore';
 import { useCurrentRole } from './hooks/useCurrentMember';
 import { getUpdateState, subscribeUpdate, markUpdateStep, finishUpdate, isPreReloadStep, UPDATE_STEPS, pctOf } from './lib/updateProgress';
 import { runBoot } from './lib/boot';
+import { withChunkRecovery } from './lib/chunkRecovery';
 
 // Lazy-loaded route components. Each compiles into its own chunk, so a user
 // who only ever opens Login / Dashboard does not download the Repertorio
@@ -14,8 +15,12 @@ import { runBoot } from './lib/boot';
 //
 // `.then(m => ({ default: m.Foo }))` is needed because the page modules use
 // named exports rather than default ones.
+//
+// `withChunkRecovery`: si el chunk no existe más porque se publicó una versión nueva
+// (hashes distintos), recarga la página UNA vez en lugar de mostrar "Algo salió mal"
+// (ver src/lib/chunkRecovery.js).
 const lazyPage = (importer, name) =>
-  lazy(() => importer().then(m => ({ default: m[name] })));
+  lazy(withChunkRecovery(() => importer().then(m => ({ default: m[name] }))));
 
 const Login = lazyPage(() => import('./pages/Login'), 'Login');
 const Dashboard = lazyPage(() => import('./pages/Dashboard'), 'Dashboard');
