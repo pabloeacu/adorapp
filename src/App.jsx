@@ -5,6 +5,7 @@ import { PageLoader } from './components/ui/PageLoader';
 import { useAuthStore } from './stores/authStore';
 import { useAppStore } from './stores/appStore';
 import { useCurrentRole } from './hooks/useCurrentMember';
+import { getUpdateState, subscribeUpdate, markUpdateStep, finishUpdate, isPreReloadStep, UPDATE_STEPS } from './lib/updateProgress';
 
 // Lazy-loaded route components. Each compiles into its own chunk, so a user
 // who only ever opens Login / Dashboard does not download the Repertorio
@@ -85,27 +86,56 @@ const RouteSync = ({ children }) => {
   return children;
 };
 
+// Estado de "Actualizando a la nueva versión" (ver lib/updateProgress.js).
+const useUpdateProgress = () => {
+  const [state, setState] = useState(getUpdateState);
+  useEffect(() => subscribeUpdate(setState), []);
+  return state;
+};
+
 function App() {
   const [initialized, setInitialized] = useState(false);
   const initializeAuth = useAuthStore((state) => state.initialize);
   const initializeApp = useAppStore((state) => state.initialize);
   const authLoading = useAuthStore((state) => state.loading);
+  const update = useUpdateProgress();
 
   useEffect(() => {
     const init = async () => {
       await initializeAuth();
+      if (getUpdateState().active) markUpdateStep('session');
       await initializeApp();
+      if (getUpdateState().active) {
+        // Segunda carga de una actualización: cerramos la barra con "Listo" un
+        // instante antes de entrar, y limpiamos la marca.
+        markUpdateStep('data');
+        await new Promise((r) => setTimeout(r, 350));
+        markUpdateStep('done');
+        await new Promise((r) => setTimeout(r, 650));
+        finishUpdate();
+      }
       setInitialized(true);
     };
     init();
   }, [initializeAuth, initializeApp]);
 
+  const updateStep = update.active ? UPDATE_STEPS[update.step] : null;
+
   if (!initialized || authLoading) {
-    return <PageLoader fullscreen label="Cargando AdorAPP..." />;
+    return updateStep
+      ? <PageLoader fullscreen progress={updateStep.pct} caption={updateStep.caption} />
+      : <PageLoader fullscreen label="Cargando AdorAPP..." />;
   }
+
+  // La versión nueva se detectó con la app ya en pantalla: cubrimos la vista
+  // con la misma pantalla de progreso hasta que el SW recargue.
+  const updateOverlay = updateStep && isPreReloadStep(update.step)
+    ? <PageLoader overlay progress={updateStep.pct} caption={updateStep.caption} />
+    : null;
 
   return (
     <BrowserRouter>
+      {updateOverlay}
       <RouteSync>
         <Suspense fallback={<RouteFallback />}>
           <Routes>
