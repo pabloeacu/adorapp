@@ -6,6 +6,10 @@
 
 ---
 
+> ⚠️ **DOCUMENTO HISTÓRICO (abril 2026) — NO es la fuente de verdad.** Describe una versión muy temprana del proyecto y quedó desactualizado en casi todo (documenta 2 migraciones de 67, 0 Edge Functions de 13, 8 páginas de 10, y ninguno de los subsistemas de mayo–septiembre 2026). Para el estado real usá **`CLAUDE.md`** (contrato + landmines + secciones "Estado al…") y **`ARCHITECTURE.md`** (mapa + sección "Subsistemas Sep 2026"), más la base en vivo (Supabase MCP). **Dos secciones de acá están directamente MAL y podrían inducir a error de seguridad — ya corregidas abajo con una nota**: §4.3 (RLS) y §11.4 (variables de entorno).
+
+---
+
 ## 1. Visión General del Proyecto
 
 ### 1.1 Descripción
@@ -407,10 +411,16 @@ supabase.from('table').delete().eq('id', id)
 
 ### 4.3 Row Level Security (RLS)
 
-Todas las tablas tienen RLS habilitado con políticas que permiten operaciones completas para usuarios autenticados:
+> ⚠️ **CORRECCIÓN (2026-09-13): esto es FALSO en el sistema actual.** El ejemplo de abajo (`USING(true)` para todo autenticado) NO refleja la realidad y NO debe copiarse. El modelo vigente es lo OPUESTO a "CRUD abierto":
+> - Las políticas se apoyan en helpers `auth_role()` / `is_pastor()` / `is_pastor_or_leader()`; las escrituras son pastor o pastor/líder, no "cualquier autenticado".
+> - **`members` NO tiene SELECT de tabla para `authenticated`** (solo columnas no-PII); `email/phone/birthdate` salen únicamente por la vista `members_directory` + `member_private_fields()` (self-or-pastor). Un `from('members').select('*')` da **42501**. Migración `20260913_members_revoke_select.sql` (landmine #73).
+> - **`notifications`** tiene INSERT/UPDATE/DELETE **REVOCADOS** al cliente (landmine #42); muchas tablas son server-owned (write-only-via-EF/RPC): `service_feedback`, `member_activity`, `collaboration_*`, `audit_events`, `email_queue`, etc.
+> - Columnas privilegiadas congeladas por triggers INVOKER (`enforce_member_update_rules` #41, `enforce_band_update_rules`).
+>
+> Ver el modelo real en `ARCHITECTURE.md` → "Subsistemas Sep 2026" y `CLAUDE.md`. (Ejemplo original preservado abajo solo como referencia histórica de cómo NO es.)
 
 ```sql
--- Ejemplo para tabla members
+-- ⚠️ HISTÓRICO / INCORRECTO — no es el modelo real (ver corrección arriba)
 CREATE POLICY "Enable read access for authenticated users" ON members FOR SELECT TO authenticated USING (true);
 CREATE POLICY "Enable insert for authenticated users" ON members FOR INSERT TO authenticated WITH CHECK (true);
 CREATE POLICY "Enable update for authenticated users" ON members FOR UPDATE TO authenticated USING (true);
@@ -830,7 +840,7 @@ La aplicación se despliega usando la herramienta `deploy`:
 
 ### 11.4 Variables de Entorno
 
-No hay archivos `.env` - las credenciales de Supabase están hardcodeadas en `/src/lib/supabase.js` para simplificar el despliegue.
+> ⚠️ **CORRECCIÓN (2026-09-13): FALSO.** Las credenciales NO están hardcodeadas. `src/lib/supabase.js` lee `import.meta.env.VITE_SUPABASE_URL` y `VITE_SUPABASE_ANON_KEY` y **lanza error si faltan**. En dev van en `.env.local`; en prod, en las Environment Variables de Vercel. (Coincide con §2.3 de este mismo doc y con `docs/RUNBOOK.md`.) Nunca hardcodear keys.
 
 ---
 
