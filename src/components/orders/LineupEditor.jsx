@@ -7,6 +7,7 @@ import { Badge } from '../ui/Badge';
 import { IconBadge } from '../ui/IconBadge';
 import {
   directorIdsOf, coverageGaps, suggestRotation, lineupEntries, sortInstruments, instrumentRank, formatShortDate,
+  defaultInstrumentsFor, pendingChoiceIds,
 } from '../../lib/lineup';
 
 // Normaliza acentos/mayúsculas para el buscador (mismo criterio que Bandas).
@@ -70,19 +71,31 @@ export const LineupEditor = ({ bandId, songs = [], orderDate = null, excludeOrde
     onChange({ mode: nextMode, members: nextMode === 'custom' ? withDirectors(nextEntries, directorIds, membersById) : [] });
   };
 
+  // Entrada por defecto al sumar un miembro: los directores conservan su default
+  // por rol (Voz si la tienen, si no vacío); el resto sigue la regla de elección:
+  // 1 instrumento se asigna solo, 2+ queda vacío para que el líder ELIJA.
+  const defaultEntryFor = (m) => ({
+    memberId: m.id,
+    instruments: directorIds.has(m.id)
+      ? ((m.instruments || []).includes('Voz') ? ['Voz'] : [])
+      : defaultInstrumentsFor(m),
+  });
+
   const setAll = () => emit('all', []);
   const setCustom = () => {
     // Al pasar a "elegir", arranca con la selección previa (o todos, la primera vez).
-    const base = entries.length > directorIds.size ? entries : bandMembers.map((m) => ({ memberId: m.id, instruments: sortInstruments(m.instruments || []) }));
+    const base = entries.length > directorIds.size ? entries : bandMembers.map(defaultEntryFor);
     emit('custom', base);
   };
-  const selectEveryone = () => emit('custom', bandMembers.map((m) => ({ memberId: m.id, instruments: sortInstruments(m.instruments || []) })));
+  // "Todos": suma a todos SIN pisar las funciones ya elegidas (merge). Los que ya
+  // estaban conservan su instrumento; los nuevos entran con el default de elección.
+  const selectEveryone = () => emit('custom', bandMembers.map((m) => entryById.get(m.id) || defaultEntryFor(m)));
   const selectNobody = () => emit('custom', []);
 
   const togglePerson = (m) => {
     if (directorIds.has(m.id)) return; // bloqueado
     if (entryById.has(m.id)) emit('custom', entries.filter((e) => e.memberId !== m.id));
-    else emit('custom', [...entries, { memberId: m.id, instruments: sortInstruments(m.instruments || []) }]);
+    else emit('custom', [...entries, defaultEntryFor(m)]);
   };
 
   const toggleInstrument = (m, inst) => {
@@ -105,12 +118,22 @@ export const LineupEditor = ({ bandId, songs = [], orderDate = null, excludeOrde
   const applySuggestion = () => {
     let next = entries.map((e) => ({ ...e, instruments: [...e.instruments] }));
     for (const s of suggestions) {
+      // Snapshot ANTES de liberar el instrumento: distingue a quien ya estaba
+      // "pendiente" (vacío por elección aún sin definir) de quien se vacía JUSTO
+      // ahora al soltar el instrumento sugerido.
+      const before = new Map(next.map((e) => [e.memberId, e.instruments]));
       // Los demás candidatos del instrumento lo sueltan (los directores conservan
-      // lo suyo: dirigen y cantan igual); si quedan sin nada y no dirigen, salen.
+      // lo suyo: dirigen y cantan igual).
       next = next
         .map((e) => (e.memberId !== s.memberId && !directorIds.has(e.memberId) && e.instruments.includes(s.instrument)
           ? { ...e, instruments: e.instruments.filter((i) => i !== s.instrument) } : e))
-        .filter((e) => e.instruments.length > 0 || directorIds.has(e.memberId));
+        .filter((e) => {
+          if (e.instruments.length > 0 || directorIds.has(e.memberId)) return true;
+          // Quedó sin instrumentos: si YA estaba pendiente (vacío antes de este
+          // paso) se conserva como participante; si lo vaciamos ahora al liberar
+          // el instrumento sugerido, sale de la formación (rotó).
+          return (before.get(e.memberId) || []).length === 0;
+        });
       const cur = next.find((e) => e.memberId === s.memberId);
       if (cur) { if (!cur.instruments.includes(s.instrument)) cur.instruments = sortInstruments([...cur.instruments, s.instrument]); }
       else next.push({ memberId: s.memberId, instruments: [s.instrument] });
@@ -118,14 +141,31 @@ export const LineupEditor = ({ bandId, songs = [], orderDate = null, excludeOrde
     emit('custom', next);
   };
 
-  const gaps = useMemo(() => (mode === 'custom' ? coverageGaps(bandMembers, entries) : []), [mode, bandMembers, entries]);
+  // Miembros seleccionados con la función SIN elegir (2+ instrumentos, ninguno
+  // marcado). Guía al líder y, mientras haya pendientes, silencia la alerta de
+  // cobertura (que si no informaría "Sin guitarra…" por instrumentos que un
+  // seleccionado todavía podría cubrir → ruido). La cobertura real se muestra
+  // recién cuando ya no queda nadie pendiente.
+  const pendingIds = useMemo(
+    () => (mode === 'custom' ? pendingChoiceIds(entries, membersById, directorIds) : new Set()),
+    [mode, entries, membersById, directorIds],
+  );
+  const gaps = useMemo(
+    () => (mode === 'custom' && pendingIds.size === 0 ? coverageGaps(bandMembers, entries) : []),
+    [mode, bandMembers, entries, pendingIds],
+  );
 
-  // Conteo por instrumento (chips del resumen).
+  // Conteo por instrumento (chips del resumen). Solo cuenta instrumentos que el
+  // miembro TODAVÍA tiene en su ficha, así un instrumento viejo (drift) no
+  // muestra un badge sin su chip correspondiente.
   const counts = useMemo(() => {
     const c = new Map();
-    for (const e of entries) for (const i of e.instruments) c.set(i, (c.get(i) || 0) + 1);
+    for (const e of entries) {
+      const regd = membersById.get(e.memberId)?.instruments || [];
+      for (const i of e.instruments) if (regd.includes(i)) c.set(i, (c.get(i) || 0) + 1);
+    }
     return [...c.entries()].sort(([a], [b]) => instrumentRank(a) - instrumentRank(b));
-  }, [entries]);
+  }, [entries, membersById]);
 
   // Orden estable de la lista: directores primero, después por instrumento principal, después nombre.
   const sorted = useMemo(() => {
@@ -227,11 +267,16 @@ export const LineupEditor = ({ bandId, songs = [], orderDate = null, excludeOrde
                 <button type="button" onClick={selectNobody} className="rounded-full px-3 py-1 text-xs border border-neutral-700 text-gray-300 hover:border-gold-500/50 hover:text-gold-200">Ninguno</button>
               </div>
             </div>
-            {(counts.length > 0 || gaps.length > 0) && (
+            {(counts.length > 0 || gaps.length > 0 || pendingIds.size > 0) && (
               <div className="mt-2.5 flex flex-wrap gap-1.5">
                 {counts.map(([inst, n]) => (
                   <Badge key={inst} variant="gold" size="sm">{inst} · {n}</Badge>
                 ))}
+                {pendingIds.size > 0 && (
+                  <span data-testid="lineup-pending" className="inline-flex items-center gap-1 rounded-full bg-amber-500/20 text-amber-200 ring-1 ring-amber-400/50 px-2.5 py-1 text-xs font-semibold">
+                    <AlertTriangle size={11} /> Falta elegir instrumento · {pendingIds.size}
+                  </span>
+                )}
                 {gaps.map((inst) => (
                   <span key={`gap-${inst}`} data-testid="lineup-gap" className="inline-flex items-center gap-1 rounded-full bg-amber-500/15 text-amber-300 ring-1 ring-amber-500/30 px-2.5 py-1 text-xs font-medium">
                     <AlertTriangle size={11} /> Sin {inst.toLowerCase()}
@@ -292,12 +337,14 @@ export const LineupEditor = ({ bandId, songs = [], orderDate = null, excludeOrde
               const selected = !!entry;
               const locked = directorIds.has(m.id);
               const instruments = sortInstruments(m.instruments || []);
+              const pending = selected && pendingIds.has(m.id); // toca varios: falta elegir cuál
               return (
                 <div
                   key={m.id}
                   data-testid={`lineup-row-${m.id}`}
                   data-selected={selected ? '1' : '0'}
-                  className={`rounded-xl border-2 transition-all ${selected ? 'border-gold-500/60 bg-gold-500/10' : 'border-neutral-800 bg-neutral-900/60 hover:border-neutral-700'}`}
+                  data-pending={pending ? '1' : '0'}
+                  className={`rounded-xl border-2 transition-all ${pending ? 'border-amber-400/70 bg-amber-500/[0.08]' : selected ? 'border-gold-500/60 bg-gold-500/10' : 'border-neutral-800 bg-neutral-900/60 hover:border-neutral-700'}`}
                 >
                   <button
                     type="button"
@@ -329,7 +376,13 @@ export const LineupEditor = ({ bandId, songs = [], orderDate = null, excludeOrde
                     </div>
                   </button>
                   {selected && instruments.length > 0 && (
-                    <div className="flex flex-wrap gap-1.5 px-3 pb-3 -mt-1">
+                    <div className="px-3 pb-3 -mt-1">
+                      {pending && (
+                        <p className="mb-1.5 flex items-center gap-1 text-[11px] font-medium text-amber-200">
+                          <AlertTriangle size={11} /> Toca varios instrumentos: elegí con cuál participa en este servicio.
+                        </p>
+                      )}
+                      <div className="flex flex-wrap gap-1.5">
                       {instruments.map((inst) => {
                         const on = entry.instruments.includes(inst);
                         return (
@@ -347,6 +400,7 @@ export const LineupEditor = ({ bandId, songs = [], orderDate = null, excludeOrde
                           </button>
                         );
                       })}
+                      </div>
                     </div>
                   )}
                 </div>
