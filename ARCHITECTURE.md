@@ -1326,7 +1326,7 @@ Trigger BEFORE `set_order_content_changed` sella `content_changed_at` + `content
 ## Bandas: membresía efectiva permanente ∪ temporal (PR #79-81; landmines #37/#38/#40)
 `bands.members uuid[]` (permanentes) ∪ `band_temporary_members` (ventana 1-90 días, FORCE RLS). Helper `band_effective_member_ids`. Líderes AGREGAN (permanentes/temporales), solo pastor quita/edita. Store: `getEffectiveBandMemberIds`, `getBandMembers`, `addPermanent/addTemporary/removeTemporaryBandMember`. `Bandas.jsx`: modal "Agregar miembro" (líder+pastor) + badge temporal.
 
-## Formación: elegir la función del multi-instrumento (PR #139; landmine #82)
+## Formación: elegir la función del multi-instrumento (PR #139; landmine #79)
 `orders.lineup` custom: al sumar un miembro con 2+ instrumentos NO se le asignan todos; queda "pendiente" y el líder ELIGE (obligatorio ≥1 para guardar). `src/lib/lineup.js`: `defaultInstrumentsFor`, `pendingChoiceIds`. Gate bloqueante en `LineupModal`/alta de `Ordenes`. `validate_order_lineup` sigue SECURITY DEFINER (landmine #54).
 
 ## Cliente: arranque, banners y librerías puras
