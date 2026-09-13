@@ -1,6 +1,7 @@
-import React, { useState, useRef, useEffect } from 'react';
+import React, { useState, useRef, useEffect, useMemo } from 'react';
 import { createPortal } from 'react-dom';
-import { ChevronDown, Check } from 'lucide-react';
+import { ChevronDown, Check, Search } from 'lucide-react';
+import { matchesSearch } from '../../lib/searchText';
 
 // Desplegable propio de la plataforma. Dos presentaciones según el dispositivo:
 //  • ESCRITORIO (≥640px): panel flotante anclado al botón, por PORTAL con posición
@@ -8,22 +9,40 @@ import { ChevronDown, Check } from 'lucide-react';
 //    el espacio. El listener de scroll ignora el scroll DENTRO del panel.
 //  • MÓVIL (<640px): hoja inferior (bottom sheet) fija abajo — cómoda para el pulgar,
 //    no salta de posición ni se esconde, y no se cierra al scrollear la lista.
-// options: [{ value, label }].
-export const SelectMenu = ({ value, onChange, options = [], placeholder = 'Elegí…', disabled = false, icon: Icon, className = '' }) => {
+// options: [{ value, label, sublabel?, badge?, keywords? }].
+//  • `searchable`: buscador DENTRO de la hoja/panel (indistinto a tildes, src/lib/searchText.js)
+//    sobre label + sublabel + badge + keywords. Es el método para listas largas (repertorio):
+//    la lista scrollea en la hoja, nunca "atrapada" dentro del área scrolleable de un modal.
+//  • `beforeOpen()`: si devuelve false, no se abre (p. ej. "Elegí la banda primero").
+//  • `testId`: data-testid del botón; el buscador lleva `${testId}-search` y la lista `${testId}-list`.
+export const SelectMenu = ({
+  value, onChange, options = [], placeholder = 'Elegí…', disabled = false, icon: Icon, className = '',
+  searchable = false, searchPlaceholder = 'Buscar…', emptyText = 'Sin opciones', beforeOpen, testId,
+}) => {
   const [open, setOpen] = useState(false);
   const [rect, setRect] = useState(null);
   const [mobile, setMobile] = useState(false);
+  const [query, setQuery] = useState('');
   const btnRef = useRef(null);
   const panelRef = useRef(null);
   const selected = options.find((o) => o.value === value);
 
   const openMenu = () => {
     if (disabled) return;
+    if (beforeOpen && beforeOpen() === false) return;
+    setQuery('');
     setMobile(typeof window !== 'undefined' && window.innerWidth < 640);
     const r = btnRef.current?.getBoundingClientRect();
     if (r) setRect({ left: r.left, top: r.top, bottom: r.bottom, width: r.width });
     setOpen(true);
   };
+
+  const visible = useMemo(
+    () => (searchable && query.trim()
+      ? options.filter((o) => matchesSearch(query, o.label, o.sublabel, o.badge, o.keywords))
+      : options),
+    [options, searchable, query]
+  );
 
   // Escritorio: cerrar ante scroll/resize (la posición fija quedaría desalineada),
   // PERO no cuando el scroll ocurre DENTRO del propio panel (lista de opciones). En
@@ -44,9 +63,9 @@ export const SelectMenu = ({ value, onChange, options = [], placeholder = 'Eleg�
   const up = rect && spaceBelow < 260 && rect.top > spaceBelow;
 
   const optionList = (
-    <>
-      {options.length === 0 && <div className="px-3 py-2 text-sm text-gray-500">Sin opciones</div>}
-      {options.map((o) => {
+    <div data-testid={testId ? `${testId}-list` : undefined}>
+      {visible.length === 0 && <div className="px-3 py-3 text-sm text-gray-500">{emptyText}</div>}
+      {visible.map((o) => {
         const on = o.value === value;
         return (
           <button
@@ -57,13 +76,34 @@ export const SelectMenu = ({ value, onChange, options = [], placeholder = 'Eleg�
               on ? 'bg-gold-500/15 text-gold-100' : 'text-gray-200 hover:bg-neutral-800 active:bg-neutral-800'
             }`}
           >
-            <span className="truncate text-sm">{o.label}</span>
-            {on && <Check size={16} className="shrink-0 text-gold-300" />}
+            <span className="min-w-0">
+              <span className="block truncate text-sm">{o.label}</span>
+              {o.sublabel ? <span className="block truncate text-xs text-gray-500">{o.sublabel}</span> : null}
+            </span>
+            {on ? <Check size={16} className="shrink-0 text-gold-300" /> : o.badge ? (
+              <span className="shrink-0 rounded-md bg-gold-500/15 px-1.5 py-0.5 text-[11px] font-semibold text-gold-200">{o.badge}</span>
+            ) : null}
           </button>
         );
       })}
-    </>
+    </div>
   );
+
+  // Buscador dentro de la hoja/panel (solo `searchable`). Autofoco: al abrir, ya se puede tipear.
+  const searchBox = searchable ? (
+    <div className="relative px-1 pb-2">
+      <Search size={15} className="pointer-events-none absolute left-4 top-1/2 -translate-y-1/2 text-gray-500" />
+      <input
+        type="text"
+        value={query}
+        onChange={(e) => setQuery(e.target.value)}
+        placeholder={searchPlaceholder}
+        autoFocus
+        data-testid={testId ? `${testId}-search` : undefined}
+        className="w-full bg-neutral-800 border border-neutral-700 rounded-xl pl-9 pr-3 py-2.5 text-sm text-white placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-gold-500/40"
+      />
+    </div>
+  ) : null;
 
   return (
     <div className={`relative ${className}`}>
@@ -71,6 +111,7 @@ export const SelectMenu = ({ value, onChange, options = [], placeholder = 'Eleg�
         ref={btnRef}
         type="button"
         disabled={disabled}
+        data-testid={testId}
         onClick={() => (open ? setOpen(false) : openMenu())}
         className={`w-full flex items-center justify-between gap-2 px-4 py-2.5 bg-neutral-900 border rounded-xl transition-colors disabled:opacity-50 disabled:cursor-not-allowed ${
           value ? 'border-gold-500/60 text-white' : 'border-neutral-700 text-gray-400 hover:text-white'
@@ -89,12 +130,13 @@ export const SelectMenu = ({ value, onChange, options = [], placeholder = 'Eleg�
           <div className="fixed inset-0 z-[300] bg-black/50" onClick={() => setOpen(false)} />
           <div
             ref={panelRef}
-            className="fixed inset-x-0 bottom-0 z-[301] bg-neutral-900 border-t border-gold-500/20 rounded-t-2xl shadow-2xl max-h-[70vh] overflow-y-auto overscroll-contain p-2 animate-slide-up"
+            className={`fixed inset-x-0 bottom-0 z-[301] flex flex-col bg-neutral-900 border-t border-gold-500/20 rounded-t-2xl shadow-2xl overscroll-contain p-2 animate-slide-up ${searchable ? 'h-[85vh]' : 'max-h-[70vh]'}`}
             style={{ paddingBottom: 'calc(0.5rem + env(safe-area-inset-bottom, 0px))' }}
           >
-            <div className="mx-auto mb-2 mt-1 h-1 w-10 rounded-full bg-neutral-600" aria-hidden="true" />
-            {placeholder && <p className="px-3 pb-1.5 text-[11px] uppercase tracking-wider text-neutral-500">{placeholder}</p>}
-            {optionList}
+            <div className="mx-auto mb-2 mt-1 h-1 w-10 shrink-0 rounded-full bg-neutral-600" aria-hidden="true" />
+            {placeholder && <p className="shrink-0 px-3 pb-1.5 text-[11px] uppercase tracking-wider text-neutral-500">{placeholder}</p>}
+            {searchBox}
+            <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain">{optionList}</div>
           </div>
         </>,
         document.body,
@@ -106,10 +148,11 @@ export const SelectMenu = ({ value, onChange, options = [], placeholder = 'Eleg�
           <div className="fixed inset-0 z-[300]" onClick={() => setOpen(false)} />
           <div
             ref={panelRef}
-            className="fixed z-[301] bg-neutral-900 border border-neutral-700 rounded-xl shadow-2xl max-h-60 overflow-y-auto overscroll-contain p-1.5"
+            className={`fixed z-[301] flex flex-col bg-neutral-900 border border-neutral-700 rounded-xl shadow-2xl overscroll-contain p-1.5 ${searchable ? 'max-h-96' : 'max-h-60'}`}
             style={{ left: rect.left, width: rect.width, ...(up ? { bottom: window.innerHeight - rect.top + 6 } : { top: rect.bottom + 6 }) }}
           >
-            {optionList}
+            {searchBox}
+            <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain">{optionList}</div>
           </div>
         </>,
         document.body,
