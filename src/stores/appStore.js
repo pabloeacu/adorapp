@@ -1640,7 +1640,7 @@ export const MEMBER_ROLES = [
 ];
 
 export const INSTRUMENTS = [
-  'Voz', 'Guitarra Eléctrica', 'Guitarra Acústica', 'Piano', 'Teclado', 'Batería', 'Bajo', 'Violín', 'Flauta', 'Saxofón', 'Trompeta', 'Coros'
+  'Voz', 'Guitarra Eléctrica', 'Guitarra Acústica', 'Piano', 'Teclado', 'Batería', 'Percusión', 'Bajo', 'Violín', 'Flauta', 'Saxofón', 'Trompeta', 'Coros'
 ];
 
 export const MUSICAL_KEYS = [

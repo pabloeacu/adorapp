@@ -51,7 +51,7 @@ const getInstrumentIcon = (instrument) => {
   const lower = instrument.toLowerCase();
   if (lower.includes('guitarra')) return Guitar;
   if (lower.includes('voz') || lower.includes('coros')) return Mic2;
-  if (lower.includes('bater')) return Drum;
+  if (lower.includes('bater') || lower.includes('percu')) return Drum;
   if (lower.includes('piano') || lower.includes('teclado')) return Piano;
   return User;
 };

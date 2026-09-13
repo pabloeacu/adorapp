@@ -14,7 +14,7 @@
 
 export const INSTRUMENT_ORDER = [
   'Voz', 'Coros', 'Guitarra Eléctrica', 'Guitarra Acústica', 'Piano', 'Teclado',
-  'Bajo', 'Batería', 'Violín', 'Flauta', 'Saxofón', 'Trompeta',
+  'Bajo', 'Batería', 'Percusión', 'Violín', 'Flauta', 'Saxofón', 'Trompeta',
 ];
 
 export const instrumentRank = (instrument) => {
