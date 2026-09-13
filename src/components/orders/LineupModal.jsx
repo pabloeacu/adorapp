@@ -2,7 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { useAppStore } from '../../stores/appStore';
 import { Modal } from '../ui/Modal';
 import { Button } from '../ui/Button';
-import { SuccessModal, ErrorModal, ConfirmModal } from '../ui/ConfirmModal';
+import { SuccessModal, ErrorModal } from '../ui/ConfirmModal';
 import { LineupEditor } from './LineupEditor';
 import { buildLineup, lineupEntries, directorIdsOf, pendingChoiceIds } from '../../lib/lineup';
 
@@ -17,7 +17,7 @@ export const LineupModal = ({ isOpen, onClose, order, onSaved }) => {
   const [submitting, setSubmitting] = useState(false);
   const [success, setSuccess] = useState({ isOpen: false, message: '' });
   const [error, setError] = useState({ isOpen: false, message: '' });
-  const [pendingConfirm, setPendingConfirm] = useState({ isOpen: false, count: 0 });
+  const [pendingBlock, setPendingBlock] = useState(false);
 
   useEffect(() => {
     if (!isOpen || !order) return;
@@ -36,8 +36,12 @@ export const LineupModal = ({ isOpen, onClose, order, onSaved }) => {
     return pendingChoiceIds(value.members, membersById, directorIdsOf(order.songs)).size;
   })();
 
-  const handleSave = async (opts = {}) => {
+  const handleSave = async () => {
     if (!order || submitting || invalid) return;
+    // OBLIGATORIO (pedido de Paul): cada integrante con instrumentos en su ficha
+    // debe tener AL MENOS uno elegido (puede elegir más de uno). Bloquea el
+    // guardado — no es una advertencia salteable.
+    if (pendingCount > 0) { setPendingBlock(true); return; }
     const built = buildLineup(value.mode, value.members);
     // No-op guard: si la formación quedó igual a la guardada, NO reenviar. Un
     // re-guardado sin cambios, si no, re-sella definedBy/definedAt y dispara
@@ -46,11 +50,6 @@ export const LineupModal = ({ isOpen, onClose, order, onSaved }) => {
     const originalMode = order.lineup?.mode === 'custom' ? 'custom' : 'all';
     const original = buildLineup(originalMode, originalMode === 'custom' ? lineupEntries(order.lineup) : []);
     if (JSON.stringify(built) === JSON.stringify(original)) { onClose(); return; }
-    // Aviso no bloqueante por funciones sin elegir (una sola vez).
-    if (!opts.skipPendingCheck && pendingCount > 0) {
-      setPendingConfirm({ isOpen: true, count: pendingCount });
-      return;
-    }
     setSubmitting(true);
     const res = await updateOrder(order.id, { lineup: built });
     setSubmitting(false);
@@ -96,15 +95,11 @@ export const LineupModal = ({ isOpen, onClose, order, onSaved }) => {
       </Modal>
       <SuccessModal isOpen={success.isOpen} onClose={() => setSuccess({ isOpen: false, message: '' })} title="Formación guardada" message={success.message} />
       <ErrorModal isOpen={error.isOpen} onClose={() => setError({ isOpen: false, message: '' })} title="No se pudo guardar" message={error.message} />
-      <ConfirmModal
-        isOpen={pendingConfirm.isOpen}
-        onClose={() => setPendingConfirm({ isOpen: false, count: 0 })}
-        onConfirm={() => { setPendingConfirm({ isOpen: false, count: 0 }); handleSave({ skipPendingCheck: true }); }}
+      <ErrorModal
+        isOpen={pendingBlock}
+        onClose={() => setPendingBlock(false)}
         title="Falta elegir el instrumento"
-        message={`Hay ${pendingConfirm.count} ${pendingConfirm.count === 1 ? 'integrante que toca varios instrumentos y no le elegiste' : 'integrantes que tocan varios instrumentos y no les elegiste'} con cuál participan en este servicio. Podés elegirlo ahora o guardar y definirlo después.`}
-        type="warning"
-        confirmText="Guardar igual"
-        cancelText="Volver a elegir"
+        message={`Antes de guardar, elegí con qué toca cada integrante marcado en ámbar (${pendingCount === 1 ? 'falta 1' : `faltan ${pendingCount}`}). Tiene que ser al menos uno — podés elegir más de uno si toca varios.`}
       />
     </>
   );

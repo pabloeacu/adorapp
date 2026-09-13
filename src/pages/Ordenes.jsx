@@ -323,7 +323,7 @@ export const Ordenes = () => {
     setSearchParams(searchParams, { replace: true });
   }, [searchParams, orders, setSearchParams]);
 
-  const handleSubmit = async (e, opts = {}) => {
+  const handleSubmit = async (e) => {
     e?.preventDefault?.();
     if (!formData.date || !formData.bandId) return;
 
@@ -365,23 +365,18 @@ export const Ordenes = () => {
     }
     if (lineupSaving) return; // anti doble toque
 
-    // Aviso NO bloqueante antes de crear: integrantes que tocan varios
-    // instrumentos y a los que todavía no se les eligió con cuál participan.
-    // El líder puede elegir ahora o guardar y definirlo después (misma regla que
-    // la edición de formación). Solo aplica a la creación con formación custom.
-    if (!editingOrder && !opts.skipPendingCheck && lineupDraft.mode === 'custom') {
+    // OBLIGATORIO antes de crear (pedido de Paul): cada integrante con
+    // instrumentos en su ficha debe tener AL MENOS uno elegido (puede elegir más
+    // de uno). Bloquea el guardado — no es una advertencia salteable. Solo aplica
+    // a la creación con formación custom.
+    if (!editingOrder && lineupDraft.mode === 'custom') {
       const membersById = new Map((getBandMembers(formData.bandId) || []).map((m) => [m.id, m]));
       const pendingCount = pendingChoiceIds(lineupDraft.members, membersById, directorIdsOf(formData.songs)).size;
       if (pendingCount > 0) {
-        setConfirmModal({
+        setErrorModal({
           isOpen: true,
           title: 'Falta elegir el instrumento',
-          message: `Hay ${pendingCount} ${pendingCount === 1 ? 'integrante que toca varios instrumentos y no le elegiste' : 'integrantes que tocan varios instrumentos y no les elegiste'} con cuál participan en este servicio. Podés elegirlo ahora o guardar y definirlo después.`,
-          type: 'warning',
-          confirmText: 'Guardar igual',
-          cancelText: 'Volver a elegir',
-          loading: false,
-          onConfirm: () => { setConfirmModal((prev) => ({ ...prev, isOpen: false })); handleSubmit(null, { skipPendingCheck: true }); },
+          message: `Antes de guardar el orden, elegí con qué toca cada integrante marcado en ámbar (${pendingCount === 1 ? 'falta 1' : `faltan ${pendingCount}`}). Tiene que ser al menos uno — podés elegir más de uno si toca varios.`,
         });
         return;
       }
