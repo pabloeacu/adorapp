@@ -41,7 +41,7 @@ import { LineupModal } from '../components/orders/LineupModal';
 import { RehearsalActionModal } from '../components/orders/RehearsalActionModal';
 import { isChunkLoadError, recoverFromStaleChunk } from '../lib/chunkRecovery';
 import { CollapsibleSection } from '../components/ui/CollapsibleSection';
-import { buildLineup, lineupSummaryText, isCustomLineup } from '../lib/lineup';
+import { buildLineup, lineupSummaryText, isCustomLineup, directorIdsOf, pendingChoiceIds } from '../lib/lineup';
 
 // Parsear 'YYYY-MM-DD' como fecha LOCAL (no UTC). `new Date('2026-09-11')` se
 // interpreta en UTC y, en ART (-3), muestra el día ANTERIOR (jueves 10 en vez de
@@ -106,7 +106,7 @@ const statusConfig = {
 
 export const Ordenes = () => {
   useDocumentTitle('Órdenes');
-  const { orders, bands, songs, members, bandTemporaryMembers, addOrder, updateOrder, deleteOrder, cloneOrder, getUnusedByBand, getSongById, getBandById, getMemberById, getEffectiveBandMemberIds, getServiceSchema, getOrderParticipants } = useAppStore();
+  const { orders, bands, songs, members, bandTemporaryMembers, addOrder, updateOrder, deleteOrder, cloneOrder, getUnusedByBand, getSongById, getBandById, getMemberById, getBandMembers, getEffectiveBandMemberIds, getServiceSchema, getOrderParticipants } = useAppStore();
   const userRole = useCurrentRole();
   const isPastor = userRole === 'pastor';
   const isLeader = userRole === 'leader';
@@ -315,7 +315,7 @@ export const Ordenes = () => {
   }, [searchParams, orders, setSearchParams]);
 
   const handleSubmit = async (e) => {
-    e.preventDefault();
+    e?.preventDefault?.();
     if (!formData.date || !formData.bandId) return;
 
     // La hora del servicio es obligatoria (la base también la exige: NOT NULL).
@@ -355,6 +355,24 @@ export const Ordenes = () => {
       return;
     }
     if (lineupSaving) return; // anti doble toque
+
+    // OBLIGATORIO antes de crear (pedido de Paul): cada integrante con
+    // instrumentos en su ficha debe tener AL MENOS uno elegido (puede elegir más
+    // de uno). Bloquea el guardado — no es una advertencia salteable. Solo aplica
+    // a la creación con formación custom.
+    if (!editingOrder && lineupDraft.mode === 'custom') {
+      const membersById = new Map((getBandMembers(formData.bandId) || []).map((m) => [m.id, m]));
+      const pendingCount = pendingChoiceIds(lineupDraft.members, membersById, directorIdsOf(formData.songs)).size;
+      if (pendingCount > 0) {
+        setErrorModal({
+          isOpen: true,
+          title: 'Falta elegir el instrumento',
+          message: `Antes de guardar el orden, elegí con qué toca cada integrante marcado en ámbar (${pendingCount === 1 ? 'falta 1' : `faltan ${pendingCount}`}). Tiene que ser al menos uno — podés elegir más de uno si toca varios.`,
+        });
+        return;
+      }
+    }
+
     setLineupSaving(true);
 
     let orderId;

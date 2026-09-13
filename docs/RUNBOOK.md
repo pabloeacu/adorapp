@@ -94,7 +94,8 @@ Supabase Pro tiene **Point-in-Time Recovery** (PITR) con retención de 7 días.
 
 1. Verificar el job:
    ```sql
-   SELECT * FROM cron.job WHERE jobname = 'daily-reflection-notification';
+   -- Nombres reales en cron.job: 'daily-afternoon-reflection' (jobid 5) y el monitor 'notification-monitor' (jobid 6).
+   SELECT * FROM cron.job WHERE jobname IN ('daily-afternoon-reflection', 'notification-monitor');
    SELECT * FROM cron.job_run_details ORDER BY start_time DESC LIMIT 10;
    ```
 2. Si el job está pero falla: leer `return_message` de la última run.

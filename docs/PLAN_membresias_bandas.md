@@ -1,6 +1,6 @@
 # Plan: miembros de banda agregados por líderes (permanentes y temporales)
 
-> Estado: **IMPLEMENTADO (2026-09-05)** en 3 PRs (§2.8). PR A y PR B aplicados a producción y verificados en vivo; PR C (cliente) commiteado, a la espera del merge. Decisiones de producto tomadas por Paul el 2026-09-05.
+> Estado: **IMPLEMENTADO Y EN PROD (2026-09-05)** en 3 PRs (§2.8). Los tres (A backend, B, C cliente) están mergeados y en producción, verificados en vivo, y ya son base de features posteriores (colaboración, formación, suspender ensamble). Decisiones de producto tomadas por Paul el 2026-09-05.
 >
 > **Desvíos verificados en vivo respecto de este contrato (Regla de Oro):**
 > - §2.5: el "agregar permanente" del líder usa un **update DIRIGIDO solo a `members`** (`addPermanentBandMember`), no `updateBand`. Motivo verificado: `convertBandToDB` coerce `meeting_time` null→'20:00' y normaliza el nombre; con el trigger append-only del PR A, cualquier campo que difiera del row real haría rechazar el append del líder. El update dirigido no toca otros campos → inmune. (Hoy 0 bandas tienen esos valores, pero es a prueba de futuro.)

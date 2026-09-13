@@ -452,11 +452,17 @@ export const useAppStore = create((set, get) => ({
       const serviceSchemas = schemasRes.error ? [] : (schemasRes.data || []).map(convertServiceSchemaFromDB);
       const schemaTemplates = templatesRes.error ? [] : (templatesRes.data || []).map(convertSchemaTemplateFromDB);
 
-      // Persist to localStorage for survival across page refreshes
-      localStorage.setItem('appMembers', JSON.stringify(members));
-      localStorage.setItem('appBands', JSON.stringify(bands));
-      localStorage.setItem('appSongs', JSON.stringify(songs));
-      localStorage.setItem('appOrders', JSON.stringify(orders));
+      // Persist to localStorage for survival across page refreshes.
+      // Cada setItem va en su propio try/catch: si el navegador queda sin cuota
+      // (repertorio grande → JSON > ~5MB), un fallo de caché NO debe abortar la
+      // carga ni descartar los datos frescos que acabamos de traer — el store en
+      // memoria ya los tiene; localStorage es solo conveniencia offline. (Antes
+      // estas 4 escrituras estaban sin guarda y un QuotaExceeded caía al catch
+      // externo, que revertía a la copia local vieja en silencio.)
+      try { localStorage.setItem('appMembers', JSON.stringify(members)); } catch { /* non-fatal */ }
+      try { localStorage.setItem('appBands', JSON.stringify(bands)); } catch { /* non-fatal */ }
+      try { localStorage.setItem('appSongs', JSON.stringify(songs)); } catch { /* non-fatal */ }
+      try { localStorage.setItem('appOrders', JSON.stringify(orders)); } catch { /* non-fatal */ }
       try { localStorage.setItem('appBandTempMembers', JSON.stringify(bandTemporaryMembers)); } catch { /* non-fatal */ }
       try { localStorage.setItem('appCollabRequests', JSON.stringify(collaborationRequests)); } catch { /* non-fatal */ }
       try { localStorage.setItem('appCollabParticipants', JSON.stringify(collaborationParticipants)); } catch { /* non-fatal */ }
