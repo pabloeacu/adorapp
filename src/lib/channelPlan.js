@@ -11,6 +11,7 @@ export const CHANNEL_COLORS = {
   'Teclado': '#A79BE0',
   'Bajo': '#E8A45C',
   'Batería': '#EF7A7A',
+  'Percusión': '#E68FB7',
   'Violín': '#79D2C3',
   'Flauta': '#B7D77E',
   'Saxofón': '#E0C05A',

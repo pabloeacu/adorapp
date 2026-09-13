@@ -13,7 +13,7 @@ function json(body: unknown, status = 200): Response {
 // Debe coincidir con INSTRUMENTS del store (src/stores/appStore.js).
 const INSTRUMENTS = new Set([
   "Voz", "Guitarra Eléctrica", "Guitarra Acústica", "Piano", "Teclado",
-  "Batería", "Bajo", "Violín", "Flauta", "Saxofón", "Trompeta", "Coros",
+  "Batería", "Percusión", "Bajo", "Violín", "Flauta", "Saxofón", "Trompeta", "Coros",
 ]);
 
 // Identidad + rol del que llama, SIEMPRE desde el JWT/DB (nunca del body).
