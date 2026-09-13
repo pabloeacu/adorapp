@@ -2,7 +2,7 @@
 
 Este archivo se carga automáticamente al iniciar cualquier sesión de Claude Code en este repo. Es el contrato mínimo para no perder contexto entre sesiones.
 
-> 📐 **Mapa completo del proyecto:** `ARCHITECTURE.md` (raíz) documenta **cada página, store, componente, librería, migración y cron** con sus funciones y flujo de datos, más la foto autoritativa de la base (tablas/RLS/crons/FKs/funciones). Leé PRIMERO este `CLAUDE.md` (el contrato: Regla de Oro + reglas + los 50 landmines), y usá `ARCHITECTURE.md` como el mapa exhaustivo del código.
+> 📐 **Mapa del proyecto:** `ARCHITECTURE.md` (raíz) es un mapa útil pero **parcialmente desactualizado** (fiel hasta ~PR #105; sus subsistemas nuevos están en la sección "Subsistemas Sep 2026 (sincronización)"). Leé PRIMERO este `CLAUDE.md` (el contrato: Regla de Oro + reglas + los landmines numerados hasta #80): es **la fuente de verdad**, junto con la base en vivo (Supabase MCP), para todo lo posterior a #105 (correos, suspender ensamble, multi-área, ministración, member_activity, feedback, colaboración, banners). Usá `ARCHITECTURE.md` para el núcleo previo (órdenes/repertorio/práctica/bandas, motor de transposición, converters/regla #8, formación, push).
 
 ## ⭐ REGLA DE ORO — método obligatorio para CADA pedido (innegociable)
 
@@ -37,7 +37,7 @@ PWA en Vite/React 18 + Supabase + Vercel para ~8 usuarios reales del **ministeri
 3. **No le pidas a Paul pasos manuales en Supabase, Vercel o GitHub.** Usá los MCPs (`mcp__c5073f58-...` para Supabase, `mcp__a9edc114-...` para Vercel, `gh` para GitHub) o tomá control de Chrome (`mcp__Claude_in_Chrome__*`).
 4. **Cierre narrativo no-técnico al terminar cada fase.** "Qué pasaba → qué hice → qué cambia para vos como pastor". El detalle técnico va al `AUDIT_LOG.md` y a los commits.
 5. **Testeá que no se rompa lo que funciona** antes de cerrar una fase: lint + build + tests + smoke en prod.
-6. **Sin `service_role` en cliente.** Las operaciones privilegiadas pasan por Edge Functions admin-* (ya hay 7 desplegadas).
+6. **Sin `service_role` en cliente.** Las operaciones privilegiadas pasan por Edge Functions. Hay **13 EFs en `supabase/functions/`**: 7 `admin-*` (approve/reject/create/delete/update-member, reset-password, send-communication) + `collab`, `send-emails`, `send-service-feedback`, `send-push`, `log-error`, `record-health-check`. Todas están en el repo (ya no hay EFs "desplegadas pero fuera del repo").
 7. **Toda migración que `CREATE TABLE` en `public` debe incluir explícitamente `GRANT SELECT, INSERT, UPDATE, DELETE ON <tabla> TO authenticated;`** (y `TO anon` si corresponde). Desde el 30-oct-2026 Supabase deja de exponer tablas nuevas al Data API por defecto; este paso anticipa el cambio y evita "tabla creada que el cliente no puede leer".
 8. **NUNCA llamar `supabase.from(...).update(convertXToDB(partial))`.** Los `convertXToDB` en `src/stores/appStore.js` generan rows completos con defaults para INSERTs. Si un partial pasa por ahí, Postgres SOBRESCRIBE TODA la fila con esos defaults — pérdida silenciosa de letra/acordes/tono/etc. Siempre rutear vía `updateMember/Band/Song/Order` del store, que mergean el partial con el snapshot del store antes del converter. Incidente raíz: 15-jun-2026, PR #20. Si agregás una nueva tabla con su propio converter, replicar este patrón (merge primero) y dejar el comentario "DATA-LOSS LANDMINE" sobre el converter.
 
@@ -51,8 +51,9 @@ PWA en Vite/React 18 + Supabase + Vercel para ~8 usuarios reales del **ministeri
 
 ## Estética
 
-- Negro plano queda simplón. Preferí gradientes radiales aurora (azul/violeta) sobre fondos oscuros.
-- Para PDFs e iOS: nunca confiar en `radial-gradient + mask-image` — generá PNG real con `scripts/gen-aurora-bg.cjs` y embebelo.
+- **Sistema vigente: champagne-gold sobre obsidiana (reskin PR #72/#73).** El acento primario son los tokens `gold-*` de `tailwind.config.js` (543+ usos en `src/`). **El aurora azul/violeta quedó RETIRADO** — no lo uses para UI nueva (no queda `aurora` en `src/`). Primitivas doradas: `GoldWave`, `IconBadge`, `EmptyState`, `StatCard`, `Annotation` (manuscrita, fuente `Caveat`), avatares de iniciales en degradé dorado. Íconos: **Phosphor duotono** (`@phosphor-icons/react`) como set primario, junto a Lucide.
+- No uses negro plano sobre negro (feedback de Paul): apoyate en los tokens y degradés dorados sobre obsidiana.
+- Para PDFs e iOS: nunca confiar en `radial-gradient + mask-image` — generá PNG real y embebelo (mismo patrón que `scripts/gen-aurora-bg.cjs`, ahora en clave dorada).
 - Logos PNG sobre fondo dark: `mix-blend-mode: lighten` para eliminar el cuadrado negro.
 - Spinners de carga: usar `<PageLoader />` (logo + pulso + "Cargando…"), no spinners circulares genéricos.
 
@@ -72,10 +73,14 @@ PWA en Vite/React 18 + Supabase + Vercel para ~8 usuarios reales del **ministeri
 
 ## Crons activos (Supabase pg_cron)
 
-- `daily-devotional-notification` 06:00 ART
-- `daily-reflection-notification` 17:00 ART
-- `reflection-monitor` cada 6 h (escribe a `error_log` si falta reflexión >25 h)
-- `daily-birthday-notification` 09:00 ART (push a pastores con cumpleaños del día; jobid 7)
+_Lista verificada contra `cron.job` en vivo (12 jobs activos). El nombre importa: para operar un cron, greapeá `cron.job` por estos nombres exactos._
+
+- `daily-devotional-notification` `0 9 * * *` (06:00 ART; jobid 4)
+- `daily-afternoon-reflection` `0 20 * * *` (17:00 ART; jobid 5) — la función manual sigue siendo `send_daily_reflection_notification()`
+- `notification-monitor` `0 */6 * * *` (cada 6 h; jobid 6; escribe a `error_log` si falta reflexión >25 h)
+- `daily-birthday-notification` `0 12 * * *` (09:00 ART; push a pastores con cumpleaños del día; jobid 7)
+- `send-emails-worker` `* * * * *` (cada minuto; jobid 14) — **el latido que envía TODO el correo**: `trigger_send_emails()` → EF `send-emails` → Gmail. Ver "Pipeline de correo".
+- `ensamble-health-report` `0 11 * * *` (08:00 ART; jobid 17) — reporte trimestral "Salud de los ensambles", auto-gateado cada 90 días desde el 1/10 (ver Estado IV + landmine #65).
 - `rehearsal-reminders` cada 15 min (push 2 h antes del ensamble programado en un orden a los **participantes** del orden — `order_participant_ids`; ver "Estado al 2026-06-20" y "Estado al 2026-09-11 (II)")
 - `practice-reminders` `0 21 * * *` (18:00 ART): alarma personal de ensayo (opt-in) a quien **participa** de ≥1 orden programado con canciones y Ensayómetro < 100%. Ver "Estado al 2026-08-03 (II)" y "(II) del 2026-09-11".
 - `practice-cleanup` `30 7 * * *` (04:30 ART): poda `practice_logs` de órdenes no programados con fecha < hoy−7.
@@ -499,7 +504,7 @@ Pedido de Paul (capturas del iPhone): en "Solicitar registro" el campo "Líder d
 - QA: Chromium 390 px sobre `Login.jsx` real (arnés `scratchpad/qa/login.html`): placeholder, nota, borde computado 1 px dorado, selección múltiple (Adoración + Multimedia) y aparición de instrumentos; arnés de formación 49/49 sin regresión; lint 0 errores, 98 tests, build OK.
 
 **Landmine nuevo:**
-59. **NUNCA `border: none` (ni `border: 0`) en un reset global de `button`/`input`.** Anula el `border-style` del preflight y deja invisibles TODAS las utilidades `border-*` de Tailwind sobre ese elemento, sin ningún error. El reset de `button` en `index.css` deja `background/appearance/touch-action` pero NO toca `border`. Si un botón tiene que ir sin borde, que no lleve clase `border`. Para verificar un borde "que no se ve", medir `getComputedStyle(el).borderTopStyle`/`borderTopWidth` en Chromium: si el style es `none` con una clase `border` presente, hay un reset de elemento pisándolo.
+80. **NUNCA `border: none` (ni `border: 0`) en un reset global de `button`/`input`.** _(Era un segundo #59 duplicado — renumerado a #80 el 2026-09-13 para que la cita sea inequívoca; #59 = "Logos de área sin filtro".)_ Anula el `border-style` del preflight y deja invisibles TODAS las utilidades `border-*` de Tailwind sobre ese elemento, sin ningún error. El reset de `button` en `index.css` deja `background/appearance/touch-action` pero NO toca `border`. Si un botón tiene que ir sin borde, que no lleve clase `border`. Para verificar un borde "que no se ve", medir `getComputedStyle(el).borderTopStyle`/`borderTopWidth` en Chromium: si el style es `none` con una clase `border` presente, hay un reset de elemento pisándolo.
 
 ## Estado al 2026-09-12 — Arranque lento: diagnóstico + pantalla "Actualizando a la nueva versión"
 
@@ -690,3 +695,16 @@ Pedido de Paul: al armar la formación custom, un integrante puede tener **vario
 
 **Landmine nuevo:**
 79. **Sumar a la formación un integrante con 2+ instrumentos NO le asigna ninguno: queda "pendiente", el líder ELIGE y elegir es OBLIGATORIO para guardar (`src/lib/lineup.js` `defaultInstrumentsFor`/`pendingChoiceIds`; gate en `LineupModal` y en el alta de `Ordenes`).** Un participante con instrumentos `[]` es una forma soportada de punta a punta (cae en `noInstrument` → "También participan"; sigue siendo participante para avisos, que van por `order_participant_ids`, no por instrumento) — por eso el bloqueo es de CLIENTE (UX), no de base. Reglas a respetar: (a) el bloqueo aplica SOLO a "pendientes" = 2+ instrumentos en la ficha y 0 elegidos; **NO** bloquea a los de 0 instrumentos en la ficha (no hay qué elegir) ni a los directores (default por rol) — si algún día Paul quiere forzar también a los directores-sin-Voz, es un cambio de una línea en `pendingChoiceIds`; (b) toda lógica del editor que "limpie" entradas vacías (como `applySuggestion`) debe distinguir "pendiente por elección" de "se quedó sin instrumento al rotar" — nunca podar a un pendiente; (c) `pendingChoiceIds` intersecta lo elegido con la ficha ACTUAL (drift: si le sacan un instrumento de la ficha, su elección vieja cuenta como no-elegida); (d) mientras haya pendientes, la cobertura ("Sin X") se silencia para no duplicar la señal; (e) un pendiente se cuenta como INSTRUMENTISTA en el Ensayómetro (4 hitos, ver #75) hasta que se resuelve — transitorio; (f) `buildLineup` NO manda `definedBy/definedAt` (los sella la base) → todo re-guardado difiere del jsonb guardado: por eso `LineupModal` tiene el no-op guard (comparar `buildLineup` contra `buildLineup` de lo guardado) antes de `updateOrder`. El modo 'all' se deja intacto (atajo whole-band; la elección es exclusiva de "Elegir la formación").
+
+## Estado al 2026-09-13 (VI) — Sincronización de docs: subsistemas que faltaban en CLAUDE.md
+
+Auditoría de documentación (Workflow, 8 agentes) pedida por Paul para que cualquier sesión nueva sea experta "a lo largo y ancho". Además de la Estética (corregida arriba: el sistema vigente es champagne-gold, el aurora quedó retirado) y la lista de crons (corregida: nombres reales + `send-emails-worker` + `ensamble-health-report`), faltaban en CLAUDE.md tres subsistemas ya EN PROD. Quedan documentados acá (y con más detalle en `ARCHITECTURE.md` → "Subsistemas Sep 2026").
+
+**Pipeline de correo (Gmail transaccional) — el latido de TODO el correo.** Ningún correo se manda "en el acto": se ENCOLA y un worker lo procesa.
+- Flujo: SQL llama `encolar_email(slug, destinatario, vars jsonb)` → inserta fila en `email_queue` → cron **`send-emails-worker`** (`* * * * *`, jobid 14) llama `trigger_send_emails()` → invoca la EF **`send-emails`** → lee secretos con `get_email_config()` → renderiza la plantilla de `email_templates` (el `cuerpo_html` se guarda RAW; TODO dato de usuario se escapa con `_html_escape`, landmine #70) → envía por la **Gmail API** → registra `sent_emails` y respeta `email_throttle`.
+- Plantillas: catálogo de slugs en `email_templates` (nuevo-orden, orden-editado, recordatorio-ensayo, ensamble-suspendido/reactivado/reprogramado, feedback-post-servicio, colaboracion-*, salud-ensambles, ministracion, digest, etc.). Los pastores tienen un **editor de plantillas** (PR #63).
+- **QA sin spamear:** para probar cualquier flujo de correo, PAUSAR el worker `send-emails-worker` (o dejar la fila en `email_queue` sin procesar). Nunca disparar correos reales a los 8 usuarios en pruebas. `send-push` es análogo para notificaciones push.
+
+**`member_activity` — ficha de actividad del miembro (solo pastor) (PR #85).** Tabla server/RPC-owned con telemetría por miembro: `last_seen_at`, `app_installed_at`, `notifications_on`. SELECT **solo pastor** (`member_activity_select_pastor`); la escribe la RPC `record_member_activity()` (upsert para `auth.uid()`), nunca el cliente. El trigger `sync_member_notifications_flag` (sobre `push_subscriptions`) mantiene `members.notifications_enabled` en sincronía. Se muestra como el panel "actividad" (solo pastor) en `Miembros.jsx` (última conexión / app instalada / campanita). No confundir con datos personales (email/phone/birthdate), que salen por `members_directory`/`member_private_fields` (landmine #73).
+
+**Comunicaciones — mensaje masivo del pastor (PR #68).** El pastor manda un mensaje a la banda/ministerio desde `Comunicaciones.jsx`. Va por la EF **`admin-send-communication`** → tabla `communications` (mensaje **saneado server-side**, `sender_id` poblado) + `communication_notifications` (una fila por destinatario) + push (`push_on_communication_insert`). El editor es **contentEditable rico** (barra de formato N/C/S/emoji): whitelist `strong/em/u/br` vía `sanitizeRichMessage`, flag `format:'rich'` vs. la ruta legacy byte-idéntica, anti-ReDoS. No toca las plantillas de correo (es otro canal).

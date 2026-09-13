@@ -1,6 +1,6 @@
 # Plan — Multi-área (observadores de Multimedia y Sonido + área universal)
 
-> Estudio y contrato de implementación. **Sin código aplicado todavía.** Escrito el 2026-09-11.
+> Estudio y contrato de implementación original (escrito el 2026-09-11). **Estado: IMPLEMENTADO Y EN PROD** (PR #108 backend / #109 cliente + banners #119; refinado en #136). Este documento se conserva como contrato de diseño; para el estado real ver `CLAUDE.md` "Estado al 2026-09-11 (III)" y siguientes, y `ARCHITECTURE.md` → "Subsistemas Sep 2026". Desvío a tener en cuenta: los triggers filtran inline con `m.areas && _area_email_slugs()` (no con los wrappers `area_observers_for_*` propuestos en §3), y `_area_formation_slugs()` = {multimedia, sonido}.
 > Metodología: Regla de Oro (panorama total, verificación empírica, pruebas adversariales, cero-romper, informe en criollo).
 
 ## 0. Qué pidió Paul (decisiones cerradas)
