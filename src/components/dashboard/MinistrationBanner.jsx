@@ -1,10 +1,9 @@
-import React, { useEffect, useMemo, useState, useRef } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { Mic2, Search, Plus, X, CheckCircle2, User } from 'lucide-react';
 import { useAppStore, MUSICAL_KEYS } from '../../stores/appStore';
 import { supabase } from '../../lib/supabase';
 import { resolveMinistrationOrder, ministrationWindow, isMinistrationSong } from '../../lib/ministration';
 import { suggestDirectorForSong } from '../../lib/orders';
-import { matchesSearch as matchesSearchText } from '../../lib/searchText';
 import { Modal } from '../ui/Modal';
 import { Button } from '../ui/Button';
 import { SelectMenu } from '../ui/SelectMenu';
@@ -64,12 +63,10 @@ export const MinistrationBanner = ({ member, role }) => {
   }, [orders, bands, member, role, getBandById, tick]);
 
   const [open, setOpen] = useState(false);
-  const [query, setQuery] = useState('');
   const [picked, setPicked] = useState([]); // [{ songId, key, directorId, historyKey }]
   const [sending, setSending] = useState(false);
   const [error, setError] = useState('');
   const [result, setResult] = useState(null); // { added, notified }
-  const inputRef = useRef(null);
 
   const band = order ? getBandById(order.bandId) : null;
   // Directores elegibles = integrantes EFECTIVOS activos con 'Voz' (misma regla que el editor de órdenes).
@@ -80,17 +77,17 @@ export const MinistrationBanner = ({ member, role }) => {
   }, [order?.bandId, members, bands, bandTemporaryMembers, getEffectiveBandMemberIds]);
   const singerIds = useMemo(() => new Set(singers.map((s) => s.id)), [singers]);
 
-  const results = useMemo(() => {
-    if (!query.trim()) return [];
+  // Opciones del selector: todo el repertorio menos lo ya elegido (el buscador vive en la hoja).
+  const pickerOptions = useMemo(() => {
     const taken = new Set(picked.map((p) => p.songId));
     return songs
-      .filter((s) => !taken.has(s.id) && matchesSearchText(query, s.title, s.artist))
-      .slice(0, 8);
-  }, [query, songs, picked]);
+      .filter((s) => !taken.has(s.id))
+      .map((s) => ({ value: s.id, label: s.title, sublabel: s.artist || '', badge: s.key || '' }));
+  }, [songs, picked]);
 
   const alreadyAssigned = useMemo(() => (order?.songs || []).filter(isMinistrationSong), [order]);
 
-  const openModal = () => { setPicked([]); setQuery(''); setError(''); setResult(null); setOpen(true); setTimeout(() => inputRef.current?.focus?.(), 50); };
+  const openModal = () => { setPicked([]); setError(''); setResult(null); setOpen(true); };
   const closeModal = () => { if (!sending) setOpen(false); };
 
   // Al elegir una canción: director sugerido por historial + tono del director la última
@@ -99,7 +96,6 @@ export const MinistrationBanner = ({ member, role }) => {
     const directorId = suggestDirectorForSong({ singerIds, orders, songId: song.id, bandId: order?.bandId }) || null;
     const base = { songId: song.id, key: song.key || song.originalKey || 'C', directorId, historyKey: null };
     setPicked((prev) => [...prev, base]);
-    setQuery('');
     if (!directorId) return;
     try {
       const { data } = await supabase
@@ -179,26 +175,20 @@ export const MinistrationBanner = ({ member, role }) => {
               Elegí la canción para la parte final del servicio de <span className="text-white font-medium">{band?.name || 'la banda'}</span>. Se agrega al final del orden y se avisa a la formación, Multimedia, Sonido y a los pastores.
             </p>
 
-            <div className="relative">
-              <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-500" />
-              <input ref={inputRef} type="text" value={query} onChange={(e) => setQuery(e.target.value)} placeholder="Buscar en el repertorio…"
-                data-testid="ministration-search"
-                className="w-full bg-neutral-800 border border-neutral-700 rounded-xl pl-9 pr-3 py-3 text-white placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-gold-500/40" />
-              {results.length > 0 && (
-                <div className="absolute z-10 mt-1 w-full rounded-xl border border-neutral-700 bg-neutral-900 shadow-xl overflow-hidden" data-testid="ministration-results">
-                  {results.map((s) => (
-                    <button key={s.id} type="button" onClick={() => pickSong(s)}
-                      className="w-full flex items-center justify-between gap-3 px-4 py-2.5 text-left hover:bg-neutral-800 transition-colors">
-                      <span className="min-w-0">
-                        <span className="block font-medium text-white truncate">{s.title}</span>
-                        {s.artist && <span className="block text-xs text-gray-500 truncate">{s.artist}</span>}
-                      </span>
-                      <Plus size={16} className="shrink-0 text-gold-300" />
-                    </button>
-                  ))}
-                </div>
-              )}
-            </div>
+            {/* Elección de canciones con el MISMO método que director y tono (SelectMenu con
+                buscador adentro de la hoja): la lista scrollea en la hoja inferior, no queda
+                atrapada dentro del modal. Cada elección agrega la canción; se puede repetir. */}
+            <SelectMenu
+              icon={Search}
+              value=""
+              placeholder={picked.length ? 'Agregar otra canción del repertorio…' : 'Elegir canción del repertorio…'}
+              searchable
+              searchPlaceholder="Buscar por título o artista…"
+              emptyText="No encontramos esa canción. Probá con otro título o artista."
+              testId="ministration-picker"
+              options={pickerOptions}
+              onChange={(id) => { const s = getSongById(id); if (s) pickSong(s); }}
+            />
 
             {picked.length === 0 ? (
               <p className="text-xs text-gray-500">Buscá por título o artista y tocá la canción para agregarla.</p>

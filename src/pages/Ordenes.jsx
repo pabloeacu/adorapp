@@ -1,11 +1,10 @@
 import React, { useState, useMemo, useEffect, useRef } from 'react';
-import { matchesSearch as matchesSearchText } from '../lib/searchText';
 import { useSearchParams, Link } from 'react-router-dom';
 import { useDocumentTitle } from '../hooks/useDocumentTitle';
 import {
   Plus, Music, Clock, Copy, Activity,
   MessageSquare, Eye, Trash2, Search, Check, X,
-  User, Zap, AlertCircle, ChevronDown, FileDown, History, Award,
+  User, Zap, AlertCircle, FileDown, History, Award,
   FileText, Printer, Copy as CopyIcon,
   Edit, CheckCircle, XCircle, RotateCcw, Target, ChevronRight, ListChecks, Play, CalendarClock, SlidersHorizontal, Ban
 } from 'lucide-react';
@@ -13,7 +12,6 @@ import {
   CalendarDots,
   CalendarBlank,
   MusicNotes as MusicNotesDuo,
-  MagnifyingGlass,
   UsersThree,
 } from '@phosphor-icons/react';
 // jspdf is loaded on demand inside generateOrderPDF / generateSongsPDF
@@ -127,9 +125,6 @@ export const Ordenes = () => {
   const [filterBand, setFilterBand] = useState('all');
   const [showUnused, setShowUnused] = useState(false);
   const [selectedBandForUnused, setSelectedBandForUnused] = useState(null);
-  const [songSearchTerm, setSongSearchTerm] = useState('');
-  const [showSongDropdown, setShowSongDropdown] = useState(false);
-  const [songDropdownPosition, setSongDropdownPosition] = useState('bottom');
 
   // Key history feature
   const [keyHistoryLoading, setKeyHistoryLoading] = useState(false);
@@ -223,11 +218,12 @@ export const Ordenes = () => {
   // Filtered songs for dropdown search.
   // Defensive null-guards: any NULL on title/artist/key (legacy data) would
   // crash the whole Ordenes page with "Cannot read properties of null".
-  const filteredSongsForDropdown = useMemo(() => {
-    if (!songSearchTerm.trim()) return songs.slice(0, 10);
-    // Indistinto a tildes y mayúsculas (src/lib/searchText.js).
-    return songs.filter(song => matchesSearchText(songSearchTerm, song.title, song.artist, song.key)).slice(0, 15);
-  }, [songs, songSearchTerm]);
+  // Opciones del selector de canciones (el buscador vive dentro de la hoja del SelectMenu,
+  // indistinto a tildes vía src/lib/searchText.js: título, artista y tonalidad).
+  const songPickerOptions = useMemo(
+    () => songs.map((song) => ({ value: song.id, label: song.title || '', sublabel: song.artist || '', badge: song.key || '' })),
+    [songs]
+  );
 
   const handleOpenModal = (order = null) => {
     if (order) {
@@ -258,10 +254,7 @@ export const Ordenes = () => {
         rehearsalTime: '18:00'
       });
     }
-    // Blanquear el buscador de canciones para no arrastrar lo tipeado en una
-    // apertura anterior (el search vive fuera de formData).
-    setSongSearchTerm('');
-    setShowSongDropdown(false);
+    // El buscador de canciones vive dentro del SelectMenu (se blanquea al abrirse).
     setKeyHistoryTooltip(null);
     setFormStep('form');
     setLineupDraft({ mode: 'all', members: [] });
@@ -274,8 +267,6 @@ export const Ordenes = () => {
     setEditingOrder(null);
     setShowUnused(false);
     setSelectedBandForUnused(null);
-    setSongSearchTerm('');
-    setShowSongDropdown(false);
     setKeyHistoryTooltip(null);
     setFormStep('form');
     setLineupSaving(false);
@@ -1707,25 +1698,21 @@ export const Ordenes = () => {
             </DndContext>
 
             {/* Add from Repertoire - Searchable Dropdown */}
-            <div className="mt-4 relative">
+            <div className="mt-4">
               <label className="text-xs text-gray-400 block mb-2">Agregar canción del repertorio</label>
-              <div
-                className="relative"
-                ref={(el) => {
-                  if (el) {
-                    const rect = el.getBoundingClientRect();
-                    const spaceBelow = window.innerHeight - rect.bottom;
-                    setSongDropdownPosition(spaceBelow < 300 ? 'top' : 'bottom');
-                  }
-                }}
-              >
-                <div
-                  className={`w-full bg-neutral-800 border border-neutral-700 rounded-xl px-4 py-3 flex items-center gap-2 transition-colors ${
-                    formData.bandId
-                      ? 'cursor-pointer hover:border-neutral-600'
-                      : 'cursor-not-allowed opacity-60'
-                  }`}
-                  onClick={() => {
+              <div>
+                {/* Buscador de canciones con el MISMO método que Banda/Director/Tono (SelectMenu
+                    con buscador adentro de la hoja): en el celular la lista scrollea en la hoja
+                    inferior, no queda atrapada dentro del modal. Sin banda, explica por qué. */}
+                <SelectMenu
+                  icon={Search}
+                  value=""
+                  placeholder={formData.bandId ? 'Buscar canción por nombre, artista o tonalidad...' : 'Primero elegí la banda…'}
+                  searchable
+                  searchPlaceholder="Buscar canción por nombre, artista o tonalidad..."
+                  emptyText="No se encontraron canciones. Probá con otro nombre, artista o tonalidad."
+                  testId="order-song-picker"
+                  beforeOpen={() => {
                     // Block adding songs until a band is chosen: the director
                     // dropdown derives its options from the band, so without
                     // a band the song row would offer an empty director list.
@@ -1735,73 +1722,13 @@ export const Ordenes = () => {
                         title: 'Elegí la banda primero',
                         message: 'Para agregar canciones necesitamos saber qué banda va a tocar — así sólo te ofrecemos como directores a quienes integran esa banda.',
                       });
-                      return;
+                      return false;
                     }
-                    setShowSongDropdown(!showSongDropdown);
+                    return true;
                   }}
-                >
-                  <Search size={16} className="text-gray-500" />
-                  <input
-                    type="text"
-                    placeholder={formData.bandId ? 'Buscar canción por nombre, artista o tonalidad...' : 'Primero elegí la banda…'}
-                    value={songSearchTerm}
-                    disabled={!formData.bandId}
-                    onChange={(e) => {
-                      setSongSearchTerm(e.target.value);
-                      setShowSongDropdown(true);
-                    }}
-                    onFocus={() => {
-                      if (!formData.bandId) {
-                        setErrorModal({
-                          isOpen: true,
-                          title: 'Elegí la banda primero',
-                          message: 'Para agregar canciones necesitamos saber qué banda va a tocar — así sólo te ofrecemos como directores a quienes integran esa banda.',
-                        });
-                        return;
-                      }
-                      setShowSongDropdown(true);
-                    }}
-                    className="flex-1 bg-transparent outline-none text-sm disabled:cursor-not-allowed"
-                  />
-                  <ChevronDown size={16} className="text-gray-500" />
-                </div>
-
-                {showSongDropdown && (
-                  <div className={`absolute z-50 w-full bg-neutral-800 border border-neutral-700 rounded-xl shadow-2xl max-h-72 overflow-y-auto ${
-                    songDropdownPosition === 'top' ? 'bottom-full mb-2' : 'top-full mt-2'
-                  }`}>
-                    {filteredSongsForDropdown.length > 0 ? (
-                      filteredSongsForDropdown.map(song => (
-                        <button
-                          key={song.id}
-                          onClick={() => {
-                            addSongToOrder(song);
-                            setSongSearchTerm('');
-                            setShowSongDropdown(false);
-                          }}
-                          className="w-full px-4 py-3 flex items-center justify-between hover:bg-neutral-700 transition-colors border-b border-neutral-800 last:border-0"
-                        >
-                          <div className="flex items-center gap-3">
-                            <Music size={16} className="text-gold-300" />
-                            <div className="text-left">
-                              <p className="font-medium text-sm">{song.title}</p>
-                              <p className="text-xs text-gray-400">{song.artist}</p>
-                            </div>
-                          </div>
-                          <Badge size="sm" variant="primary">{song.key}</Badge>
-                        </button>
-                      ))
-                    ) : (
-                      <EmptyState
-                        className="!py-8"
-                        icon={MagnifyingGlass}
-                        title="No se encontraron canciones"
-                        subtitle="Probá con otro nombre, artista o tonalidad."
-                        annotation="Revisá el repertorio"
-                      />
-                    )}
-                  </div>
-                )}
+                  options={songPickerOptions}
+                  onChange={(id) => { const song = songs.find((x) => x.id === id); if (song) addSongToOrder(song); }}
+                />
               </div>
             </div>
           </div>
