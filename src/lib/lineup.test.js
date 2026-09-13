@@ -2,6 +2,7 @@ import { describe, it, expect } from 'vitest';
 import {
   participantIdsOf, isOrderParticipant, lineupInstrumentsFor, groupByInstrument, coverageGaps,
   suggestRotation, buildLineup, lineupEntries, lineupSummaryText, sortInstruments, formatShortDate,
+  defaultInstrumentsFor, pendingChoiceIds,
 } from './lineup';
 
 const luca = { id: 'luca', name: 'Luca Molina', instruments: ['Batería', 'Bajo'], active: true };
@@ -90,6 +91,48 @@ describe('rotación asistida', () => {
     const orders = [past('o1', '2026-08-29', [{ memberId: 'marcos', instruments: ['Batería'] }])];
     // marcos tocó; luca nunca → sugiere luca (distinto del último) → sí hay sugerencia
     expect(suggestRotation({ bandId: 'b1', orderDate: '2026-09-12', orders, bandMembers: band }).map((s) => s.memberId)).toContain('luca');
+  });
+});
+
+describe('elección de instrumento (multi-instrumento)', () => {
+  const byId = new Map(band.map((m) => [m.id, m]));
+
+  it('defaultInstrumentsFor: 1 se asigna solo, 2+ queda vacío para elegir, 0 vacío', () => {
+    expect(defaultInstrumentsFor(marcos)).toEqual(['Batería']); // 1 → se asigna
+    expect(defaultInstrumentsFor(luca)).toEqual([]);            // 2 → hay que elegir
+    expect(defaultInstrumentsFor(damaris)).toEqual([]);         // 0 → nada que elegir
+    expect(defaultInstrumentsFor(null)).toEqual([]);
+    expect(defaultInstrumentsFor({})).toEqual([]);
+  });
+
+  it('pendingChoiceIds: marca al de 2+ sin elegir; ignora al de 1, al de 0 y al ya elegido', () => {
+    const entries = [
+      { memberId: 'luca', instruments: [] },        // 2 instrumentos, ninguno → pendiente
+      { memberId: 'marcos', instruments: [] },      // 1 instrumento → NO pendiente
+      { memberId: 'damaris', instruments: [] },     // 0 instrumentos → NO pendiente
+      { memberId: 'gus', instruments: ['Bajo'] },   // 1 instrumento → NO pendiente
+    ];
+    expect([...pendingChoiceIds(entries, byId)]).toEqual(['luca']);
+  });
+
+  it('pendingChoiceIds: al de 2+ con uno elegido NO lo marca', () => {
+    const entries = [{ memberId: 'luca', instruments: ['Bajo'] }];
+    expect(pendingChoiceIds(entries, byId).size).toBe(0);
+  });
+
+  it('pendingChoiceIds: excluye a los directores (su función es por rol)', () => {
+    const entries = [{ memberId: 'luca', instruments: [] }];
+    expect(pendingChoiceIds(entries, byId, new Set(['luca'])).size).toBe(0);
+  });
+
+  it('pendingChoiceIds: un instrumento viejo (ya no en la ficha) cuenta como no-elegido → pendiente', () => {
+    const entries = [{ memberId: 'luca', instruments: ['Piano'] }]; // Piano no está en la ficha de luca
+    expect([...pendingChoiceIds(entries, byId)]).toEqual(['luca']);
+  });
+
+  it('pendingChoiceIds: ids desconocidos o entradas basura no rompen', () => {
+    const entries = [{ memberId: 'fantasma', instruments: [] }, null, { instruments: [] }];
+    expect(pendingChoiceIds(entries, byId).size).toBe(0);
   });
 });
 

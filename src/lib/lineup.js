@@ -25,6 +25,37 @@ export const instrumentRank = (instrument) => {
 export const sortInstruments = (list) =>
   [...new Set(list || [])].sort((a, b) => instrumentRank(a) - instrumentRank(b) || a.localeCompare(b, 'es'));
 
+// Instrumento(s) por defecto al SUMAR un miembro a una formación custom.
+// Regla (pedido de Paul): tener varios instrumentos cargados en la ficha NO
+// implica tocarlos todos en un servicio. Si hay UNA sola alternativa (0 o 1),
+// se asigna sola (no hay nada que elegir); si hay MÁS DE UNA, se deja VACÍO a
+// propósito para que el líder ELIJA con qué toca (queda "pendiente de elección").
+export const defaultInstrumentsFor = (member) => {
+  const registered = sortInstruments(member?.instruments || []);
+  return registered.length >= 2 ? [] : registered;
+};
+
+// Ids de miembros SELECCIONADOS cuya función quedó SIN DEFINIR: tienen 2+
+// instrumentos en su ficha y ninguno elegido (todavía) en la formación. El
+// líder tiene que elegir con cuál tocan. Los directores se EXCLUYEN (su función
+// es dirigir; el default Voz/— es por rol, no una elección pendiente). El set
+// "elegido" se intersecta con la ficha ACTUAL, así un instrumento que el miembro
+// ya no tiene registrado (drift de ficha) cuenta como no-elegido y vuelve a
+// pedir elección. `membersById` = Map id→miembro; `directorIds` = Set.
+export const pendingChoiceIds = (entries, membersById, directorIds = new Set()) => {
+  const out = new Set();
+  for (const e of entries || []) {
+    if (!e || directorIds.has(e.memberId)) continue;
+    const m = membersById && membersById.get ? membersById.get(e.memberId) : null;
+    if (!m) continue;
+    const registered = m.instruments || [];
+    if (registered.length < 2) continue;
+    const chosen = (e.instruments || []).filter((i) => registered.includes(i));
+    if (chosen.length === 0) out.add(e.memberId);
+  }
+  return out;
+};
+
 export const lineupMode = (order) => {
   const m = order?.lineup?.mode;
   return m === 'all' || m === 'custom' ? m : null;
