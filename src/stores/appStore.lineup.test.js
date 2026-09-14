@@ -11,7 +11,14 @@ vi.mock('../lib/supabase', () => ({
     from: () => ({
       select: () => ({ order: () => Promise.resolve({ data: [], error: null }) }),
       insert: (row) => { captured.inserted = row; return { select: () => ({ single: () => Promise.resolve({ data: { ...row, band_id: row.band_id }, error: null }) }) }; },
-      update: (row) => { captured.updated = row; return { eq: () => ({ select: () => ({ single: () => Promise.resolve({ data: { id: 'o1', ...row }, error: null }) }) }) }; },
+      update: (row) => {
+        captured.updated = row;
+        // Cadena flexible: updateOrder ahora encadena .eq('id').eq('content_changed_at')
+        // (o .is(null)) antes de .select().single() (guarda de concurrencia optimista).
+        const single = () => Promise.resolve({ data: { id: 'o1', ...row }, error: null });
+        const chain = { eq: () => chain, is: () => chain, select: () => ({ single }) };
+        return chain;
+      },
     }),
     auth: { getSession: () => Promise.resolve({ data: { session: null } }) },
   },

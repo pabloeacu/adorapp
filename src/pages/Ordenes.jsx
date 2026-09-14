@@ -379,8 +379,29 @@ export const Ordenes = () => {
     if (editingOrder) {
       // Editar: updateOrder mergea el partial con el snapshot del store antes
       // del converter (sin DATA-LOSS). rehearsal_reminder_sent NO se toca (lo
-      // maneja el cron).
-      await updateOrder(editingOrder.id, orderPayload);
+      // maneja el cron). Además, guarda de concurrencia: si otra persona cambió
+      // el contenido mientras editabas, NO se pisa — se avisa y se cierra tu
+      // edición para que la reapliques sobre la versión actual.
+      const res = await updateOrder(editingOrder.id, orderPayload, editingOrder.contentChangedAt);
+      if (res && res.__conflict) {
+        setLineupSaving(false);
+        handleCloseModal();
+        setErrorModal({
+          isOpen: true,
+          title: 'Otra persona editó este orden',
+          message: 'Mientras lo tenías abierto, alguien más cambió este orden. Lo actualizamos a la última versión y cerramos tu edición para que no se pierda nada. Volvé a abrirlo y aplicá tus cambios sobre lo que ya está guardado.',
+        });
+        return;
+      }
+      if (!res) {
+        setLineupSaving(false);
+        setErrorModal({
+          isOpen: true,
+          title: 'No se pudo guardar el orden',
+          message: useAppStore.getState().error || 'Intentá de nuevo. Si el problema sigue, avisale al pastor.',
+        });
+        return;
+      }
       orderId = editingOrder.id;
     } else {
       // Crear: addOrder corre PRIMERO para tener el order.id real y satisfacer

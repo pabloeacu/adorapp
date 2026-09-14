@@ -51,8 +51,14 @@ export const LineupModal = ({ isOpen, onClose, order, onSaved }) => {
     const original = buildLineup(originalMode, originalMode === 'custom' ? lineupEntries(order.lineup) : []);
     if (JSON.stringify(built) === JSON.stringify(original)) { onClose(); return; }
     setSubmitting(true);
-    const res = await updateOrder(order.id, { lineup: built });
+    const res = await updateOrder(order.id, { lineup: built }, order.contentChangedAt);
     setSubmitting(false);
+    if (res && res.__conflict) {
+      // Otra persona cambió el orden mientras editabas la formación: NO se pisa.
+      onClose();
+      setError({ isOpen: true, message: 'Otra persona cambió este orden mientras editabas la formación. La actualizamos a la última versión — volvé a abrirla y aplicá tus cambios sobre lo que ya está guardado.' });
+      return;
+    }
     if (!res) {
       setError({ isOpen: true, message: useAppStore.getState().error || 'No se pudo guardar la formación. Intentá de nuevo.' });
       return;
