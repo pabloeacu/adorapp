@@ -230,7 +230,9 @@ Deno.serve(async (req) => {
             { title, body: messageBody, url },
           );
           // Push services use 404/410 to signal a retired endpoint — prune so we
-          // don't keep retrying dead subscribers forever.
+          // don't keep retrying dead subscribers forever. NO podamos en 401/403:
+          // un VAPID mal configurado devolvería 403 para TODAS y borraríamos a
+          // todos los suscriptores de golpe; esos casos se registran y alertan (abajo).
           if (r.status === 404 || r.status === 410) {
             await sb.from('push_subscriptions').delete().eq('id', s.id);
           }
@@ -241,7 +243,32 @@ Deno.serve(async (req) => {
       }),
     );
 
-    return jres({ sent: results.length, results });
+    // Observabilidad (antes el push era dispara-y-olvida y un fallo se perdía en
+    // silencio): registrar los envíos fallidos en error_log. Un fallo TOTAL (todas
+    // fallaron, típico de VAPID/servicio caído) va como 'error' → lo levanta el
+    // monitor check_system_health y avisa a los pastores. Fallos parciales (algunas
+    // suscripciones muertas aún no podadas) van como 'warning' (visibles, sin alertar).
+    const pruned = results.filter((r) => r.status === 404 || r.status === 410).length;
+    const failed = results.filter((r) => 'error' in r || (typeof r.status === 'number' && r.status >= 400 && r.status !== 404 && r.status !== 410));
+    if (failed.length > 0) {
+      const total = results.length;
+      const allFailed = failed.length === total && total > 1;
+      try {
+        await sb.from('error_log').insert({
+          message: `send-push: ${failed.length}/${total} envíos de push fallaron`,
+          severity: allFailed ? 'error' : 'warning',
+          context: {
+            kind: 'push-dispatch',
+            total,
+            failed: failed.length,
+            pruned,
+            statuses: failed.slice(0, 20).map((r) => ('error' in r ? 'err' : r.status)),
+          },
+        });
+      } catch (_) { /* el log es best-effort: nunca romper el envío */ }
+    }
+
+    return jres({ sent: results.length, results, failed: failed.length, pruned });
   } catch (e) {
     return jres({ error: String(e) }, 500);
   }
