@@ -978,7 +978,15 @@ export const useAppStore = create((set, get) => ({
     }
   },
 
-  updateOrder: async (id, updates) => {
+  // `expectedContentChangedAt`: sello de versión que el usuario tenía AL ABRIR el
+  // editor (no el del store, que Realtime mantiene fresco y anularía la guarda).
+  // Las acciones rápidas (status/devolución) no lo pasan → usan el sello del store.
+  updateOrder: async (id, updates, expectedContentChangedAt = undefined) => {
+    // Campos que un usuario EDITA de forma deliberada y cuyo pisado sería pérdida
+    // real de datos (los mismos que `set_order_content_changed` considera contenido).
+    // Si `updates` toca alguno, un choque se avisa (no se pisa); si no (status/
+    // devolución), se re-aplica sobre lo fresco (no pisa a nadie).
+    const CONTENT_KEYS = ['songs', 'date', 'time', 'bandId', 'meetingType', 'lineup'];
     try {
       // Merge with current store snapshot before converting — see updateMember
       // comment. Without this, saving feedback alone would wipe date/band/songs.
@@ -987,16 +995,47 @@ export const useAppStore = create((set, get) => ({
         console.error('updateOrder: order not found in store, aborting', { id });
         return null;
       }
-      const merged = { ...current, ...updates };
 
-      const { data, error } = await supabase
-        .from('orders')
-        .update(convertOrderToDB(merged))
-        .eq('id', id)
-        .select()
-        .single();
+      // Guarda de concurrencia optimista: el UPDATE solo aplica si `content_changed_at`
+      // sigue siendo el que el usuario tenía al abrir. Si otro cambió el CONTENIDO
+      // mientras tanto, afecta 0 filas (PGRST116) → detectamos el choque. La base
+      // mantiene `content_changed_at` server-side (trigger set_order_content_changed),
+      // SOLO en cambios de contenido/formación → los toques de fondo (cron, reminder,
+      // suspensión, cambio de estado) NO generan falsos choques.
+      const doUpdate = (versionToken, mergeBase) => {
+        let q = supabase.from('orders').update(convertOrderToDB({ ...mergeBase, ...updates })).eq('id', id);
+        q = (versionToken == null)
+          ? q.is('content_changed_at', null)
+          : q.eq('content_changed_at', versionToken);
+        return q.select().single();
+      };
 
-      if (error) throw error;
+      const expected = (expectedContentChangedAt !== undefined) ? expectedContentChangedAt : current.contentChangedAt;
+      let { data, error } = await doUpdate(expected, current);
+
+      if (error && error.code === 'PGRST116') {
+        // 0 filas: puede ser un choque de contenido. Traer la versión fresca.
+        const { data: fresh, error: fErr } = await supabase.from('orders').select('*').eq('id', id).single();
+        if (fErr || !fresh) throw (fErr || error);
+        const freshOrder = convertOrderFromDB(fresh);
+        set((state) => ({ orders: state.orders.map(o => o.id === id ? freshOrder : o) }));
+
+        const contentMoved = (freshOrder.contentChangedAt || null) !== (expected || null);
+        if (!contentMoved) {
+          // 0 filas pero el contenido NO se movió (RLS/carrera rara) → error genérico, no un falso choque.
+          throw error;
+        }
+        if (CONTENT_KEYS.some(k => k in updates)) {
+          // El usuario estaba editando CONTENIDO → avisar y NO pisar (decisión de Paul).
+          return { __conflict: true, order: freshOrder };
+        }
+        // El usuario NO editaba contenido (status/devolución) → re-aplicar sobre lo fresco
+        // (no pisa el contenido nuevo de nadie) y reintentar UNA vez.
+        ({ data, error } = await doUpdate(freshOrder.contentChangedAt, freshOrder));
+        if (error) throw error;
+      } else if (error) {
+        throw error;
+      }
 
       set((state) => ({
         orders: state.orders.map(o => o.id === id ? convertOrderFromDB(data) : o),
