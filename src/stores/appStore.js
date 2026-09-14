@@ -228,6 +228,10 @@ const convertSongFromDB = (s) => ({
   lastUsed: s.last_used,
   createdAt: s.created_at,
   updatedAt: s.updated_at,
+  // Sello de versión server-owned (trigger set_song_content_changed): se mueve solo
+  // en cambios de contenido. Va en FromDB pero NUNCA en convertSongToDB. Guarda de
+  // concurrencia en updateSong (landmine #85, espejo de orders).
+  contentChangedAt: s.content_changed_at,
 });
 
 const convertOrderFromDB = (o) => ({
@@ -880,7 +884,13 @@ export const useAppStore = create((set, get) => ({
     }
   },
 
-  updateSong: async (id, updates) => {
+  // `expectedContentChangedAt`: sello que el editor tenía AL ABRIR (no el del store,
+  // que Realtime refresca). Las actualizaciones de fondo (last_used de addOrder) no lo pasan.
+  updateSong: async (id, updates, expectedContentChangedAt = undefined) => {
+    // Campos de contenido que el editor cambia (los que watchea set_song_content_changed).
+    // Si `updates` toca alguno, un choque se avisa (no se pisa); si no (p. ej. lastUsed),
+    // se re-aplica sobre lo fresco y reintenta (no pisa a nadie).
+    const CONTENT_KEYS = ['title', 'artist', 'key', 'originalKey', 'categories', 'structure', 'youtubeUrl', 'compass', 'bpm'];
     try {
       // CRITICAL DATA-LOSS FIX: this was the root cause of the structure=[]
       // wipe-out reported by Paul. updateSong(id, { lastUsed }) called from
@@ -893,16 +903,36 @@ export const useAppStore = create((set, get) => ({
         console.error('updateSong: song not found in store, aborting', { id });
         return null;
       }
-      const merged = { ...current, ...updates };
 
-      const { data, error } = await supabase
-        .from('songs')
-        .update(convertSongToDB(merged))
-        .eq('id', id)
-        .select()
-        .single();
+      // Guarda de concurrencia optimista sobre `content_changed_at` (espejo de updateOrder,
+      // landmine #85). El sello lo mueve la base SOLO en cambios de contenido (no last_used).
+      const doUpdate = (versionToken, mergeBase) => {
+        let q = supabase.from('songs').update(convertSongToDB({ ...mergeBase, ...updates })).eq('id', id);
+        q = (versionToken == null) ? q.is('content_changed_at', null) : q.eq('content_changed_at', versionToken);
+        return q.select().single();
+      };
 
-      if (error) throw error;
+      const expected = (expectedContentChangedAt !== undefined) ? expectedContentChangedAt : current.contentChangedAt;
+      let { data, error } = await doUpdate(expected, current);
+
+      if (error && error.code === 'PGRST116') {
+        const { data: fresh, error: fErr } = await supabase.from('songs').select('*').eq('id', id).single();
+        if (fErr || !fresh) throw (fErr || error);
+        const freshSong = convertSongFromDB(fresh);
+        set((state) => ({ songs: state.songs.map(s => s.id === id ? freshSong : s) }));
+
+        const contentMoved = (freshSong.contentChangedAt || null) !== (expected || null);
+        if (!contentMoved) {
+          throw error; // 0 filas pero el contenido no se movió (RLS/carrera) → error genérico
+        }
+        if (CONTENT_KEYS.some(k => k in updates)) {
+          return { __conflict: true, song: freshSong }; // editor de canción → avisar y NO pisar
+        }
+        ({ data, error } = await doUpdate(freshSong.contentChangedAt, freshSong)); // lastUsed → re-aplicar sobre lo fresco
+        if (error) throw error;
+      } else if (error) {
+        throw error;
+      }
 
       set((state) => ({
         songs: state.songs.map(s => s.id === id ? convertSongFromDB(data) : s),
