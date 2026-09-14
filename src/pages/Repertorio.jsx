@@ -277,7 +277,7 @@ export const Repertorio = () => {
     setShowCategoryDropdown(false);
   };
 
-  const handleSubmit = (e) => {
+  const handleSubmit = async (e) => {
     e.preventDefault();
     if (!formData.title.trim()) return;
 
@@ -290,9 +290,27 @@ export const Repertorio = () => {
     };
 
     if (editingSong) {
-      updateSong(editingSong.id, songData);
+      // Guarda de concurrencia (landmine #85): el sello es el de AL ABRIR el editor.
+      const res = await updateSong(editingSong.id, songData, editingSong.contentChangedAt);
+      if (res && res.__conflict) {
+        handleCloseModal();
+        setErrorModal({
+          isOpen: true,
+          title: 'Otra persona editó esta canción',
+          message: 'Mientras la tenías abierta, alguien más cambió esta canción. La actualizamos a la última versión y cerramos tu edición para que no se pierda nada. Volvé a abrirla y aplicá tus cambios sobre lo que ya está guardado.',
+        });
+        return;
+      }
+      if (!res) {
+        setErrorModal({
+          isOpen: true,
+          title: 'No se pudo guardar la canción',
+          message: useAppStore.getState().error || 'Intentá de nuevo. Si el problema sigue, avisale al pastor.',
+        });
+        return;
+      }
     } else {
-      addSong(songData);
+      await addSong(songData);
     }
     handleCloseModal();
   };
