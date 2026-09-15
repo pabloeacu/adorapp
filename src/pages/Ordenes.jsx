@@ -996,9 +996,7 @@ export const Ordenes = () => {
     const singerIds = new Set(singers.map((s) => s.id));
     const suggestedDirectorId = suggestDirectorForSong({ singerIds, orders, songId: song.id, bandId: formData.bandId });
     const defaultKey = song.key || song.originalKey || 'C';
-    const localId = (typeof crypto !== 'undefined' && crypto.randomUUID)
-      ? crypto.randomUUID()
-      : `${song.id}-${Date.now()}-${Math.random()}`;
+    const localId = genLocalId();
     const newRef = {
       songId: song.id,
       directorId: suggestedDirectorId,
@@ -1829,9 +1827,8 @@ export const Ordenes = () => {
                       emptyText="No se encontraron canciones."
                       testId={`enganchar-${index}`}
                       onChange={(id) => { const s = songs.find((x) => x.id === id); if (s) addEnganchadaToOrder(index, s); }}
-                      renderTrigger={({ ref, toggle }) => (
+                      renderTrigger={({ toggle }) => (
                         <button
-                          ref={ref}
                           type="button"
                           onClick={toggle}
                           title="Enganchar una canción debajo de esta"

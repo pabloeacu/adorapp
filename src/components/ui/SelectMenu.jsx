@@ -120,7 +120,12 @@ export const SelectMenu = ({
   return (
     <div className={`relative ${className}`}>
       {renderTrigger ? (
-        renderTrigger({ ref: btnRef, open, toggle })
+        // El disparador propio va envuelto en un span que lleva el ref (para medir su
+        // posición); así NO pasamos el ref a la función durante el render (regla
+        // react-compiler "Cannot access refs during render"). El consumidor solo usa `toggle`.
+        <span ref={btnRef} className="inline-flex">
+          {renderTrigger({ open, toggle })}
+        </span>
       ) : (
         <button
           ref={btnRef}
