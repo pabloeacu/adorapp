@@ -6,7 +6,7 @@ import {
   arrayMove, SortableContext, sortableKeyboardCoordinates, verticalListSortingStrategy, useSortable,
 } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
-import { GripVertical, X, Trash2, Music2, Check, MessageSquarePlus, Download, Clock } from 'lucide-react';
+import { GripVertical, X, Trash2, Music2, Check, MessageSquarePlus, Download, Clock, Link2 } from 'lucide-react';
 import { useAppStore } from '../../stores/appStore';
 import { useCurrentRole, useCurrentMember } from '../../hooks/useCurrentMember';
 import { Modal } from '../ui/Modal';
@@ -62,7 +62,7 @@ export const SchemaBuilderModal = ({ order = null, isOpen, onClose, mode = 'sche
     setTmplName(''); setShowTmplInput(false);
   }, [isOpen, order?.id, isTemplateMode, getServiceSchema]);
 
-  const orderSongs = (order?.songs || []).map((ref) => ({ songId: ref.songId, title: getSongById(ref.songId)?.title || 'Canción' }));
+  const orderSongs = (order?.songs || []).map((ref) => ({ songId: ref.songId, title: getSongById(ref.songId)?.title || 'Canción', enganchada: !!ref.enganchada }));
 
   const sensors = useSensors(
     useSensor(PointerSensor, { activationConstraint: { distance: 6 } }),
@@ -287,7 +287,9 @@ export const SchemaBuilderModal = ({ order = null, isOpen, onClose, mode = 'sche
                                       return (
                                         <button key={os.songId} type="button" onClick={() => toggleSong(s._localId, os.songId)}
                                           className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[11px] border transition-colors ${on ? 'bg-gold-500/20 border-gold-500/50 text-gold-200' : 'bg-neutral-900 border-neutral-700 text-neutral-300 hover:border-neutral-600'}`}>
-                                          {on && <Check size={11} />}{os.title}
+                                          {on && <Check size={11} />}
+                                          {os.enganchada && <Link2 size={11} className="text-gold-400" aria-label="enganchada" />}
+                                          {os.title}
                                         </button>
                                       );
                                     })}

@@ -18,6 +18,11 @@ import { matchesSearch } from '../../lib/searchText';
 export const SelectMenu = ({
   value, onChange, options = [], placeholder = 'Elegí…', disabled = false, icon: Icon, className = '',
   searchable = false, searchPlaceholder = 'Buscar…', emptyText = 'Sin opciones', beforeOpen, testId,
+  // `iconOnly`: disparador compacto (solo el ícono `icon`, sin etiqueta ni chevron),
+  // con estilo `triggerClassName` y título/aria `triggerTitle`. `menuWidth`: ancho del
+  // panel de escritorio cuando el disparador es más angosto que la lista (ej. el picker
+  // de "enganchar"). OPT-IN: sin ellos, el comportamiento es idéntico al de antes.
+  iconOnly = false, triggerClassName = '', triggerTitle, menuWidth,
 }) => {
   const [open, setOpen] = useState(false);
   const [rect, setRect] = useState(null);
@@ -61,6 +66,11 @@ export const SelectMenu = ({
 
   const spaceBelow = rect ? window.innerHeight - rect.bottom : 0;
   const up = rect && spaceBelow < 260 && rect.top > spaceBelow;
+  // Panel de escritorio: por defecto usa el ancho del disparador; con `menuWidth`
+  // se puede forzar un ancho mayor (disparador angosto) y se clampa a la ventana.
+  const viewportW = typeof window !== 'undefined' ? window.innerWidth : 9999;
+  const panelW = menuWidth || rect?.width || 0;
+  const panelLeft = rect ? Math.max(8, Math.min(rect.left, viewportW - panelW - 8)) : 0;
 
   const optionList = (
     <div data-testid={testId ? `${testId}-list` : undefined}>
@@ -105,24 +115,43 @@ export const SelectMenu = ({
     </div>
   ) : null;
 
+  const toggle = () => (open ? setOpen(false) : openMenu());
+
   return (
     <div className={`relative ${className}`}>
-      <button
-        ref={btnRef}
-        type="button"
-        disabled={disabled}
-        data-testid={testId}
-        onClick={() => (open ? setOpen(false) : openMenu())}
-        className={`w-full flex items-center justify-between gap-2 px-4 py-2.5 bg-neutral-900 border rounded-xl transition-colors disabled:opacity-50 disabled:cursor-not-allowed ${
-          value ? 'border-gold-500/60 text-white' : 'border-neutral-700 text-gray-400 hover:text-white'
-        }`}
-      >
-        <span className="flex items-center gap-2 min-w-0">
-          {Icon && <Icon size={16} className="shrink-0 text-gold-300/80" />}
-          <span className="truncate text-sm">{selected ? selected.label : placeholder}</span>
-        </span>
-        <ChevronDown size={16} className={`shrink-0 transition-transform ${open ? 'rotate-180' : ''}`} />
-      </button>
+      {iconOnly ? (
+        // Disparador compacto: solo el ícono. Botón normal con ref={btnRef} (patrón
+        // permitido por react-compiler; no hay render-prop ni acceso a refs en render).
+        <button
+          ref={btnRef}
+          type="button"
+          disabled={disabled}
+          data-testid={testId}
+          onClick={toggle}
+          title={triggerTitle}
+          aria-label={triggerTitle}
+          className={triggerClassName || 'p-2 text-gold-300 hover:text-gold-200 shrink-0'}
+        >
+          {Icon ? <Icon size={16} /> : <ChevronDown size={16} />}
+        </button>
+      ) : (
+        <button
+          ref={btnRef}
+          type="button"
+          disabled={disabled}
+          data-testid={testId}
+          onClick={toggle}
+          className={`w-full flex items-center justify-between gap-2 px-4 py-2.5 bg-neutral-900 border rounded-xl transition-colors disabled:opacity-50 disabled:cursor-not-allowed ${
+            value ? 'border-gold-500/60 text-white' : 'border-neutral-700 text-gray-400 hover:text-white'
+          }`}
+        >
+          <span className="flex items-center gap-2 min-w-0">
+            {Icon && <Icon size={16} className="shrink-0 text-gold-300/80" />}
+            <span className="truncate text-sm">{selected ? selected.label : placeholder}</span>
+          </span>
+          <ChevronDown size={16} className={`shrink-0 transition-transform ${open ? 'rotate-180' : ''}`} />
+        </button>
+      )}
 
       {/* Móvil: hoja inferior fija (bottom sheet). */}
       {open && mobile && createPortal(
@@ -149,7 +178,7 @@ export const SelectMenu = ({
           <div
             ref={panelRef}
             className={`fixed z-[301] flex flex-col bg-neutral-900 border border-neutral-700 rounded-xl shadow-2xl overscroll-contain p-1.5 ${searchable ? 'max-h-96' : 'max-h-60'}`}
-            style={{ left: rect.left, width: rect.width, ...(up ? { bottom: window.innerHeight - rect.top + 6 } : { top: rect.bottom + 6 }) }}
+            style={{ left: panelLeft, width: panelW, ...(up ? { bottom: window.innerHeight - rect.top + 6 } : { top: rect.bottom + 6 }) }}
           >
             {searchBox}
             <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain">{optionList}</div>

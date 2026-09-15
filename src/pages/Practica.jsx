@@ -15,10 +15,12 @@ import {
   UploadCloud,
   AlarmClock,
   Timer,
+  Link2,
 } from 'lucide-react';
 import { MusicNotes, MusicNotesSimple } from '@phosphor-icons/react';
 import { useAppStore, transposeSongStructure } from '../stores/appStore';
 import { milestonesOf, ensayometroPercent, isSingerOnly, milestonesPerSong } from '../lib/ensayometro';
+import { numberOrderSongs } from '../lib/orderNumbering';
 import { lineupInstrumentsFor } from '../lib/lineup';
 import { useDocumentTitle } from '../hooks/useDocumentTitle';
 import { useCurrentMember, useCurrentRole } from '../hooks/useCurrentMember';
@@ -465,7 +467,8 @@ export const Practica = () => {
 
       {/* Tarjetas de práctica por canción */}
       <div className="space-y-4">
-        {order.songs.map((songRef, index) => {
+        {numberOrderSongs(order.songs).map((meta, index) => {
+          const songRef = meta.songRef;
           const song = getSongById(songRef.songId);
           if (!song) return null;
           const log = logs[songRef.songId] || emptyLog(orderId, songRef.songId);
@@ -480,14 +483,18 @@ export const Practica = () => {
               <div className="space-y-4">
                 {/* Cabecera de la canción */}
                 <div className="flex items-start gap-3">
-                  <span className={`w-8 h-8 shrink-0 rounded-full flex items-center justify-center font-medium ${done ? 'bg-green-500/20 text-green-400' : 'bg-gold-500/15 text-gold-300'}`}>
-                    {done ? '✓' : index + 1}
+                  <span className={`h-8 min-w-8 px-1.5 shrink-0 rounded-full flex items-center justify-center font-medium ${done ? 'bg-green-500/20 text-green-400' : 'bg-gold-500/15 text-gold-300'}`}>
+                    {done ? '✓' : meta.displayNumber}
                   </span>
                   <div className="flex-1 min-w-0">
-                    <p className="font-semibold truncate">{song.title}</p>
+                    <p className="font-semibold truncate flex items-center gap-1.5">
+                      <span className="truncate">{song.title}</span>
+                      {meta.hasLinkedBelow && <Link2 size={13} className="shrink-0 text-gold-400" aria-label="Tiene una canción enganchada debajo" />}
+                    </p>
                     <div className="flex flex-wrap items-center gap-2 mt-1 text-sm text-gray-400">
                       {song.artist && <span className="truncate">{song.artist}</span>}
                       <Badge size="sm" variant="primary">Tono: {songRef.key}</Badge>
+                      {meta.isEnganchada && <Badge size="sm" variant="secondary">Enganchada</Badge>}
                       {songRef.ministracion && <Badge size="sm" variant="warning">Ministración</Badge>}
                       {song.bpm && <Badge size="sm" variant="secondary">BPM: {song.bpm}</Badge>}
                       {director && (
