@@ -1823,21 +1823,14 @@ export const Ordenes = () => {
                       value=""
                       menuWidth={320}
                       options={songPickerOptions}
+                      icon={Link2}
+                      iconOnly
+                      triggerTitle="Enganchar una canción debajo de esta"
+                      triggerClassName="p-2 text-gold-400/80 hover:text-gold-300 shrink-0"
                       searchPlaceholder="Buscar canción para enganchar…"
                       emptyText="No se encontraron canciones."
                       testId={`enganchar-${index}`}
                       onChange={(id) => { const s = songs.find((x) => x.id === id); if (s) addEnganchadaToOrder(index, s); }}
-                      renderTrigger={({ toggle }) => (
-                        <button
-                          type="button"
-                          onClick={toggle}
-                          title="Enganchar una canción debajo de esta"
-                          aria-label="Enganchar una canción debajo"
-                          className="p-2 text-gold-400/80 hover:text-gold-300 shrink-0"
-                        >
-                          <Link2 size={16} />
-                        </button>
-                      )}
                     />
                     {meta.isEnganchada && (
                       <button

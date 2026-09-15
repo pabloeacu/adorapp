@@ -18,11 +18,11 @@ import { matchesSearch } from '../../lib/searchText';
 export const SelectMenu = ({
   value, onChange, options = [], placeholder = 'Elegí…', disabled = false, icon: Icon, className = '',
   searchable = false, searchPlaceholder = 'Buscar…', emptyText = 'Sin opciones', beforeOpen, testId,
-  // `renderTrigger({ ref, open, toggle })`: reemplaza el botón por defecto por un
-  // disparador propio (p. ej. un ícono chico). `menuWidth`: ancho del panel de
-  // escritorio cuando el disparador es más angosto que la lista (ej. el picker de
-  // "enganchar"). Ambos son OPT-IN: sin ellos, el comportamiento es idéntico al de antes.
-  renderTrigger, menuWidth,
+  // `iconOnly`: disparador compacto (solo el ícono `icon`, sin etiqueta ni chevron),
+  // con estilo `triggerClassName` y título/aria `triggerTitle`. `menuWidth`: ancho del
+  // panel de escritorio cuando el disparador es más angosto que la lista (ej. el picker
+  // de "enganchar"). OPT-IN: sin ellos, el comportamiento es idéntico al de antes.
+  iconOnly = false, triggerClassName = '', triggerTitle, menuWidth,
 }) => {
   const [open, setOpen] = useState(false);
   const [rect, setRect] = useState(null);
@@ -119,13 +119,21 @@ export const SelectMenu = ({
 
   return (
     <div className={`relative ${className}`}>
-      {renderTrigger ? (
-        // El disparador propio va envuelto en un span que lleva el ref (para medir su
-        // posición); así NO pasamos el ref a la función durante el render (regla
-        // react-compiler "Cannot access refs during render"). El consumidor solo usa `toggle`.
-        <span ref={btnRef} className="inline-flex">
-          {renderTrigger({ open, toggle })}
-        </span>
+      {iconOnly ? (
+        // Disparador compacto: solo el ícono. Botón normal con ref={btnRef} (patrón
+        // permitido por react-compiler; no hay render-prop ni acceso a refs en render).
+        <button
+          ref={btnRef}
+          type="button"
+          disabled={disabled}
+          data-testid={testId}
+          onClick={toggle}
+          title={triggerTitle}
+          aria-label={triggerTitle}
+          className={triggerClassName || 'p-2 text-gold-300 hover:text-gold-200 shrink-0'}
+        >
+          {Icon ? <Icon size={16} /> : <ChevronDown size={16} />}
+        </button>
       ) : (
         <button
           ref={btnRef}
