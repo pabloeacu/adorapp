@@ -6,7 +6,8 @@ import {
   MessageSquare, Eye, Trash2, Search, Check, X,
   User, Zap, AlertCircle, FileDown, History, Award,
   FileText, Printer, Copy as CopyIcon,
-  Edit, CheckCircle, XCircle, RotateCcw, Target, ChevronRight, ListChecks, Play, CalendarClock, SlidersHorizontal, Ban
+  Edit, CheckCircle, XCircle, RotateCcw, Target, ChevronRight, ListChecks, Play, CalendarClock, SlidersHorizontal, Ban,
+  Link2, Unlink
 } from 'lucide-react';
 import {
   CalendarDots,
@@ -42,6 +43,15 @@ import { RehearsalActionModal } from '../components/orders/RehearsalActionModal'
 import { isChunkLoadError, recoverFromStaleChunk } from '../lib/chunkRecovery';
 import { CollapsibleSection } from '../components/ui/CollapsibleSection';
 import { buildLineup, lineupSummaryText, isCustomLineup, directorIdsOf, pendingChoiceIds } from '../lib/lineup';
+import { numberOrderSongs, addEnganchadaAfter, unlinkEnganchada, normalizeEnganchadas } from '../lib/orderNumbering';
+
+// Id estable por-fila para el drag-and-drop Y para matchear escrituras asíncronas
+// (fetchKeyHistory) a la canción correcta AUNQUE se inserte una enganchada en el
+// medio y corra los índices. Se stripea al guardar (stripSongRefs). No es la clave
+// del negocio, solo del cliente.
+const genLocalId = () => (typeof crypto !== 'undefined' && crypto.randomUUID)
+  ? crypto.randomUUID()
+  : `lid-${Date.now()}-${Math.random()}`;
 
 // Parsear 'YYYY-MM-DD' como fecha LOCAL (no UTC). `new Date('2026-09-11')` se
 // interpreta en UTC y, en ART (-3), muestra el día ANTERIOR (jueves 10 en vez de
@@ -234,7 +244,10 @@ export const Ordenes = () => {
         time: order.time || '20:00',
         bandId: order.bandId || null,
         meetingType: order.meetingType || 'culto_general',
-        songs: order.songs ? order.songs.map(s => ({ ...s })) : [],
+        // Al editar, cada canción recibe un _localId estable (las órdenes guardadas
+        // NO lo traen: stripSongRefs lo quita) → así el DnD y las escrituras async
+        // (fetchKeyHistory) matchean la fila correcta aunque se inserte una enganchada.
+        songs: order.songs ? order.songs.map(s => ({ ...s, _localId: s._localId || genLocalId() })) : [],
         feedback: order.feedback || '',
         rehearsalEnabled: !!order.rehearsalDate,
         rehearsalDate: order.rehearsalDate || '',
@@ -549,6 +562,7 @@ export const Ordenes = () => {
     const white = [255, 255, 255];
     const lightGray = [200, 200, 200];
     const mediumGray = [153, 153, 153];
+    const gold = [212, 175, 55];
 
     // Helper function to add dark background to a page
     const addDarkBackground = () => {
@@ -618,7 +632,8 @@ export const Ordenes = () => {
     doc.line(20, y, 190, y);
     y += 5;
 
-    // Songs
+    // Songs — numeradas con incisos para las enganchadas (2.a / 2.b).
+    const numbered = numberOrderSongs(order.songs);
     order.songs.forEach((songRef, index) => {
       // Check if we need a new page
       if (y > 260) {
@@ -631,28 +646,40 @@ export const Ordenes = () => {
       const director = getMemberById(songRef.directorId);
       const key = songRef.key || song?.originalKey || song?.key || 'C';
 
-      // Number
+      // Number (inciso 2.a/2.b para enganchadas)
       doc.setFontSize(12);
       doc.setTextColor(...purple);
       doc.setFont('helvetica', 'bold');
-      doc.text(`${index + 1}`, 20, y);
+      doc.text(numbered[index].displayNumber, 20, y);
 
-      // Title and artist
+      // Title
       doc.setTextColor(...white);
       doc.setFont('helvetica', 'normal');
       doc.setFontSize(11);
-      doc.text(song?.title || 'Sin título', 35, y);
+      const titleText = song?.title || 'Sin título';
+      doc.text(titleText, 35, y);
+      // Marcadores en la misma fila del encabezado: MINISTRACIÓN / ENGANCHADA / cadenita dorada.
+      let markerX = 35 + doc.getTextWidth(titleText) + 3;
       if (songRef.ministracion) {
-        // Etiqueta "Ministración" a continuación del título (misma fila).
-        const w = doc.getTextWidth(song?.title || 'Sin título');
-        doc.setFontSize(8);
-        doc.setTextColor(...purple);
-        doc.setFont('helvetica', 'bold');
-        doc.text('MINISTRACIÓN', 35 + w + 3, y);
-        doc.setTextColor(...white);
-        doc.setFont('helvetica', 'normal');
-        doc.setFontSize(11);
+        doc.setFontSize(8); doc.setTextColor(...purple); doc.setFont('helvetica', 'bold');
+        doc.text('MINISTRACIÓN', markerX, y);
+        markerX += doc.getTextWidth('MINISTRACIÓN') + 3;
       }
+      if (numbered[index].isEnganchada) {
+        doc.setFontSize(8); doc.setTextColor(...gold); doc.setFont('helvetica', 'bold');
+        doc.text('ENGANCHADA', markerX, y);
+        markerX += doc.getTextWidth('ENGANCHADA') + 3;
+      }
+      if (numbered[index].hasLinkedBelow) {
+        // Cadenita dorada: dos eslabones (elipses) chiquitos que señalan la enganchada debajo.
+        doc.setDrawColor(...gold); doc.setLineWidth(0.4);
+        doc.ellipse(markerX + 1.3, y - 1.2, 1.5, 1.0, 'S');
+        doc.ellipse(markerX + 3.6, y - 1.2, 1.5, 1.0, 'S');
+      }
+      // Reset para el artista.
+      doc.setTextColor(...white);
+      doc.setFont('helvetica', 'normal');
+      doc.setFontSize(11);
       if (song?.artist) {
         doc.setFontSize(9);
         doc.setTextColor(...mediumGray);
@@ -738,6 +765,7 @@ export const Ordenes = () => {
     const lightGray = [200, 200, 200];
     const mediumGray = [153, 153, 153];
     const purpleLight = [200, 150, 255];
+    const gold = [212, 175, 55];
 
     // Helper function to add dark background to a page
     const addDarkBackground = () => {
@@ -746,6 +774,8 @@ export const Ordenes = () => {
     };
 
     // Process each song
+    // Numeración con incisos para las enganchadas (2.a / 2.b).
+    const numbered = numberOrderSongs(order.songs);
     order.songs.forEach((songRef, index) => {
       // Add new page for each song (except first)
       if (index > 0) {
@@ -766,11 +796,19 @@ export const Ordenes = () => {
 
       let y = 20;
 
-      // Song number (large)
-      doc.setFontSize(48);
+      // Song number (large) — inciso 2.a/2.b para enganchadas
+      doc.setFontSize(numbered[index].displayNumber.includes('.') ? 36 : 48);
       doc.setTextColor(...purple);
       doc.setFont('helvetica', 'bold');
-      doc.text(`${index + 1}`, 20, y + 15);
+      doc.text(numbered[index].displayNumber, 20, y + 15);
+      // Etiqueta "Enganchada" debajo del número (o "sigue enganchada" si es la madre).
+      if (numbered[index].isEnganchada) {
+        doc.setFontSize(9); doc.setTextColor(...gold); doc.setFont('helvetica', 'bold');
+        doc.text('ENGANCHADA', 20, y + 22);
+      } else if (numbered[index].hasLinkedBelow) {
+        doc.setFontSize(8); doc.setTextColor(...gold); doc.setFont('helvetica', 'normal');
+        doc.text('sigue enganchada', 20, y + 22);
+      }
 
       // Meta info on the right
       doc.setFontSize(10);
@@ -917,7 +955,10 @@ export const Ordenes = () => {
       bandId: formData.bandId,
     });
     const defaultKey = song.key || song.originalKey || 'C';
-    const newIndex = formData.songs.length;
+    // Stable client-side id: sirve al drag-and-drop Y para que la escritura async
+    // del historial de tono caiga en ESTA fila aunque se inserte una enganchada
+    // en el medio (que corre los índices) antes de que resuelva el fetch.
+    const localId = genLocalId();
 
     setFormData(prev => ({
       ...prev,
@@ -927,10 +968,7 @@ export const Ordenes = () => {
         key: defaultKey,
         _pendingHistory: true,
         _suggestedDirector: !!suggestedDirectorId,
-        // Stable client-side id used by drag-and-drop. Survives reorders.
-        _localId: typeof crypto !== 'undefined' && crypto.randomUUID
-          ? crypto.randomUUID()
-          : `${song.id}-${Date.now()}-${Math.random()}`,
+        _localId: localId,
       }]
     }));
     setShowUnused(false);
@@ -942,8 +980,8 @@ export const Ordenes = () => {
         if (result.found) {
           setFormData(prev => ({
             ...prev,
-            songs: prev.songs.map((s, i) =>
-              i === newIndex ? { ...s, key: result.key } : s
+            songs: prev.songs.map((s) =>
+              s._localId === localId ? { ...s, key: result.key } : s
             )
           }));
         }
@@ -951,12 +989,50 @@ export const Ordenes = () => {
     }
   };
 
-  // Handle director change - fetch key history and update
-  const handleDirectorChange = (index, directorId, songId) => {
-    // Update directorId immediately
+  // Agrega una canción ENGANCHADA justo debajo de `afterIndex` (mismo trato que una
+  // canción normal —director sugerido, tono, historial— con la marca `enganchada:true`).
+  // La marca sobrevive a stripSongRefs (sin `_`) y se numera como inciso (2.a/2.b).
+  const addEnganchadaToOrder = async (afterIndex, song) => {
+    const singerIds = new Set(singers.map((s) => s.id));
+    const suggestedDirectorId = suggestDirectorForSong({ singerIds, orders, songId: song.id, bandId: formData.bandId });
+    const defaultKey = song.key || song.originalKey || 'C';
+    const localId = (typeof crypto !== 'undefined' && crypto.randomUUID)
+      ? crypto.randomUUID()
+      : `${song.id}-${Date.now()}-${Math.random()}`;
+    const newRef = {
+      songId: song.id,
+      directorId: suggestedDirectorId,
+      key: defaultKey,
+      _pendingHistory: true,
+      _suggestedDirector: !!suggestedDirectorId,
+      _localId: localId,
+      enganchada: true,
+    };
+    setFormData(prev => ({ ...prev, songs: addEnganchadaAfter(prev.songs, afterIndex, newRef) }));
+    setShowUnused(false);
+    if (suggestedDirectorId) {
+      // Matchear por _localId (no por índice) porque la inserción corre las posiciones.
+      fetchKeyHistory(suggestedDirectorId, song.id).then(result => {
+        if (result.found) {
+          setFormData(prev => ({
+            ...prev,
+            songs: prev.songs.map((s) => (s._localId === localId ? { ...s, key: result.key } : s)),
+          }));
+        }
+      }).catch(() => {});
+    }
+  };
+
+  // Handle director change - fetch key history and update.
+  // `localId` = _localId de la fila: la escritura ASYNC del tono matchea por _localId
+  // (no por índice) para no caer en la fila equivocada si se insertó una enganchada
+  // en el medio mientras el fetch estaba en vuelo. Fallback a índice por defensa.
+  const handleDirectorChange = (index, directorId, songId, localId) => {
+    const matchRow = (s, i) => (localId ? s._localId === localId : i === index);
+    // Update directorId immediately (síncrono → el índice es válido en este instante).
     setFormData(prev => {
       const newSongs = prev.songs.map((s, i) =>
-        i === index ? { ...s, directorId } : s
+        matchRow(s, i) ? { ...s, directorId } : s
       );
       return { ...prev, songs: newSongs };
     });
@@ -973,7 +1049,7 @@ export const Ordenes = () => {
           setFormData(prev => ({
             ...prev,
             songs: prev.songs.map((s, i) =>
-              i === index ? { ...s, key: result.key } : s
+              matchRow(s, i) ? { ...s, key: result.key } : s
             )
           }));
         } else {
@@ -982,7 +1058,7 @@ export const Ordenes = () => {
           setFormData(prev => ({
             ...prev,
             songs: prev.songs.map((s, i) =>
-              i === index ? { ...s, key: originalKey } : s
+              matchRow(s, i) ? { ...s, key: originalKey } : s
             )
           }));
         }
@@ -1018,16 +1094,24 @@ export const Ordenes = () => {
       const oldIndex = ids.indexOf(active.id);
       const newIndex = ids.indexOf(over.id);
       if (oldIndex < 0 || newIndex < 0) return prev;
-      return { ...prev, songs: arrayMove(prev.songs, oldIndex, newIndex) };
+      // Al reordenar, una enganchada podría quedar en el índice 0 (sin nada arriba):
+      // normalizeEnganchadas la des-engancha para que no quede un inciso huérfano.
+      return { ...prev, songs: normalizeEnganchadas(arrayMove(prev.songs, oldIndex, newIndex)) };
     });
   };
 
   const removeSongFromOrder = (index) => {
     setFormData(prev => ({
       ...prev,
-      songs: prev.songs.filter((_, i) => i !== index)
+      // Quitar una canción puede dejar una enganchada arriba de todo → normalizar.
+      songs: normalizeEnganchadas(prev.songs.filter((_, i) => i !== index)),
     }));
     setKeyHistoryTooltip(null);
+  };
+
+  // Quita el enganche de una canción (vuelve a tener número propio) — para corregir.
+  const unlinkSongInOrder = (index) => {
+    setFormData(prev => ({ ...prev, songs: unlinkEnganchada(prev.songs, index) }));
   };
 
   const updateSongInOrder = (index, field, value) => {
@@ -1253,7 +1337,6 @@ export const Ordenes = () => {
       <div className="space-y-4">
         {filteredOrders.map((order) => {
           const band = getBandById(order.bandId);
-          const songDetails = order.songs.map(s => getSongById(s.songId)).filter(Boolean);
 
           return (
             <Card key={order.id} className="hover:border-neutral-700 transition-all">
@@ -1349,21 +1432,28 @@ export const Ordenes = () => {
                   <span className="text-sm font-medium">Repertorio</span>
                 </div>
                 <div className="flex flex-wrap gap-2">
-                  {songDetails.slice(0, 5).map((song, index) => (
-                    <div
-                      key={song.id}
-                      className="flex items-center gap-2 px-3 py-1.5 bg-neutral-800/50 rounded-lg"
-                    >
-                      <span className="w-5 h-5 rounded-full bg-neutral-700 flex items-center justify-center text-xs">
-                        {index + 1}
-                      </span>
-                      <span className="text-sm">{song.title}</span>
-                      <Badge size="sm" variant="primary">{order.songs[index]?.key}</Badge>
-                    </div>
-                  ))}
-                  {songDetails.length > 5 && (
+                  {/* Se itera order.songs directo (numerado) — NO el songDetails filtrado —
+                      para que el número y el tono queden alineados aunque falte una canción
+                      en el store (antes se desalineaban). */}
+                  {numberOrderSongs(order.songs).slice(0, 5).map((meta, index) => {
+                    const song = getSongById(meta.songRef.songId);
+                    return (
+                      <div
+                        key={`${meta.songRef.songId}-${index}`}
+                        className="flex items-center gap-2 px-3 py-1.5 bg-neutral-800/50 rounded-lg"
+                      >
+                        <span className="h-5 min-w-5 px-1 rounded-full bg-neutral-700 flex items-center justify-center text-xs">
+                          {meta.displayNumber}
+                        </span>
+                        <span className="text-sm">{song?.title || 'Canción'}</span>
+                        {meta.hasLinkedBelow && <Link2 size={12} className="text-gold-400" aria-label="enganchada debajo" />}
+                        <Badge size="sm" variant="primary">{meta.songRef.key}</Badge>
+                      </div>
+                    );
+                  })}
+                  {order.songs.length > 5 && (
                     <div className="px-3 py-1.5 bg-neutral-800/50 rounded-lg text-sm text-gray-400">
-                      +{songDetails.length - 5} más
+                      +{order.songs.length - 5} más
                     </div>
                   )}
                 </div>
@@ -1612,18 +1702,25 @@ export const Ordenes = () => {
                 strategy={verticalListSortingStrategy}
               >
                 <div className="space-y-2 max-h-60 overflow-y-auto">
-                  {formData.songs.map((songRef, index) => {
+                  {numberOrderSongs(formData.songs).map((meta, index) => {
+                    const songRef = meta.songRef;
                     const song = getSongById(songRef.songId);
                     const rowId = songRef._localId || `${songRef.songId}-${index}`;
                     return (
                       <SortableSongRow key={rowId} id={rowId}>
-                        <div className="flex flex-wrap items-center gap-3 p-3 bg-neutral-800 rounded-xl">
-                    <span className="w-6 h-6 rounded-full bg-neutral-700 flex items-center justify-center text-xs shrink-0">
-                      {index + 1}
+                        <div className={`flex flex-wrap items-center gap-3 p-3 rounded-xl ${meta.isEnganchada ? 'bg-neutral-800/60 border-l-2 border-gold-500/50' : 'bg-neutral-800'}`}>
+                    <span className={`h-6 min-w-6 px-1.5 rounded-full flex items-center justify-center text-xs shrink-0 font-medium ${meta.isEnganchada ? 'bg-gold-500/15 text-gold-300' : 'bg-neutral-700'}`}>
+                      {meta.displayNumber}
                     </span>
                     <div className="flex-1 min-w-0 basis-32">
-                      <p className="font-medium truncate">{song?.title}</p>
-                      <p className="text-xs text-gray-400 truncate">{song?.artist}</p>
+                      <p className="font-medium truncate flex items-center gap-1.5">
+                        <span className="truncate">{song?.title}</span>
+                        {meta.hasLinkedBelow && <Link2 size={13} className="shrink-0 text-gold-400" aria-label="Tiene una canción enganchada debajo" />}
+                      </p>
+                      <div className="flex items-center gap-2 min-w-0">
+                        <p className="text-xs text-gray-400 truncate">{song?.artist}</p>
+                        {meta.isEnganchada && <span className="shrink-0 text-[10px] font-semibold text-gold-300 uppercase tracking-wide">enganchada</span>}
+                      </div>
                     </div>
                     {/* Director selector - filtered to singers only */}
                     <div className="relative shrink-0 w-44" title={songRef._suggestedDirector ? 'Director sugerido por historial' : undefined}>
@@ -1641,7 +1738,7 @@ export const Ordenes = () => {
                               i === index ? { ...s, _suggestedDirector: false } : s
                             )
                           }));
-                          handleDirectorChange(index, newDirectorId, songRef.songId);
+                          handleDirectorChange(index, newDirectorId, songRef.songId, songRef._localId);
                         }}
                       />
                       {songRef._suggestedDirector && (
@@ -1722,6 +1819,40 @@ export const Ordenes = () => {
                         </div>
                       )}
                     </div>
+                    {/* Enganchar: agrega una canción ligada JUSTO DEBAJO de esta (inciso 2.a/2.b). */}
+                    <SelectMenu
+                      searchable
+                      value=""
+                      menuWidth={320}
+                      options={songPickerOptions}
+                      searchPlaceholder="Buscar canción para enganchar…"
+                      emptyText="No se encontraron canciones."
+                      testId={`enganchar-${index}`}
+                      onChange={(id) => { const s = songs.find((x) => x.id === id); if (s) addEnganchadaToOrder(index, s); }}
+                      renderTrigger={({ ref, toggle }) => (
+                        <button
+                          ref={ref}
+                          type="button"
+                          onClick={toggle}
+                          title="Enganchar una canción debajo de esta"
+                          aria-label="Enganchar una canción debajo"
+                          className="p-2 text-gold-400/80 hover:text-gold-300 shrink-0"
+                        >
+                          <Link2 size={16} />
+                        </button>
+                      )}
+                    />
+                    {meta.isEnganchada && (
+                      <button
+                        type="button"
+                        onClick={() => unlinkSongInOrder(index)}
+                        title="Quitar el enganche (que vuelva a tener número propio)"
+                        aria-label="Quitar el enganche"
+                        className="p-2 text-gray-400 hover:text-gold-300 shrink-0"
+                      >
+                        <Unlink size={16} />
+                      </button>
+                    )}
                     <button
                       onClick={() => removeSongFromOrder(index)}
                       className="p-2 text-gray-400 hover:text-red-400 shrink-0"
@@ -2018,18 +2149,23 @@ export const Ordenes = () => {
             {/* Canciones (colapsable, abierta por defecto: es el corazón del orden) */}
             <CollapsibleSection icon={Music} title="Canciones" count={viewingOrder.songs.length} defaultOpen>
               <div className="space-y-3">
-                {viewingOrder.songs.map((songRef, index) => {
+                {numberOrderSongs(viewingOrder.songs).map((meta, index) => {
+                  const songRef = meta.songRef;
                   const song = getSongById(songRef.songId);
                   const director = getMemberById(songRef.directorId);
                   return (
-                    <div key={index} className="flex items-center gap-4 p-3 bg-neutral-800/50 rounded-xl">
-                      <span className="w-8 h-8 rounded-full bg-gold-500/15 text-gold-300 flex items-center justify-center font-medium">
-                        {index + 1}
+                    <div key={index} className={`flex items-center gap-4 p-3 rounded-xl ${meta.isEnganchada ? 'bg-neutral-800/40 border-l-2 border-gold-500/50 ml-3' : 'bg-neutral-800/50'}`}>
+                      <span className="h-8 min-w-8 px-2 rounded-full bg-gold-500/15 text-gold-300 flex items-center justify-center font-medium shrink-0">
+                        {meta.displayNumber}
                       </span>
-                      <div className="flex-1">
-                        <p className="font-medium">{song?.title}</p>
+                      <div className="flex-1 min-w-0">
+                        <p className="font-medium flex items-center gap-1.5">
+                          <span className="truncate">{song?.title}</span>
+                          {meta.hasLinkedBelow && <Link2 size={15} className="shrink-0 text-gold-400" aria-label="Tiene una canción enganchada debajo" />}
+                        </p>
                         <div className="flex flex-wrap items-center gap-2 text-sm text-gray-400">
                           <Badge size="sm" variant="primary">Tono: {songRef.key}</Badge>
+                          {meta.isEnganchada && <Badge size="sm" variant="secondary">Enganchada</Badge>}
                           {songRef.ministracion && <Badge size="sm" variant="warning">Ministración</Badge>}
                           {director && (
                             <span className="flex items-center gap-1">

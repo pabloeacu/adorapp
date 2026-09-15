@@ -152,6 +152,7 @@ export const IniciarServicio = () => {
             <p className="text-gold-300/80 text-xs uppercase tracking-widest">{sectionDisplayLabel(curSection, sectionMeta(curSection?.type))} · canción {step.songPos} de {step.songTotal}</p>
             <h2 className="text-2xl sm:text-3xl font-bold text-white">
               {song?.title || 'Canción'}
+              {songRef?.enganchada && <span className="ml-2 align-middle inline-block rounded-full bg-gold-500/15 px-2 py-0.5 text-xs font-semibold text-gold-300 uppercase tracking-wide">Enganchada</span>}
               {songRef?.ministracion && <span className="ml-2 align-middle inline-block rounded-full bg-gold-500/20 px-2 py-0.5 text-xs font-semibold text-gold-300 uppercase tracking-wide">Ministración</span>}
             </h2>
             {orderKey && <p className="text-sm text-gold-300 mt-0.5">Tono: {orderKey}</p>}
