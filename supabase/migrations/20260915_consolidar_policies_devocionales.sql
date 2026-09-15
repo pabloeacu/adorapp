@@ -1,0 +1,12 @@
+-- Fase 3 · Chunk 9 — consolidar policies solapadas en daily_devotionals.
+-- Cierra el lint `multiple_permissive_policies`: había DOS policies permissive que
+-- aplicaban a SELECT — `daily_devotionals_select` (cmd SELECT, authenticated) y
+-- `daily_devotionals_no_write` (cmd ALL con USING/WITH CHECK = false, cuya única
+-- función era bloquear ESCRITURAS, pero al ser cmd=ALL también contaba como policy
+-- de SELECT (aportando `false`, redundante)). Se elimina `no_write`: las escrituras
+-- quedan bloqueadas igual por RLS default-deny (sin policy de INSERT/UPDATE/DELETE →
+-- denegado para roles no-bypassrls). Queda UNA sola policy de SELECT.
+-- SEMÁNTICA IDÉNTICA, verificado transaccional (rollback): authenticated lee 365
+-- antes y después, anon lee 0 antes y después; INSERT de authenticated → 42501
+-- (RLS), UPDATE/DELETE → 0 filas; queda 1 policy SELECT y 0 de escritura.
+DROP POLICY IF EXISTS daily_devotionals_no_write ON public.daily_devotionals;
