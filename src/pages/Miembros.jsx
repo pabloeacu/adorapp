@@ -269,29 +269,50 @@ export const Miembros = () => {
           newEmail.toLowerCase() !== (editingMember.email || '').trim().toLowerCase();
 
         if (emailChanged) {
-          const { error } = await updateMemberViaAdmin(editingMember.id, formData);
-          if (error) {
-            setErrorModal({
-              isOpen: true,
-              title: 'No se pudo cambiar el correo',
-              message: typeof error === 'string' ? error : 'Ocurrió un error al actualizar el correo del miembro.',
-            });
-            return; // dejar el modal abierto para corregir
-          }
-          // Si el usuario cambió su PROPIO correo, su sesión quedó con el email
-          // viejo en el token (y las sesiones fueron revocadas server-side): dejar
-          // un aviso para el Login y cerrar sesión para que vuelva a entrar con el
-          // correo nuevo, limpio.
-          if (isSelf) {
-            try { sessionStorage.setItem('emailChangedNotice', newEmail.toLowerCase()); } catch { /* no crítico */ }
-            handleCloseModal();
-            await useAuthStore.getState().logout();
-            return;
-          }
-        } else {
-          // Update member in DB and appStore
-          await updateMember(editingMember.id, formData);
+          // El correo es el correo de ACCESO (login) del miembro. Cambiarlo lo va a
+          // desloguear y va a tener que entrar con el nuevo. Anda bien (va por la EF
+          // admin-update-member: sincroniza auth+members y revoca sesiones), pero es
+          // un cambio importante → pedimos confirmación explícita antes de tocar el login.
+          const targetName = editingMember.name || 'este miembro';
+          const oldEmail = (editingMember.email || '').trim();
+          setConfirmModal({
+            isOpen: true,
+            title: isSelf ? 'Vas a cambiar tu correo de acceso' : 'Vas a cambiar el correo de acceso',
+            message: isSelf
+              ? `Tu correo de acceso pasará de "${oldEmail}" a "${newEmail}". Se va a cerrar tu sesión y vas a tener que volver a entrar con el correo nuevo (tu contraseña no cambia). ¿Confirmás?`
+              : `El correo de acceso de ${targetName} pasará de "${oldEmail}" a "${newEmail}". Esa persona va a tener que iniciar sesión con el correo nuevo (su contraseña no cambia) y sus sesiones actuales se van a cerrar. ¿Confirmás el cambio?`,
+            type: 'warning',
+            confirmText: 'Sí, cambiar el correo',
+            cancelText: 'Cancelar',
+            icon: AlertTriangle,
+            onConfirm: async () => {
+              setConfirmModal(prev => ({ ...prev, loading: true }));
+              const { error } = await updateMemberViaAdmin(editingMember.id, formData);
+              setConfirmModal(prev => ({ ...prev, loading: false, isOpen: false }));
+              if (error) {
+                setErrorModal({
+                  isOpen: true,
+                  title: 'No se pudo cambiar el correo',
+                  message: typeof error === 'string' ? error : 'Ocurrió un error al actualizar el correo del miembro.',
+                });
+                return; // dejar el modal de edición abierto para corregir
+              }
+              // Si cambió su PROPIO correo: su JWT lleva el email viejo y las sesiones
+              // fueron revocadas → aviso para el Login + logout para reentrar limpio.
+              if (isSelf) {
+                try { sessionStorage.setItem('emailChangedNotice', newEmail.toLowerCase()); } catch { /* no crítico */ }
+                handleCloseModal();
+                await useAuthStore.getState().logout();
+                return;
+              }
+              handleCloseModal();
+            },
+          });
+          return; // esperamos la confirmación; el resto de handleSubmit no corre ahora
         }
+
+        // Sin cambio de correo: camino directo de siempre (RLS self-or-pastor) intacto.
+        await updateMember(editingMember.id, formData);
 
         // CRITICAL: If the edited member is the CURRENT LOGGED-IN USER,
         // refresh authStore.profile so all pages instantly see the new role/permissions
