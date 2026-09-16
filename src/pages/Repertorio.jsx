@@ -310,7 +310,16 @@ export const Repertorio = () => {
         return;
       }
     } else {
-      await addSong(songData);
+      // Alta: esperar el resultado y avisar si falló (no cerrar a ciegas).
+      const res = await addSong(songData);
+      if (!res) {
+        setErrorModal({
+          isOpen: true,
+          title: 'No se pudo guardar la canción',
+          message: useAppStore.getState().error || 'Intentá de nuevo. Si el problema sigue, avisale al pastor.',
+        });
+        return;
+      }
     }
     handleCloseModal();
   };
