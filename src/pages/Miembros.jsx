@@ -24,20 +24,8 @@ import { Input } from '../components/ui/Input';
 import { ConfirmModal, SuccessModal, ErrorModal } from '../components/ui/ConfirmModal';
 import { toCSV, downloadCSV } from '../lib/csv';
 import { supabase } from '../lib/supabase';
+import { formatDateLocalShort as formatDateLocal } from '../lib/dates';
 
-// Helper to format dates WITHOUT timezone shift (for birthdates and stored dates)
-const formatDateLocal = (dateStr) => {
-  if (!dateStr) return '';
-  const parts = dateStr.split('T')[0].split('-');
-  if (parts.length !== 3) return dateStr;
-  const [year, month, day] = parts;
-  const date = new Date(parseInt(year), parseInt(month) - 1, parseInt(day));
-  return date.toLocaleDateString('es-AR', {
-    year: 'numeric',
-    month: 'short',
-    day: 'numeric'
-  });
-};
 
 // Última conexión → { fecha: dd/mm/yy (ART), rel: "hoy"/"ayer"/"hace N días", days }.
 // El "hace N días" ayuda al pastor a ver quién lleva tiempo sin conectarse.

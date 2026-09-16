@@ -6,29 +6,14 @@ import { Bell, Search, ChevronRight, User, Mail, Shield, Camera, X, RotateCcw, Z
 import { useAuthStore } from '../../stores/authStore';
 import { useAppStore } from '../../stores/appStore';
 import { supabase } from '../../lib/supabase';
-import { sortNotificationsByDateDesc } from '../../lib/notifications';
+import { useNotificationsPanel } from '../../hooks/useNotificationsPanel';
 import { Avatar } from '../ui/Avatar';
 import { Modal } from '../ui/Modal';
 import { PushToggle } from '../PushToggle';
 import { Button } from '../ui/Button';
 import { titleForPath } from '../../lib/pageTitles';
+import { formatDateLocal } from '../../lib/dates';
 
-// Helper to format dates WITHOUT timezone shift (for birthdates and stored dates)
-// When we store YYYY-MM-DD, we want to display it as-is, not shifted by timezone
-const formatDateLocal = (dateStr) => {
-  if (!dateStr) return '';
-  // Handle both YYYY-MM-DD and ISO formats
-  const parts = dateStr.split('T')[0].split('-');
-  if (parts.length !== 3) return dateStr;
-  const [year, month, day] = parts;
-  // Parse manually to avoid timezone shift
-  const date = new Date(parseInt(year), parseInt(month) - 1, parseInt(day));
-  return date.toLocaleDateString('es-AR', {
-    year: 'numeric',
-    month: 'long',
-    day: 'numeric'
-  });
-};
 
 // pageTitles lives in src/lib/pageTitles.js — single source of truth shared
 // with MobileNav so both layouts always show the same name for each page.
@@ -64,53 +49,12 @@ export const Header = () => {
   const [passwordSaving, setPasswordSaving] = useState(false);
   const [isSyncing, setIsSyncing] = useState(false);
   const [showNotifications, setShowNotifications] = useState(false);
-  const [notifications, setNotifications] = useState([]);
-  const [unreadCount, setUnreadCount] = useState(0);
-  const [readNotificationIds, setReadNotificationIds] = useState([]);
 
-  // Load read notification IDs for current user. Source of truth is the
-  // `notifications_read` table in DB (cross-device). localStorage is kept as
-  // an optimistic cache so the bell doesn't flicker between mount and first
-  // DB response.
-  useEffect(() => {
-    if (!user?.id) return;
-    const userKey = `readNotificationIds_${user.id}`;
-
-    // 1. Hydrate from localStorage immediately to avoid flicker. Depends on
-    // user?.id so it can't be lazy initial state — must run when the user
-    // arrives.
-    const cached = JSON.parse(localStorage.getItem(userKey) || '[]');
-    // eslint-disable-next-line react-hooks/set-state-in-effect
-    setReadNotificationIds(cached);
-    // Migrate old global key if present (legacy).
-    const oldKey = localStorage.getItem('readNotificationIds');
-    if (oldKey && !localStorage.getItem(userKey)) {
-      localStorage.setItem(userKey, oldKey);
-      localStorage.removeItem('readNotificationIds');
-    }
-
-    // 2. Replace with DB truth as soon as it arrives.
-    let cancelled = false;
-    (async () => {
-      const { data, error } = await supabase
-        .from('notifications_read')
-        .select('notification_id')
-        .eq('user_id', user.id);
-      if (cancelled) return;
-      if (error) {
-        console.error('Error fetching notifications_read:', error);
-        return;
-      }
-      const dbIds = (data || []).map((r) => r.notification_id);
-      // Union with the cache so any optimistic mark from this session that
-      // hasn't round-tripped yet doesn't disappear momentarily.
-      const merged = Array.from(new Set([...cached, ...dbIds]));
-      setReadNotificationIds(merged);
-      localStorage.setItem(userKey, JSON.stringify(merged));
-    })();
-
-    return () => { cancelled = true; };
-  }, [user?.id]);
+  // Campanita: carga, orden por fecha, realtime y estado de leído viven en el
+  // hook compartido con MobileNav (src/hooks/useNotificationsPanel.js). Antes
+  // estaba duplicado palabra por palabra en los dos archivos (landmine #34).
+  const { notifications, unreadCount, readNotificationIds, markAsRead, markAllAsRead } =
+    useNotificationsPanel({ channelKey: 'desktop' });
 
   // Custom success/error modals - replaces browser alerts
   const [successModal, setSuccessModal] = useState({ isOpen: false, title: '', message: '' });
@@ -152,215 +96,6 @@ export const Header = () => {
       setUserPhoto(profile.avatar_url);
     }
   }, [profile, displayPhoto]);
-
-  // Load notifications from Supabase. Devotional + reflection are global rows
-  // emitted by DB triggers (cron, songs/bands/members inserts, registrations
-  // pending, etc.) and live in `notifications`. Communications use their own
-  // table because they carry sender + subject + full body, which doesn't fit
-  // the title/message shape.
-  useEffect(() => {
-    const iconForType = (t) => ({
-      devotional: 'cross',
-      reflection: 'sunset',
-      song: 'music',
-      band: 'users',
-      member: 'heart',
-      request: 'file',
-      order: 'calendar',
-      birthday: 'cake',
-    }[t] || 'cross');
-
-    const loadNotifications = async () => {
-      try {
-        const notifs = [];
-        const nowIso = new Date().toISOString();
-
-        // All non-comm notifications: globals (devotional/reflection/song/band/member)
-        // plus per-user (request notifs go to each pastor with user_id set).
-        let q = supabase
-          .from('notifications')
-          .select('id, title, message, type, user_id, is_global, created_at, expires_at')
-          .or(`expires_at.is.null,expires_at.gt.${nowIso}`)
-          .order('created_at', { ascending: false })
-          .limit(20);
-        q = user?.id
-          ? q.or(`is_global.eq.true,user_id.eq.${user.id}`)
-          : q.eq('is_global', true);
-        const { data: notifRows, error: notifErr } = await q;
-        if (notifErr) console.error('Error fetching notifications:', notifErr);
-
-        (notifRows || []).forEach((n) => {
-          notifs.push({
-            id: n.id,
-            type: n.type,
-            title: n.title,
-            message: n.message,
-            icon: iconForType(n.type),
-            createdAt: n.created_at,
-            time: new Date(n.created_at).toLocaleTimeString('es-AR', { hour: '2-digit', minute: '2-digit' }),
-          });
-        });
-
-        // Communications (separate shape: sender + subject + preview + full body).
-        if (user?.id) {
-          const { data: commNotifs } = await supabase
-            .from('communication_notifications')
-            .select('id, communication_id, sender_name, sender_photo, subject, preview, full_message, is_read, created_at')
-            .eq('recipient_id', user.id)
-            .eq('is_read', false)
-            .order('created_at', { ascending: false })
-            .limit(10);
-
-          (commNotifs || []).forEach((cn) => {
-            notifs.push({
-              id: cn.id,
-              type: 'communication',
-              communicationId: cn.communication_id,
-              senderName: cn.sender_name,
-              senderPhoto: cn.sender_photo,
-              subject: cn.subject,
-              preview: cn.preview,
-              fullMessage: cn.full_message,
-              message: cn.subject,
-              icon: 'send',
-              createdAt: cn.created_at,
-              time: new Date(cn.created_at).toLocaleTimeString('es-AR', { hour: '2-digit', minute: '2-digit' }),
-            });
-          });
-        }
-
-        // TODAS las fuentes mezcladas por fecha real (lo más nuevo arriba);
-        // sin esto las comunicaciones quedaban al fondo por el push tardío.
-        setNotifications(sortNotificationsByDateDesc(notifs));
-        const unread = notifs.filter((n) => !readNotificationIds.includes(n.id)).length;
-        setUnreadCount(unread);
-      } catch (err) {
-        console.error('Error loading notifications:', err);
-      }
-    };
-
-    // Load immediately, then keep fresh through Supabase Realtime + a slower
-    // 2-minute fallback poll.
-    loadNotifications();
-    const interval = setInterval(loadNotifications, 2 * 60 * 1000);
-
-    // Realtime: refresh as soon as relevant rows are inserted, instead of waiting
-    // up to 2 minutes for the next poll. One subscription on `notifications`
-    // covers globals + per-user (the trigger pipeline writes both there).
-    const channel = supabase
-      .channel(`bell-${user?.id || 'anon'}-desktop`)
-      .on(
-        'postgres_changes',
-        { event: 'INSERT', schema: 'public', table: 'notifications' },
-        () => loadNotifications()
-      )
-      .on(
-        'postgres_changes',
-        { event: 'INSERT', schema: 'public', table: 'communication_notifications', filter: `recipient_id=eq.${user?.id}` },
-        () => loadNotifications()
-      )
-      // Listen for UPDATE too: when the user marks a comm as read on another
-      // device (mobile / PWA), is_read=true persists in DB and we want the
-      // desktop bell to drop that row instantly instead of waiting for the
-      // next 2-min poll.
-      .on(
-        'postgres_changes',
-        { event: 'UPDATE', schema: 'public', table: 'communication_notifications', filter: `recipient_id=eq.${user?.id}` },
-        () => loadNotifications()
-      )
-      // Same for notifications_read: when the same user marks a global notif
-      // as read on another device, that row INSERTs here too and the bell
-      // refreshes its readNotificationIds set so the badge count drops.
-      .on(
-        'postgres_changes',
-        { event: 'INSERT', schema: 'public', table: 'notifications_read', filter: `user_id=eq.${user?.id}` },
-        (payload) => {
-          const newId = payload?.new?.notification_id;
-          if (!newId) return;
-          setReadNotificationIds((prev) => {
-            if (prev.includes(newId)) return prev;
-            const next = [...prev, newId];
-            const userKey = `readNotificationIds_${user?.id}`;
-            try { localStorage.setItem(userKey, JSON.stringify(next)); } catch { /* ignore quota */ }
-            return next;
-          });
-        }
-      )
-      .subscribe();
-
-    return () => {
-      clearInterval(interval);
-      supabase.removeChannel(channel);
-    };
-  }, [readNotificationIds, user?.id]);
-
-  // Mark notification as read (user-specific)
-  const markAsRead = async (notificationId) => {
-    if (!user?.id) return;
-    const userKey = `readNotificationIds_${user.id}`;
-    const newReadIds = [...readNotificationIds, notificationId];
-    // Optimistic UI: update state + cache immediately so the bell reacts
-    // without waiting for the round-trip.
-    setReadNotificationIds(newReadIds);
-    localStorage.setItem(userKey, JSON.stringify(newReadIds));
-    setUnreadCount(Math.max(0, unreadCount - 1));
-
-    const notif = notifications.find(n => n.id === notificationId);
-
-    if (notif?.type === 'communication' && notif?.communicationId) {
-      // Communications track their own is_read column (one row per recipient).
-      await supabase
-        .from('communication_notifications')
-        .update({ is_read: true })
-        .eq('id', notificationId)
-        .eq('recipient_id', user.id);
-    } else {
-      // Global notifications (devotional/reflection/song/band/member/order/request)
-      // persist read state per user in notifications_read so it syncs across
-      // devices. ON CONFLICT DO NOTHING via the (user_id, notification_id) PK.
-      await supabase
-        .from('notifications_read')
-        .upsert(
-          { user_id: user.id, notification_id: notificationId },
-          { onConflict: 'user_id,notification_id', ignoreDuplicates: true }
-        );
-    }
-  };
-
-  // Mark all visible items as read.
-  const markAllAsRead = async () => {
-    if (!user?.id) return;
-    const userKey = `readNotificationIds_${user.id}`;
-    const allIds = notifications.map(n => n.id);
-    setReadNotificationIds(allIds);
-    localStorage.setItem(userKey, JSON.stringify(allIds));
-    setUnreadCount(0);
-
-    // Split by type: comms get is_read=true on their own row, the rest go
-    // through notifications_read.
-    const commIds = notifications
-      .filter((n) => n.type === 'communication')
-      .map((n) => n.id);
-    const globalIds = notifications
-      .filter((n) => n.type !== 'communication')
-      .map((n) => n.id);
-
-    if (commIds.length > 0) {
-      await supabase
-        .from('communication_notifications')
-        .update({ is_read: true })
-        .in('id', commIds)
-        .eq('recipient_id', user.id);
-    }
-    if (globalIds.length > 0) {
-      await supabase
-        .from('notifications_read')
-        .upsert(
-          globalIds.map((id) => ({ user_id: user.id, notification_id: id })),
-          { onConflict: 'user_id,notification_id', ignoreDuplicates: true }
-        );
-    }
-  };
 
   const handleEditProfile = () => {
     setEditName(currentUserMember?.name || profile?.name || user?.name || '');

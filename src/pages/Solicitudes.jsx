@@ -18,20 +18,8 @@ import { Modal } from '../components/ui/Modal';
 import { EmptyState } from '../components/ui/EmptyState';
 import { ConfirmModal, SuccessModal, ErrorModal } from '../components/ui/ConfirmModal';
 import { compareBandsByCalendar, dayLabels, dayPluralLabels } from '../lib/days';
+import { formatDateLocalShort as formatDateLocal } from '../lib/dates';
 
-// Helper to format dates WITHOUT timezone shift
-const formatDateLocal = (dateStr) => {
-  if (!dateStr) return '';
-  const parts = dateStr.split('T')[0].split('-');
-  if (parts.length !== 3) return dateStr;
-  const [year, month, day] = parts;
-  const date = new Date(parseInt(year), parseInt(month) - 1, parseInt(day));
-  return date.toLocaleDateString('es-AR', {
-    year: 'numeric',
-    month: 'short',
-    day: 'numeric'
-  });
-};
 
 export const Solicitudes = () => {
   useDocumentTitle('Solicitudes');
