@@ -7,6 +7,7 @@ import { useAppStore } from './stores/appStore';
 import { useCurrentRole } from './hooks/useCurrentMember';
 import { getUpdateState, subscribeUpdate, markUpdateStep, finishUpdate, isPreReloadStep, UPDATE_STEPS, pctOf } from './lib/updateProgress';
 import { runBoot } from './lib/boot';
+import { shouldRefresh, markRefreshed } from './lib/refreshThrottle';
 import { withChunkRecovery } from './lib/chunkRecovery';
 
 // Lazy-loaded route components. Each compiles into its own chunk, so a user
@@ -54,26 +55,22 @@ const MembersOnlyRoles = ({ children }) => {
 //     for the case where the WS was dropped while the app was suspended.
 //   - Live data updates flow through src/lib/realtimeSync.js (postgres_changes
 //     on members/bands/songs/orders, mounted from Layout).
-const REFRESH_THROTTLE_MS = 15_000;
-let lastRefreshAt = 0;
-// El arranque (App.init) ya trae ficha + tablas; lo marca acá para que el
-// primer montaje de RouteSync no vuelva a pedir todo por segunda (y tercera)
-// vez dentro de la ventana de throttle.
-const markRefreshed = () => { lastRefreshAt = Date.now(); };
-
+// El freno (throttle + "¿de qué usuario son los datos que tengo?") vive en
+// src/lib/refreshThrottle.js. El arranque (App.init) ya trae ficha + tablas y
+// lo marca, para que el primer montaje de RouteSync no vuelva a pedir todo.
 const RouteSync = ({ children }) => {
   const location = useLocation();
   const initializeApp = useAppStore((state) => state.initialize);
   const refreshProfile = useAuthStore((state) => state.refreshProfile);
   const user = useAuthStore((state) => state.user);
+  const userId = user?.id ?? null;
 
   const refreshIfStale = useCallback(() => {
-    const now = Date.now();
-    if (now - lastRefreshAt < REFRESH_THROTTLE_MS) return;
-    lastRefreshAt = now;
+    if (!shouldRefresh(userId)) return;
+    markRefreshed(userId);
     initializeApp();
     refreshProfile();
-  }, [initializeApp, refreshProfile]);
+  }, [initializeApp, refreshProfile, userId]);
 
   useEffect(() => {
     if (!user) return;
@@ -115,13 +112,13 @@ function App() {
     const init = async () => {
       // Sesión (local) → ficha y tablas EN PARALELO → espera a las dos.
       // Ver src/lib/boot.js. El Inicio se pinta recién con todo fresco.
-      await runBoot({
+      const bootUser = await runBoot({
         restoreSession,
         bootProfile,
         initializeApp,
         onSession: () => { if (getUpdateState().active) markUpdateStep('session'); },
       });
-      markRefreshed();
+      markRefreshed(bootUser?.id ?? null);
       if (getUpdateState().active) {
         // Segunda carga de una actualización: cerramos la barra con "Listo" un
         // instante antes de entrar, y limpiamos la marca.

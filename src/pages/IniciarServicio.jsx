@@ -32,10 +32,20 @@ export const IniciarServicio = () => {
   const getBandById = useAppStore((s) => s.getBandById);
   const getOrderParticipants = useAppStore((s) => s.getOrderParticipants);
 
-  // Deep-link / refresh: si el store está vacío, cargarlo.
+  // Deep-link / refresh: si el store está vacío, cargarlo. SOLO con sesión: sin
+  // credencial la base deniega todo (401/42501) y el pedido únicamente ensucia
+  // la consola antes de redirigir al login (landmine #62(a)).
+  // UNA sola vez por visita (`triedLoadRef`): si la carga vuelve con 0 órdenes
+  // (RLS, o un ministerio sin órdenes), la condición `orders.length === 0` sigue
+  // siendo verdadera y el efecto se re-disparaba en bucle contra la base.
+  const triedLoadRef = useRef(false);
   useEffect(() => {
-    if (orders.length === 0 && !loading) initialize?.();
-  }, [orders.length, loading, initialize]);
+    if (!user || triedLoadRef.current) return;
+    if (orders.length === 0 && !loading) {
+      triedLoadRef.current = true;
+      initialize?.();
+    }
+  }, [user, orders.length, loading, initialize]);
 
   const order = orders.find((o) => o.id === orderId);
   const schema = getServiceSchema(orderId);
