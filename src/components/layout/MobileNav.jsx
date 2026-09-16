@@ -394,9 +394,14 @@ export const MobileNav = () => {
     return () => window.removeEventListener('keydown', handleEscape);
   }, [profileOpen, showPhotoModal, showCropper, successModal.isOpen, errorModal.isOpen]);
 
-  // Prevent scroll when profile is open
+  // Prevent scroll when profile is open. Incluye los avisos (successModal/
+  // errorModal) para RE-ASERTAR el lock al cerrar un aviso con el sheet/foto/
+  // recortador todavía abiertos: el <Modal> compartido libera body.overflow al
+  // cerrarse y, sin esta dep, este efecto no se re-ejecutaba → el fondo volvía a
+  // scrollear detrás del sheet. Los efectos del hijo (<Modal>) corren antes que
+  // los del padre, así que este gana con 'hidden' cuando corresponde.
   useEffect(() => {
-    if (profileOpen || showPhotoModal || showCropper) {
+    if (profileOpen || showPhotoModal || showCropper || successModal.isOpen || errorModal.isOpen) {
       document.body.style.overflow = 'hidden';
     } else {
       document.body.style.overflow = '';
@@ -404,7 +409,7 @@ export const MobileNav = () => {
     return () => {
       document.body.style.overflow = '';
     };
-  }, [profileOpen, showPhotoModal, showCropper]);
+  }, [profileOpen, showPhotoModal, showCropper, successModal.isOpen, errorModal.isOpen]);
 
   return (
     <>
