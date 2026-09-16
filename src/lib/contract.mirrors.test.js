@@ -5,6 +5,8 @@ import { dirname, join } from 'node:path';
 import { INSTRUMENT_ORDER } from './lineup.js';
 import { SINGER_INSTRUMENTS } from './ensayometro.js';
 import { EMAIL_AREAS, FORMATION_AREAS, PRESENTER_AREAS } from './areas.js';
+import { MINISTRATION_WINDOW_MS } from './ministration.js';
+import { FEEDBACK_WINDOW_MS } from './serviceFeedback.js';
 
 // ─────────────────────────────────────────────────────────────────────────────
 // RED DE CONTENCIÓN DE LOS ESPEJOS MANUALES JS↔SQL (landmines #27 / #58 / #75).
@@ -72,5 +74,47 @@ describe('contrato de espejos JS↔SQL (constantes de negocio duplicadas)', () =
 
   it('PRESENTER_AREAS (areas.js) coincide con _area_presenter_slugs (SQL)', () => {
     expect(PRESENTER_AREAS).toEqual(sqlArrayLiteral('_area_presenter_slugs'));
+  });
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
+// VENTANAS DE TIEMPO duplicadas JS↔SQL/EF (el hueco que dejaba abierto landmine #81:
+// "NO cubre todavía las ventanas numéricas — esas siguen siendo disciplina manual").
+// Ahora sí: si alguien cambia una ventana en un lado y no en el otro, CI se pone rojo.
+// (El offset ART −3 es difuso —aparece en decenas de funciones SQL, no como un único
+//  literal— así que ese sí queda como disciplina manual, deliberadamente.)
+// ─────────────────────────────────────────────────────────────────────────────
+
+// Última `v_start + interval 'N hours'` de las migraciones (la ventana de la
+// ministración vive en add_ministration_songs). "Última def gana", como los arrays.
+function sqlMinistrationHours() {
+  let hours = null;
+  for (const sql of migrationsSorted()) {
+    const re = /v_start\s*\+\s*interval\s*'(\d+)\s*hours?'/gi;
+    let m;
+    while ((m = re.exec(sql)) !== null) hours = Number(m[1]);
+  }
+  if (hours == null) throw new Error('No se encontró "v_start + interval \'N hours\'" en las migraciones');
+  return hours;
+}
+
+// El multiplicador de horas del FEEDBACK_WINDOW_MS de la Edge Function (Deno/TS).
+function efFeedbackHours() {
+  const p = join(dirname(fileURLToPath(import.meta.url)), '..', '..', 'supabase', 'functions', 'send-service-feedback', 'index.ts');
+  const src = readFileSync(p, 'utf8');
+  const m = src.match(/FEEDBACK_WINDOW_MS\s*=\s*(\d+)\s*\*\s*3600\s*\*\s*1000/);
+  if (!m) throw new Error('No se encontró "FEEDBACK_WINDOW_MS = N * 3600 * 1000" en la EF send-service-feedback');
+  return Number(m[1]);
+}
+
+describe('contrato de espejos JS↔SQL/EF (ventanas de tiempo)', () => {
+  it('ministración: MINISTRATION_WINDOW_MS (ministration.js) = interval de add_ministration_songs (SQL)', () => {
+    expect(MINISTRATION_WINDOW_MS).toBe(sqlMinistrationHours() * 3600 * 1000);
+    expect(sqlMinistrationHours()).toBe(3); // ancla explícita del valor actual
+  });
+
+  it('feedback: FEEDBACK_WINDOW_MS (serviceFeedback.js) = FEEDBACK_WINDOW_MS (EF send-service-feedback)', () => {
+    expect(FEEDBACK_WINDOW_MS).toBe(efFeedbackHours() * 3600 * 1000);
+    expect(efFeedbackHours()).toBe(48); // ancla explícita del valor actual
   });
 });
