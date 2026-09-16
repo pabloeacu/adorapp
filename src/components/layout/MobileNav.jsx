@@ -41,6 +41,8 @@ import { titleForPath } from '../../lib/pageTitles';
 import { useNotificationsPanel } from '../../hooks/useNotificationsPanel';
 import { formatDateLocal } from '../../lib/dates';
 import { PhotoCropper } from '../profile/PhotoCropper';
+import { Modal } from '../ui/Modal';
+import { Button } from '../ui/Button';
 
 
 // The mobile bottom strip is split in two:
@@ -76,6 +78,9 @@ export const MobileNav = () => {
   const [editMode, setEditMode] = useState(false);
   const [showCropper, setShowCropper] = useState(false);
   const [previewUrl, setPreviewUrl] = useState(null);
+  // Avisos prolijos (ventanitas), en vez de alert() nativos — espeja al Header.
+  const [successModal, setSuccessModal] = useState({ isOpen: false, title: '', message: '' });
+  const [errorModal, setErrorModal] = useState({ isOpen: false, title: '', message: '' });
 
   // Notifications state
   const [showNotifications, setShowNotifications] = useState(false);
@@ -148,7 +153,7 @@ export const MobileNav = () => {
 
   const handleSaveProfile = async () => {
     if (!editName.trim()) {
-      alert('El nombre es obligatorio');
+      setErrorModal({ isOpen: true, title: 'Falta el nombre', message: 'El nombre es obligatorio.' });
       return;
     }
 
@@ -166,7 +171,7 @@ export const MobileNav = () => {
       // and could in theory match a different member if user_id wiring drifted.
       const memberIdToUpdate = currentUserMember?.id;
       if (!memberIdToUpdate) {
-        alert('No pudimos identificar tu fila de miembro. Probá recargar la página.');
+        setErrorModal({ isOpen: true, title: 'No se pudo identificar', message: 'No pudimos identificar tu ficha de miembro. Probá recargar la página.' });
         return;
       }
 
@@ -177,7 +182,7 @@ export const MobileNav = () => {
 
       if (error) {
         console.error('Error updating profile:', error);
-        alert('Error al actualizar el perfil');
+        setErrorModal({ isOpen: true, title: 'Error al guardar', message: 'No se pudo actualizar el perfil. Probá de nuevo.' });
         return;
       }
 
@@ -185,7 +190,7 @@ export const MobileNav = () => {
       setEditMode(false);
     } catch (err) {
       console.error('Error saving profile:', err);
-      alert('Error al guardar los cambios');
+      setErrorModal({ isOpen: true, title: 'Error al guardar', message: 'No se pudieron guardar los cambios. Probá de nuevo.' });
     }
   };
 
@@ -193,15 +198,15 @@ export const MobileNav = () => {
   // since MobileNav doesn't have the success/error modal infrastructure.
   const handleChangePassword = async () => {
     if (!pwNew.trim()) {
-      alert('Ingresá la nueva contraseña.');
+      setErrorModal({ isOpen: true, title: 'Falta la contraseña', message: 'Ingresá la nueva contraseña.' });
       return;
     }
     if (pwNew.length < 6) {
-      alert('La contraseña debe tener al menos 6 caracteres.');
+      setErrorModal({ isOpen: true, title: 'Contraseña muy corta', message: 'La contraseña debe tener al menos 6 caracteres.' });
       return;
     }
     if (pwNew !== pwConfirm) {
-      alert('Las contraseñas no coinciden.');
+      setErrorModal({ isOpen: true, title: 'No coinciden', message: 'Las contraseñas no coinciden.' });
       return;
     }
     setPwSaving(true);
@@ -213,10 +218,10 @@ export const MobileNav = () => {
       setPwConfirm('');
       setPwShowNew(false);
       setPwShowConfirm(false);
-      alert('Contraseña actualizada correctamente.');
+      setSuccessModal({ isOpen: true, title: '¡Listo!', message: 'Tu contraseña se actualizó correctamente.' });
     } catch (err) {
       console.error('Error changing password:', err);
-      alert('No se pudo cambiar la contraseña. Probá de nuevo.');
+      setErrorModal({ isOpen: true, title: 'Error', message: 'No se pudo cambiar la contraseña. Probá de nuevo.' });
     } finally {
       setPwSaving(false);
     }
@@ -230,13 +235,13 @@ export const MobileNav = () => {
 
     // Validate file type
     if (!file.type.startsWith('image/')) {
-      alert('Por favor selecciona una imagen válida.');
+      setErrorModal({ isOpen: true, title: 'Archivo inválido', message: 'Por favor, seleccioná una imagen válida (JPEG, PNG, etc.).' });
       return;
     }
 
     // Validate file size (max 5MB)
     if (file.size > 5 * 1024 * 1024) {
-      alert('La imagen es muy grande. Máximo 5MB.');
+      setErrorModal({ isOpen: true, title: 'Imagen muy grande', message: 'La imagen debe ser menor a 5MB. Probá con una más chica.' });
       return;
     }
 
@@ -260,7 +265,7 @@ export const MobileNav = () => {
       // El transform lo resetea <PhotoCropper> al cambiar previewUrl.
     } catch (err) {
       console.error('Error selecting file:', err);
-      alert('Error al seleccionar la imagen.');
+      setErrorModal({ isOpen: true, title: 'Error', message: 'No se pudo procesar la imagen. Probá de nuevo.' });
     }
   };
 
@@ -322,7 +327,7 @@ export const MobileNav = () => {
 
       if (uploadError) {
         console.error('Upload error:', uploadError);
-        alert('Error al subir la foto: ' + uploadError.message);
+        setErrorModal({ isOpen: true, title: 'Error al subir', message: 'No se pudo subir la foto. Probá de nuevo.' });
         return;
       }
 
@@ -335,7 +340,7 @@ export const MobileNav = () => {
       const memberUserId = profile?.user_id || profile?.id;
       if (!memberUserId) {
         console.error('ERROR: No se pudo determinar el ID del miembro para actualizar');
-        alert('Error: No se encontró el ID del usuario. Intentá de nuevo.');
+        setErrorModal({ isOpen: true, title: 'Error', message: 'No se encontró tu identificación de usuario. Probá recargar la página.' });
         return;
       }
 
@@ -362,7 +367,7 @@ export const MobileNav = () => {
 
     } catch (err) {
       console.error('Photo upload error:', err);
-      alert('Error al procesar la foto. Intentá de nuevo.');
+      setErrorModal({ isOpen: true, title: 'Error', message: 'No se pudo procesar la foto. Probá de nuevo.' });
     } finally {
       setShowCropper(false);
       setPreviewUrl(null);
@@ -375,6 +380,9 @@ export const MobileNav = () => {
   // Close on escape key
   useEffect(() => {
     const handleEscape = (e) => {
+      // Si hay una ventanita de aviso abierta encima, Escape NO cierra lo de
+      // abajo (el aviso es un diálogo bloqueante; se cierra con "Aceptar").
+      if (successModal.isOpen || errorModal.isOpen) return;
       if (e.key === 'Escape' && (profileOpen || showPhotoModal || showCropper)) {
         setProfileOpen(false);
         setShowPhotoModal(false);
@@ -384,11 +392,16 @@ export const MobileNav = () => {
     };
     window.addEventListener('keydown', handleEscape);
     return () => window.removeEventListener('keydown', handleEscape);
-  }, [profileOpen, showPhotoModal, showCropper]);
+  }, [profileOpen, showPhotoModal, showCropper, successModal.isOpen, errorModal.isOpen]);
 
-  // Prevent scroll when profile is open
+  // Prevent scroll when profile is open. Incluye los avisos (successModal/
+  // errorModal) para RE-ASERTAR el lock al cerrar un aviso con el sheet/foto/
+  // recortador todavía abiertos: el <Modal> compartido libera body.overflow al
+  // cerrarse y, sin esta dep, este efecto no se re-ejecutaba → el fondo volvía a
+  // scrollear detrás del sheet. Los efectos del hijo (<Modal>) corren antes que
+  // los del padre, así que este gana con 'hidden' cuando corresponde.
   useEffect(() => {
-    if (profileOpen || showPhotoModal || showCropper) {
+    if (profileOpen || showPhotoModal || showCropper || successModal.isOpen || errorModal.isOpen) {
       document.body.style.overflow = 'hidden';
     } else {
       document.body.style.overflow = '';
@@ -396,7 +409,7 @@ export const MobileNav = () => {
     return () => {
       document.body.style.overflow = '';
     };
-  }, [profileOpen, showPhotoModal, showCropper]);
+  }, [profileOpen, showPhotoModal, showCropper, successModal.isOpen, errorModal.isOpen]);
 
   return (
     <>
@@ -1296,6 +1309,46 @@ export const MobileNav = () => {
           )}
         </div>
       </div>
+
+      {/* Aviso de éxito (ventanita prolija, en vez de alert()) — espeja al Header */}
+      <Modal
+        isOpen={successModal.isOpen}
+        onClose={() => setSuccessModal({ isOpen: false, title: '', message: '' })}
+        title={successModal.title}
+        size="sm"
+        footer={
+          <Button onClick={() => setSuccessModal({ isOpen: false, title: '', message: '' })} className="w-full">
+            Aceptar
+          </Button>
+        }
+      >
+        <div className="text-center py-4">
+          <div className="w-16 h-16 bg-green-500/20 rounded-full flex items-center justify-center mx-auto mb-4">
+            <Check size={32} className="text-green-400" />
+          </div>
+          <p className="text-gray-300">{successModal.message}</p>
+        </div>
+      </Modal>
+
+      {/* Aviso de error (ventanita prolija, en vez de alert()) — espeja al Header */}
+      <Modal
+        isOpen={errorModal.isOpen}
+        onClose={() => setErrorModal({ isOpen: false, title: '', message: '' })}
+        title={errorModal.title}
+        size="sm"
+        footer={
+          <Button onClick={() => setErrorModal({ isOpen: false, title: '', message: '' })} variant="secondary" className="w-full">
+            Aceptar
+          </Button>
+        }
+      >
+        <div className="text-center py-4">
+          <div className="w-16 h-16 bg-red-500/20 rounded-full flex items-center justify-center mx-auto mb-4">
+            <X size={32} className="text-red-400" />
+          </div>
+          <p className="text-gray-300">{errorModal.message}</p>
+        </div>
+      </Modal>
     </>
   );
 };
