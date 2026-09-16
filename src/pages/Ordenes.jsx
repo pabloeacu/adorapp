@@ -43,7 +43,7 @@ import { RehearsalActionModal } from '../components/orders/RehearsalActionModal'
 import { isChunkLoadError, recoverFromStaleChunk } from '../lib/chunkRecovery';
 import { CollapsibleSection } from '../components/ui/CollapsibleSection';
 import { buildLineup, lineupSummaryText, isCustomLineup, directorIdsOf, pendingChoiceIds } from '../lib/lineup';
-import { numberOrderSongs, addEnganchadaAfter, unlinkEnganchada, normalizeEnganchadas } from '../lib/orderNumbering';
+import { numberOrderSongs, addEnganchadaAfter, unlinkEnganchada, normalizeEnganchadas, moveOrderSongs } from '../lib/orderNumbering';
 
 // Id estable por-fila para el drag-and-drop Y para matchear escrituras asíncronas
 // (fetchKeyHistory) a la canción correcta AUNQUE se inserte una enganchada en el
@@ -74,7 +74,6 @@ import {
   useSensors,
 } from '@dnd-kit/core';
 import {
-  arrayMove,
   SortableContext,
   sortableKeyboardCoordinates,
   verticalListSortingStrategy,
@@ -1092,9 +1091,11 @@ export const Ordenes = () => {
       const oldIndex = ids.indexOf(active.id);
       const newIndex = ids.indexOf(over.id);
       if (oldIndex < 0 || newIndex < 0) return prev;
-      // Al reordenar, una enganchada podría quedar en el índice 0 (sin nada arriba):
-      // normalizeEnganchadas la des-engancha para que no quede un inciso huérfano.
-      return { ...prev, songs: normalizeEnganchadas(arrayMove(prev.songs, oldIndex, newIndex)) };
+      // Arrastrar una canción MADRE mueve todo su grupo (ella + sus enganchadas)
+      // y nunca parte el grupo de otra; una enganchada sola viaja libre y se
+      // engancha a la que le quede arriba. `moveOrderSongs` también normaliza
+      // (una enganchada no puede quedar arriba de todo). Ver src/lib/orderNumbering.js.
+      return { ...prev, songs: moveOrderSongs(prev.songs, oldIndex, newIndex) };
     });
   };
 

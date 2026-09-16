@@ -79,6 +79,74 @@ export function unlinkEnganchada(songs, index) {
   });
 }
 
+/**
+ * Límites del GRUPO que contiene al índice `index`: [inicioMadre, finUltimaEnganchada].
+ * Devuelve null si el índice está fuera del array. Pura.
+ */
+export function groupBoundsAt(songs, index) {
+  const arr = Array.isArray(songs) ? songs : [];
+  if (index < 0 || index >= arr.length) return null;
+  let start = index;
+  while (start > 0 && isEnganchadaAt(arr, start)) start -= 1;
+  let end = start;
+  while (end + 1 < arr.length && isEnganchadaAt(arr, end + 1)) end += 1;
+  return [start, end];
+}
+
+/**
+ * Reordena arrastrando POR GRUPO (2ª etapa de las enganchadas). Pura.
+ *
+ * Reglas (las que se ven al arrastrar en el editor de órdenes):
+ *  • Arrastrar una canción MADRE mueve TODO su grupo (ella + sus enganchadas)
+ *    como una sola pieza — antes se movía sola y sus enganchadas se quedaban
+ *    colgando de la canción que quedara arriba.
+ *  • Un grupo sólo aterriza ENTRE grupos, nunca en el medio de otro: si se
+ *    suelta sobre una canción de otro grupo, cae antes (si viene subiendo) o
+ *    después (si viene bajando) de ESE grupo completo. Así mover una canción
+ *    nunca parte el grupo de otra.
+ *  • Arrastrar una ENGANCHADA sola sí es libre: va a donde se la suelte y queda
+ *    enganchada a la canción que le toque arriba (el modelo es posicional).
+ *    Es la forma de pasarla de un grupo a otro.
+ *  • Si una enganchada termina arriba de todo, pierde el enganche
+ *    (`normalizeEnganchadas`): no puede haber un inciso sin canción madre.
+ *
+ * Los objetos se mueven POR REFERENCIA: cada canción conserva su `_localId`
+ * (landmine #91: las escrituras async del tono matchean por `_localId`).
+ */
+export function moveOrderSongs(songs, fromIndex, toIndex) {
+  const arr = Array.isArray(songs) ? [...songs] : [];
+  if (fromIndex < 0 || fromIndex >= arr.length) return arr;
+  if (toIndex < 0 || toIndex >= arr.length) return arr;
+  if (fromIndex === toIndex) return arr;
+
+  const dragEnganchada = isEnganchadaAt(arr, fromIndex);
+  const [bStart, bEnd] = dragEnganchada ? [fromIndex, fromIndex] : groupBoundsAt(arr, fromIndex);
+
+  // Soltar dentro del propio bloque no mueve nada.
+  if (toIndex >= bStart && toIndex <= bEnd) return arr;
+
+  const block = arr.slice(bStart, bEnd + 1);
+
+  let insertAt;
+  if (dragEnganchada) {
+    insertAt = toIndex; // libre: se engancha a la que le quede arriba
+  } else {
+    const [gStart, gEnd] = groupBoundsAt(arr, toIndex);
+    insertAt = bStart < toIndex ? gEnd + 1 : gStart; // bajando → después del grupo; subiendo → antes
+  }
+
+  const rest = [...arr.slice(0, bStart), ...arr.slice(bEnd + 1)];
+  // Una enganchada sola se comporta igual que el reordenamiento común de dnd-kit
+  // (`arrayMove`): el índice de destino se aplica sobre la lista YA sin ella.
+  // Para un bloque, en cambio, el destino se calculó sobre la lista ORIGINAL, así
+  // que hay que descontar lo que se corrió al sacar el bloque.
+  const at = dragEnganchada
+    ? insertAt
+    : (insertAt > bEnd ? insertAt - block.length : insertAt);
+  rest.splice(at, 0, ...block);
+  return normalizeEnganchadas(rest);
+}
+
 /** Limpia enganches inválidos: la canción en índice 0 nunca puede ser enganchada. Pura. */
 export function normalizeEnganchadas(songs) {
   const arr = Array.isArray(songs) ? songs : [];
