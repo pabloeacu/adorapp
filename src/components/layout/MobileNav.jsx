@@ -40,6 +40,7 @@ import { PhotoCropper } from '../profile/PhotoCropper';
 import { Modal } from '../ui/Modal';
 import { Button } from '../ui/Button';
 import { NotifIconBadge } from '../../lib/notificationVisual';
+import { usePasswordChange } from '../../hooks/usePasswordChange';
 
 
 // The mobile bottom strip is split in two:
@@ -62,22 +63,47 @@ const SECONDARY_NAV = [
 // pageTitles lives in src/lib/pageTitles.js — single source of truth shared
 // with Header so both layouts always show the same name for each page.
 
+// Copy EXACTO de los avisos de "cambiar contraseña" en CELULAR (idéntico al que
+// tenía el handler viejo — más corto/coloquial que el de escritorio a propósito).
+// El hook usePasswordChange emite el código; esta pantalla decide el texto.
+const MOBILE_PW_ERRORS = {
+  empty: { title: 'Falta la contraseña', message: 'Ingresá la nueva contraseña.' },
+  short: { title: 'Contraseña muy corta', message: 'La contraseña debe tener al menos 6 caracteres.' },
+  mismatch: { title: 'No coinciden', message: 'Las contraseñas no coinciden.' },
+  failed: { title: 'Error', message: 'No se pudo cambiar la contraseña. Probá de nuevo.' },
+};
+
 export const MobileNav = () => {
   const [menuOpen, setMenuOpen] = useState(false);
   const [profileOpen, setProfileOpen] = useState(false);
   const [showPhotoModal, setShowPhotoModal] = useState(false);
+  // Solo el flag de "mostrar el formulario" es local; los campos + validación +
+  // updateUser viven en el hook compartido usePasswordChange (tras los modales).
   const [showPasswordChange, setShowPasswordChange] = useState(false);
-  const [pwNew, setPwNew] = useState('');
-  const [pwConfirm, setPwConfirm] = useState('');
-  const [pwSaving, setPwSaving] = useState(false);
-  const [pwShowNew, setPwShowNew] = useState(false);
-  const [pwShowConfirm, setPwShowConfirm] = useState(false);
   const [editMode, setEditMode] = useState(false);
   const [showCropper, setShowCropper] = useState(false);
   const [previewUrl, setPreviewUrl] = useState(null);
   // Avisos prolijos (ventanitas), en vez de alert() nativos — espeja al Header.
   const [successModal, setSuccessModal] = useState({ isOpen: false, title: '', message: '' });
   const [errorModal, setErrorModal] = useState({ isOpen: false, title: '', message: '' });
+
+  // Cambiar contraseña: estado + validación + updateUser en el hook compartido
+  // usePasswordChange (antes duplicado verbatim con Header). Se aliasan los
+  // nombres a los que ya usa el formulario de abajo (pwNew, pwSaving, etc.) para
+  // no tocar el JSX; el código de error se mapea al copy de celular.
+  const {
+    newPassword: pwNew, setNewPassword: setPwNew,
+    confirmPassword: pwConfirm, setConfirmPassword: setPwConfirm,
+    showNew: pwShowNew, setShowNew: setPwShowNew,
+    showConfirm: pwShowConfirm, setShowConfirm: setPwShowConfirm,
+    saving: pwSaving, submit: handleChangePassword,
+  } = usePasswordChange({
+    onError: (code) => setErrorModal({ isOpen: true, ...MOBILE_PW_ERRORS[code] }),
+    onSuccess: () => {
+      setShowPasswordChange(false);
+      setSuccessModal({ isOpen: true, title: '¡Listo!', message: 'Tu contraseña se actualizó correctamente.' });
+    },
+  });
 
   // Notifications state
   const [showNotifications, setShowNotifications] = useState(false);
@@ -188,39 +214,6 @@ export const MobileNav = () => {
     } catch (err) {
       console.error('Error saving profile:', err);
       setErrorModal({ isOpen: true, title: 'Error al guardar', message: 'No se pudieron guardar los cambios. Probá de nuevo.' });
-    }
-  };
-
-  // Change own password — same flow as Header.jsx, simpler UI (alerts vs modals)
-  // since MobileNav doesn't have the success/error modal infrastructure.
-  const handleChangePassword = async () => {
-    if (!pwNew.trim()) {
-      setErrorModal({ isOpen: true, title: 'Falta la contraseña', message: 'Ingresá la nueva contraseña.' });
-      return;
-    }
-    if (pwNew.length < 6) {
-      setErrorModal({ isOpen: true, title: 'Contraseña muy corta', message: 'La contraseña debe tener al menos 6 caracteres.' });
-      return;
-    }
-    if (pwNew !== pwConfirm) {
-      setErrorModal({ isOpen: true, title: 'No coinciden', message: 'Las contraseñas no coinciden.' });
-      return;
-    }
-    setPwSaving(true);
-    try {
-      const { error } = await supabase.auth.updateUser({ password: pwNew });
-      if (error) throw error;
-      setShowPasswordChange(false);
-      setPwNew('');
-      setPwConfirm('');
-      setPwShowNew(false);
-      setPwShowConfirm(false);
-      setSuccessModal({ isOpen: true, title: '¡Listo!', message: 'Tu contraseña se actualizó correctamente.' });
-    } catch (err) {
-      console.error('Error changing password:', err);
-      setErrorModal({ isOpen: true, title: 'Error', message: 'No se pudo cambiar la contraseña. Probá de nuevo.' });
-    } finally {
-      setPwSaving(false);
     }
   };
 
