@@ -16,6 +16,8 @@ export const Button = ({
     secondary: 'bg-transparent border border-neutral-700 text-gray-200 hover:border-gold-500/50 hover:text-gold-200 hover:bg-gold-500/5 active:scale-95',
     ghost: 'bg-transparent text-gray-400 hover:text-gold-200 hover:bg-gold-500/5',
     danger: 'bg-red-600 text-white hover:bg-red-700 active:scale-95',
+    warning: 'bg-yellow-600 text-black font-semibold hover:bg-yellow-500 active:scale-95',
+    success: 'bg-green-600 text-white hover:bg-green-500 active:scale-95',
   };
 
   const sizes = {

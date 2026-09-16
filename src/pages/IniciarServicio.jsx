@@ -101,6 +101,30 @@ export const IniciarServicio = () => {
   const [speed, setSpeed] = useState(() => { try { const v = Number(localStorage.getItem('adorapp_presenter_speed')); return v > 0 ? v : 40; } catch { return 40; } });
   useEffect(() => { try { localStorage.setItem('adorapp_presenter_speed', String(speed)); } catch { /* non-fatal */ } }, [speed]);
   useEffect(() => { setAutoScroll(false); if (scrollRef.current) scrollRef.current.scrollTop = 0; }, [stepIdx]);
+  // Mantener la pantalla DESPIERTA durante el servicio: nadie toca el dispositivo
+  // mientras se proyecta la letra con acordes, así que el sistema podría apagar/bloquear
+  // la pantalla justo en el peor momento. Screen Wake Lock API (best-effort; no soportado
+  // en algunos navegadores → simplemente no hace nada). Se re-adquiere al volver a estar
+  // visible, porque el lock se suelta al ocultar la pestaña.
+  useEffect(() => {
+    let wakeLock = null;
+    let released = false;
+    const request = async () => {
+      try {
+        if ('wakeLock' in navigator && document.visibilityState === 'visible' && !released) {
+          wakeLock = await navigator.wakeLock.request('screen');
+        }
+      } catch { /* no soportado o denegado — no es crítico */ }
+    };
+    const onVisible = () => { if (document.visibilityState === 'visible') request(); };
+    request();
+    document.addEventListener('visibilitychange', onVisible);
+    return () => {
+      released = true;
+      document.removeEventListener('visibilitychange', onVisible);
+      if (wakeLock) { try { wakeLock.release(); } catch { /* ya liberado */ } wakeLock = null; }
+    };
+  }, []);
   useEffect(() => {
     if (!autoScroll) return;
     const el0 = scrollRef.current;

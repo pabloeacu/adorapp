@@ -214,7 +214,7 @@ export const Bandas = () => {
       isOpen: true,
       title: 'Eliminar Banda',
       message: `¿Querés eliminar "${band.name}"? Esta banda tiene ${getBandSongCount(band.id)} ordenes asociadas. Se eliminará la banda pero las ordenes permanecerán.`,
-      type: 'warning',
+      type: 'danger',
       confirmText: 'Sí, eliminar',
       cancelText: 'Mejor no',
       icon: AlertTriangle,
