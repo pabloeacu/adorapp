@@ -43,7 +43,7 @@ export const ChannelPlanModal = ({ order, isOpen, onClose, canEdit = false }) =>
   const rows = useMemo(() => buildChannelRows(groups, overrides), [groups, overrides]);
   const dups = useMemo(() => duplicateChannels(rows), [rows]);
   const band = order?.bandId ? getBandById?.(order.bandId) : null;
-  const fecha = order?.date ? parseLocalDate(order.date).toLocaleDateString('es-ES', { weekday: 'long', day: 'numeric', month: 'long' }) : '';
+  const fecha = order?.date ? parseLocalDate(order.date).toLocaleDateString('es-AR', { weekday: 'long', day: 'numeric', month: 'long' }) : '';
 
   // Mientras se edita guardamos el texto crudo (incluido ''), sin tocar los overrides:
   // así la fila no salta al autonumerado ni se reordena hasta que el operador termina.

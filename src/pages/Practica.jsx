@@ -349,7 +349,7 @@ export const Practica = () => {
 
   if (!logsLoaded) return <PageLoader />;
 
-  const orderDateLabel = new Date(order.date + 'T00:00:00').toLocaleDateString('es-ES', {
+  const orderDateLabel = new Date(order.date + 'T00:00:00').toLocaleDateString('es-AR', {
     weekday: 'long', day: 'numeric', month: 'long',
   });
 
@@ -427,7 +427,7 @@ export const Practica = () => {
                 <Badge variant="warning" size="sm">
                   <span className="flex items-center gap-1">
                     <CalendarDays size={12} />
-                    Ensamble: {new Date(order.rehearsalDate + 'T00:00:00').toLocaleDateString('es-ES', { day: 'numeric', month: 'short' })}
+                    Ensamble: {new Date(order.rehearsalDate + 'T00:00:00').toLocaleDateString('es-AR', { day: 'numeric', month: 'short' })}
                     {order.rehearsalTime ? ` · ${order.rehearsalTime}` : ''}
                   </span>
                 </Badge>

@@ -786,7 +786,7 @@ export const Ordenes = () => {
     doc.text('Generado por AdorAPP - La plataforma de Adoración CAF', 105, y, { align: 'center' });
 
     // Download the PDF
-    const dateStr = parseLocalDate(order.date).toLocaleDateString('es-ES', { day: '2-digit', month: '2-digit', year: '2-digit' }).replace(/\//g, '-');
+    const dateStr = parseLocalDate(order.date).toLocaleDateString('es-AR', { day: '2-digit', month: '2-digit', year: '2-digit' }).replace(/\//g, '-');
     const fileName = `${band?.name || 'Banda'} - Orden ${dateStr}.pdf`;
     doc.save(fileName);
   };
@@ -983,7 +983,7 @@ export const Ordenes = () => {
     });
 
     // Download the PDF
-    const dateStr = parseLocalDate(order.date).toLocaleDateString('es-ES', { day: '2-digit', month: '2-digit', year: '2-digit' }).replace(/\//g, '-');
+    const dateStr = parseLocalDate(order.date).toLocaleDateString('es-AR', { day: '2-digit', month: '2-digit', year: '2-digit' }).replace(/\//g, '-');
     const fileName = `${band?.name || 'Banda'} - Orden ${dateStr} - Canciones.pdf`;
     doc.save(fileName);
   };
@@ -1166,7 +1166,7 @@ export const Ordenes = () => {
   };
 
   const formatDate = (dateStr) => {
-    return parseLocalDate(dateStr).toLocaleDateString('es-ES', {
+    return parseLocalDate(dateStr).toLocaleDateString('es-AR', {
       weekday: 'long',
       year: 'numeric',
       month: 'long',
@@ -1218,7 +1218,7 @@ export const Ordenes = () => {
         // Get the order info for the tooltip
         const order = orders.find(o => o.id === data.order_id);
         const formattedDate = order
-          ? parseLocalDate(order.date).toLocaleDateString('es-ES', { day: '2-digit', month: '2-digit', year: 'numeric' })
+          ? parseLocalDate(order.date).toLocaleDateString('es-AR', { day: '2-digit', month: '2-digit', year: 'numeric' })
           : 'fecha no disponible';
 
         showKeyHistoryTooltip({

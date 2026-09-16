@@ -7,7 +7,7 @@ import { useLifetimeTick } from '../../hooks/useLifetimeTick';
 
 const fmtDate = (d) => {
   try {
-    return new Date(`${String(d).slice(0, 10)}T00:00:00`).toLocaleDateString('es-ES', {
+    return new Date(`${String(d).slice(0, 10)}T00:00:00`).toLocaleDateString('es-AR', {
       weekday: 'long', day: 'numeric', month: 'long',
     });
   } catch {
