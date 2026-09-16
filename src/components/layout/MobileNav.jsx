@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react';
+import React, { useState, useEffect, useRef, useMemo } from 'react';
 import { NavLink, useLocation } from 'react-router-dom';
 import {
   LayoutDashboard,
@@ -16,9 +16,6 @@ import {
   Cross,
   Users2,
   Calendar,
-  RotateCcw,
-  ZoomOut,
-  Move,
   FileText,
   Send,
   Bell,
@@ -43,6 +40,7 @@ import { PushToggle } from '../PushToggle';
 import { titleForPath } from '../../lib/pageTitles';
 import { useNotificationsPanel } from '../../hooks/useNotificationsPanel';
 import { formatDateLocal } from '../../lib/dates';
+import { PhotoCropper } from '../profile/PhotoCropper';
 
 
 // The mobile bottom strip is split in two:
@@ -78,11 +76,6 @@ export const MobileNav = () => {
   const [editMode, setEditMode] = useState(false);
   const [showCropper, setShowCropper] = useState(false);
   const [previewUrl, setPreviewUrl] = useState(null);
-  const [isDragging, setIsDragging] = useState(false);
-  const [dragStart, setDragStart] = useState({ x: 0, y: 0 });
-  const [zoom, setZoom] = useState(1);
-  const [rotation, setRotation] = useState(0);
-  const [position, setPosition] = useState({ x: 0, y: 0 });
 
   // Notifications state
   const [showNotifications, setShowNotifications] = useState(false);
@@ -128,9 +121,8 @@ export const MobileNav = () => {
 
   const profileSheetRef = useRef(null);
   const fileInputRef = useRef(null);
-  // Ref to the preview <img> in the cropper so the save can read its real
-  // rendered (pre-transform) size and reproduce the crop exactly.
-  const cropImgRef = useRef(null);
+  // Ref al <PhotoCropper> compartido para pedirle el Blob del recorte al guardar.
+  const cropperRef = useRef(null);
 
   const handleLogout = async (e) => {
     e.stopPropagation();
@@ -153,44 +145,6 @@ export const MobileNav = () => {
     setEditLeaderOf(displayLeaderOf || '');
     setEditBirthdate(displayBirthdate || '');
   };
-
-  // Cropper drag: use Pointer Events so mouse, touch and pen all work with the
-  // same handlers. The previous mouse-only impl meant Leandro (and every
-  // other phone/tablet user) could zoom/rotate but not pan the image inside
-  // the crop circle.
-  const handlePointerDown = (e) => {
-    setIsDragging(true);
-    setDragStart({
-      x: e.clientX - position.x,
-      y: e.clientY - position.y
-    });
-  };
-
-  const handlePointerMove = useCallback((e) => {
-    if (isDragging) {
-      setPosition({
-        x: e.clientX - dragStart.x,
-        y: e.clientY - dragStart.y
-      });
-    }
-  }, [isDragging, dragStart]);
-
-  const handlePointerUp = useCallback(() => {
-    setIsDragging(false);
-  }, []);
-
-  useEffect(() => {
-    if (isDragging) {
-      document.addEventListener('pointermove', handlePointerMove);
-      document.addEventListener('pointerup', handlePointerUp);
-      document.addEventListener('pointercancel', handlePointerUp);
-      return () => {
-        document.removeEventListener('pointermove', handlePointerMove);
-        document.removeEventListener('pointerup', handlePointerUp);
-        document.removeEventListener('pointercancel', handlePointerUp);
-      };
-    }
-  }, [isDragging, handlePointerMove, handlePointerUp]);
 
   const handleSaveProfile = async () => {
     if (!editName.trim()) {
@@ -303,9 +257,7 @@ export const MobileNav = () => {
       setPreviewUrl(url);
       setShowCropper(true);
       setShowPhotoModal(false);
-      setZoom(1);
-      setRotation(0);
-      setPosition({ x: 0, y: 0 });
+      // El transform lo resetea <PhotoCropper> al cambiar previewUrl.
     } catch (err) {
       console.error('Error selecting file:', err);
       alert('Error al seleccionar la imagen.');
@@ -347,68 +299,9 @@ export const MobileNav = () => {
     }
 
     try {
-      // Load the image from previewUrl. We intentionally do NOT read the file
-      // from fileInputRef here: the <input> lives inside the photo modal, which
-      // is unmounted when the cropper opens (setShowPhotoModal(false)), so
-      // fileInputRef.current is null at save time — that made "Guardar" un
-      // no-op silencioso en móvil (no subía nada). previewUrl ya tiene todo lo
-      // necesario para renderizar el recorte.
-      const img = new Image();
-
-      await new Promise((resolve, reject) => {
-        img.onload = resolve;
-        img.onerror = reject;
-        img.src = previewUrl;
-      });
-
-      // Create canvas - 400x400 for high quality avatar
-      const canvasSize = 400;
-      const canvas = document.createElement('canvas');
-      canvas.width = canvasSize;
-      canvas.height = canvasSize;
-      const ctx = canvas.getContext('2d');
-
-      // Reproduce the on-screen preview EXACTLY. Instead of guessing the
-      // displayed image size from constants (the old bug: the saved crop didn't
-      // match what the user saw), we read the preview <img>'s real rendered
-      // size — offsetWidth/Height reflect the browser's object-fit:contain
-      // layout and are unaffected by the CSS transform.
-      const previewCircleSize = 200; // crop circle diameter in preview px
-      const imgEl = cropImgRef.current;
-      let baseW, baseH;
-      if (imgEl && imgEl.offsetWidth) {
-        baseW = imgEl.offsetWidth;
-        baseH = imgEl.offsetHeight;
-      } else {
-        // Fallback (should not happen while the cropper is open).
-        const aspect = img.width / img.height;
-        baseW = aspect >= 1 ? previewCircleSize : previewCircleSize * aspect;
-        baseH = aspect >= 1 ? previewCircleSize / aspect : previewCircleSize;
-      }
-      const k = canvasSize / previewCircleSize; // preview px -> canvas px
-
-      // Clip to circle
-      ctx.save();
-      ctx.beginPath();
-      ctx.arc(canvasSize / 2, canvasSize / 2, canvasSize / 2, 0, Math.PI * 2);
-      ctx.clip();
-
-      // Same transform pipeline as the CSS preview (transform-origin: center,
-      // image centered): center -> scale(k) -> scale(zoom) -> rotate ->
-      // translate(px/zoom, py/zoom), then draw the image centered.
-      ctx.translate(canvasSize / 2, canvasSize / 2);
-      ctx.scale(k, k);
-      ctx.scale(zoom, zoom);
-      ctx.rotate((rotation * Math.PI) / 180);
-      ctx.translate(position.x / zoom, position.y / zoom);
-      ctx.drawImage(img, -baseW / 2, -baseH / 2, baseW, baseH);
-
-      ctx.restore();
-
-      // Convert canvas to blob
-      const blob = await new Promise(resolve => {
-        canvas.toBlob(resolve, 'image/png', 0.95);
-      });
+      // El recorte lo produce <PhotoCropper> reproduciendo EXACTO la vista previa
+      // (mide el <img> real, landmine #2). Celular: círculo 200 → PNG.
+      const blob = await cropperRef.current?.getCroppedBlob();
 
       if (!blob) {
         throw new Error('Error al procesar la imagen');
@@ -1001,148 +894,20 @@ export const MobileNav = () => {
           </div>
 
           <div className="flex-1 overflow-y-auto flex flex-col items-center justify-center p-4" onClick={(e) => e.stopPropagation()}>
-            {/* Image Preview - Full image with circular guide overlay */}
-            <div className="relative flex items-center justify-center" style={{ height: '300px', width: '100%', maxWidth: '400px' }}>
-              {/* Dark Background */}
-              <div
-                className="absolute inset-0 rounded-2xl bg-neutral-900"
-              />
-
-              {/* Full Image Container - shows complete image WITHOUT clipping */}
-              <div
-                className="relative w-full h-full cursor-move"
-                onPointerDown={handlePointerDown}
-                style={{
-                  cursor: isDragging ? 'grabbing' : 'grab',
-                  // Prevent the browser from hijacking the touch gesture for
-                  // scrolling/zooming the page — we want it for panning the photo.
-                  touchAction: 'none',
-                }}
-              >
-                {previewUrl && (
-                  <img
-                    ref={cropImgRef}
-                    src={previewUrl}
-                    alt="Preview"
-                    className="absolute"
-                    style={{
-                      maxHeight: '280px',
-                      maxWidth: '100%',
-                      objectFit: 'contain',
-                      // Clean centering: translate(-50%,-50%) centers the image on
-                      // its own size (% is relative to the element), then zoom /
-                      // rotate / pan about the center. The canvas save replicates
-                      // this exact pipeline so the crop matches the preview.
-                      left: '50%',
-                      top: '50%',
-                      transformOrigin: 'center center',
-                      transform: `translate(-50%, -50%) scale(${zoom}) rotate(${rotation}deg) translate(${position.x / zoom}px, ${position.y / zoom}px)`,
-                      transition: isDragging ? 'none' : 'transform 0.2s ease',
-                    }}
-                    draggable={false}
-                  />
-                )}
-              </div>
-
-              {/* Circle Guide Overlay - Semi-transparent, shows crop area */}
-              <div
-                className="absolute pointer-events-none"
-                style={{
-                  width: '200px',
-                  height: '200px',
-                  borderRadius: '50%',
-                  border: '3px solid rgba(255, 255, 255, 0.8)',
-                  boxShadow: '0 0 0 9999px rgba(0, 0, 0, 0.7)',
-                  zIndex: 10
-                }}
-              />
-
-              {/* Corner Handles on the guide */}
-              <div className="absolute pointer-events-none" style={{ width: '200px', height: '200px', zIndex: 11 }}>
-                <div className="absolute -top-[3px] -left-[3px] w-6 h-6 border-t-4 border-l-4 border-white rounded-tl-full" />
-                <div className="absolute -top-[3px] -right-[3px] w-6 h-6 border-t-4 border-r-4 border-white rounded-tr-full" />
-                <div className="absolute -bottom-[3px] -left-[3px] w-6 h-6 border-b-4 border-l-4 border-white rounded-bl-full" />
-                <div className="absolute -bottom-[3px] -right-[3px] w-6 h-6 border-b-4 border-r-4 border-white rounded-br-full" />
-              </div>
-
-              {/* Drag Hint */}
-              {isDragging && (
-                <div className="absolute bottom-4 left-1/2 -translate-x-1/2 bg-black/70 text-white text-xs px-3 py-1.5 rounded-full flex items-center gap-1.5 z-20">
-                  <Move size={12} />
-                  Soltá para posicionar
-                </div>
-              )}
-            </div>
-
-            {/* Controls */}
-            <div className="w-full max-w-sm mt-6 space-y-4 p-4 bg-neutral-800/50 rounded-2xl">
-              {/* Zoom Control */}
-              <div className="space-y-2">
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-2 text-neutral-400">
-                    <ZoomOut size={16} />
-                    <span className="text-xs">Zoom</span>
-                  </div>
-                  <span className="text-xs text-white font-medium">{Math.round(zoom * 100)}%</span>
-                </div>
-                <input
-                  type="range"
-                  min="0.5"
-                  max="2.5"
-                  step="0.05"
-                  value={zoom}
-                  onChange={(e) => setZoom(parseFloat(e.target.value))}
-                  className="w-full h-2 bg-neutral-700 rounded-lg appearance-none cursor-pointer accent-white"
-                />
-              </div>
-
-              {/* Rotation Control */}
-              <div className="space-y-2">
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-2 text-neutral-400">
-                    <RotateCcw size={16} />
-                    <span className="text-xs">Rotación</span>
-                  </div>
-                  <span className="text-xs text-white font-medium">{rotation}°</span>
-                </div>
-                <input
-                  type="range"
-                  min="-180"
-                  max="180"
-                  step="5"
-                  value={rotation}
-                  onChange={(e) => setRotation(parseInt(e.target.value))}
-                  className="w-full h-2 bg-neutral-700 rounded-lg appearance-none cursor-pointer accent-white"
-                />
-              </div>
-
-              {/* Quick Actions */}
-              <div className="flex gap-2 pt-2">
-                <button
-                  onClick={() => { setZoom(1); setRotation(0); setPosition({ x: 0, y: 0 }); }}
-                  className="flex-1 px-3 py-2 bg-neutral-700 hover:bg-neutral-600 rounded-lg text-sm text-neutral-300 transition-colors flex items-center justify-center gap-1.5"
-                >
-                  <RotateCcw size={14} />
-                  Restablecer
-                </button>
-                <button
-                  onClick={() => setRotation(prev => prev + 90)}
-                  className="flex-1 px-3 py-2 bg-neutral-700 hover:bg-neutral-600 rounded-lg text-sm text-neutral-300 transition-colors"
-                >
-                  +90°
-                </button>
-                <button
-                  onClick={() => setRotation(prev => prev - 90)}
-                  className="flex-1 px-3 py-2 bg-neutral-700 hover:bg-neutral-600 rounded-lg text-sm text-neutral-300 transition-colors"
-                >
-                  -90°
-                </button>
-              </div>
-            </div>
-
-            <p className="text-neutral-500 text-xs text-center mt-4 px-4">
-              Arrastrá la imagen para posicionarla dentro del círculo. Ajustá el zoom y rotación.
-            </p>
+            <PhotoCropper
+              ref={cropperRef}
+              previewUrl={previewUrl}
+              circleSize={200}
+              stageHeight={300}
+              imgMaxHeight={280}
+              canvasSize={400}
+              outputType="image/png"
+              outputQuality={0.95}
+              accentClass="accent-white"
+              radiusClass="rounded-2xl"
+              borderOpacity={0.8}
+              maskOpacity={0.7}
+            />
           </div>
 
           {/* Save bar pinned at the bottom — always reachable and clear of the

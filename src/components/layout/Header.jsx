@@ -1,8 +1,9 @@
 // AdorAPP - Centro de Avivamiento Familiar
 // Photo Cropper fix - Canvas API image processing
-import React, { useState, useRef, useEffect, useCallback, useMemo } from 'react';
+import React, { useState, useRef, useEffect, useMemo } from 'react';
+import { PhotoCropper } from '../profile/PhotoCropper';
 import { useLocation, useNavigate } from 'react-router-dom';
-import { Bell, Search, ChevronRight, User, Mail, Shield, Camera, X, RotateCcw, ZoomOut, Check, Move, LogOut, Trash2, Phone, Cross, Users2, Calendar, Loader2, Lock, Eye, EyeOff, RefreshCw, Music, Heart, FileText, Send, Sunset, Cake } from 'lucide-react';
+import { Bell, Search, ChevronRight, User, Mail, Shield, Camera, X, Check, LogOut, Trash2, Phone, Cross, Users2, Calendar, Loader2, Lock, Eye, EyeOff, RefreshCw, Music, Heart, FileText, Send, Sunset, Cake } from 'lucide-react';
 import { useAuthStore } from '../../stores/authStore';
 import { useAppStore } from '../../stores/appStore';
 import { supabase } from '../../lib/supabase';
@@ -17,6 +18,18 @@ import { formatDateLocal } from '../../lib/dates';
 
 // pageTitles lives in src/lib/pageTitles.js — single source of truth shared
 // with MobileNav so both layouts always show the same name for each page.
+
+// Fallback: si la subida a Storage falla, guardamos la foto como data URL desde
+// el Blob que produjo <PhotoCropper> (antes se usaba canvas.toDataURL, pero el
+// canvas ahora vive dentro del componente).
+function blobToDataURL(blob) {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => resolve(reader.result);
+    reader.onerror = reject;
+    reader.readAsDataURL(blob);
+  });
+}
 
 export const Header = () => {
   const location = useLocation();
@@ -34,11 +47,7 @@ export const Header = () => {
   const [showPhotoOptions, setShowPhotoOptions] = useState(false);
   const [previewUrl, setPreviewUrl] = useState(null);
   const [userPhoto, setUserPhoto] = useState(null);
-  const [zoom, setZoom] = useState(1);
-  const [rotation, setRotation] = useState(0);
-  const [position, setPosition] = useState({ x: 0, y: 0 });
-  const [isDragging, setIsDragging] = useState(false);
-  const [dragStart, setDragStart] = useState({ x: 0, y: 0 });
+  const cropperRef = useRef(null);
   const [isSaving, setIsSaving] = useState(false);
   // Password change state
   const [showPasswordChange, setShowPasswordChange] = useState(false);
@@ -319,9 +328,7 @@ export const Header = () => {
       const url = URL.createObjectURL(file);
       setPreviewUrl(url);
       setShowCropper(true);
-      setZoom(1);
-      setRotation(0);
-      setPosition({ x: 0, y: 0 });
+      // El transform (zoom/rotación/pan) lo resetea <PhotoCropper> al cambiar previewUrl.
     } catch (err) {
       console.error('Error selecting file:', err);
       setErrorModal({
@@ -332,45 +339,8 @@ export const Header = () => {
     }
   };
 
-  // Cropper drag uses Pointer Events so mouse, touch and pen all share one
-  // handler set. Mouse-only events meant tablet/touch users could zoom and
-  // rotate but not pan the photo inside the crop circle.
-  const handlePointerDown = (e) => {
-    e.preventDefault();
-    setIsDragging(true);
-    setDragStart({
-      x: e.clientX - position.x,
-      y: e.clientY - position.y
-    });
-  };
-
-  const handlePointerMove = useCallback((e) => {
-    if (isDragging) {
-      setPosition({
-        x: e.clientX - dragStart.x,
-        y: e.clientY - dragStart.y
-      });
-    }
-  }, [isDragging, dragStart]);
-
-  const handlePointerUp = useCallback(() => {
-    setIsDragging(false);
-  }, []);
-
-  useEffect(() => {
-    if (isDragging) {
-      document.addEventListener('pointermove', handlePointerMove);
-      document.addEventListener('pointerup', handlePointerUp);
-      document.addEventListener('pointercancel', handlePointerUp);
-      return () => {
-        document.removeEventListener('pointermove', handlePointerMove);
-        document.removeEventListener('pointerup', handlePointerUp);
-        document.removeEventListener('pointercancel', handlePointerUp);
-      };
-    }
-  }, [isDragging, handlePointerMove, handlePointerUp]);
-
-  // Process and save photo with crop/zoom/rotation applied - MATCHES PREVIEW EXACTLY
+  // El arrastre/zoom/rotación y el recorte a canvas viven en <PhotoCropper>
+  // (compartido con MobileNav). Acá solo pedimos el Blob y lo subimos.
   const handleSavePhoto = async () => {
     if (!previewUrl) {
       setErrorModal({
@@ -384,91 +354,9 @@ export const Header = () => {
     setIsSaving(true);
 
     try {
-      const img = new Image();
-      await new Promise((resolve, reject) => {
-        img.onload = resolve;
-        img.onerror = reject;
-        img.src = previewUrl;
-      });
-
-      // Output canvas size
-      const cropSize = 400;
-      const canvas = document.createElement('canvas');
-      canvas.width = cropSize;
-      canvas.height = cropSize;
-      const ctx = canvas.getContext('2d');
-
-      // Preview uses maxHeight: 260px, maxWidth: 100%, objectFit: contain, in a 256x256 circle
-      // We need to calculate the image dimensions as the browser does for object-fit: contain
-      const previewCircleSize = 256; // w-64 h-64 in CSS
-      const previewMaxHeight = 260;
-
-      const imgAspect = img.width / img.height;
-      let imgDisplayW, imgDisplayH;
-
-      // object-fit: contain calculation
-      // Compare image aspect with container aspect (using preview dimensions)
-      const containerAspect = 1; // square container
-      if (imgAspect > containerAspect) {
-        // Wide image: width = previewCircleSize, height proportionally
-        imgDisplayW = previewCircleSize;
-        imgDisplayH = previewCircleSize / imgAspect;
-      } else {
-        // Tall/square image: height = previewMaxHeight, width proportionally
-        imgDisplayH = previewMaxHeight;
-        imgDisplayW = previewMaxHeight * imgAspect;
-      }
-
-      // Scale from preview pixels to canvas pixels
-      // previewCircleSize (256) maps to cropSize (400)
-      const scaleToCanvas = cropSize / previewCircleSize;
-
-      // Draw image centered, scaled to canvas
-      const canvasImgW = imgDisplayW * scaleToCanvas;
-      const canvasImgH = imgDisplayH * scaleToCanvas;
-
-      // CRITICAL: Match EXACTLY what CSS does
-      // CSS: transform: scale(zoom) rotate(rotation) translate(position.x/zoom, position.y/zoom)
-      // Canvas applies RIGHT-TO-LEFT, so order is: translate → rotate → scale (visually)
-
-      // First save state
-      ctx.save();
-
-      // Move to canvas center
-      ctx.translate(cropSize / 2, cropSize / 2);
-
-      // Apply transforms in canvas order (right-to-left = visual left-to-right)
-      // Visual order: 1) translate(position/zoom), 2) rotate, 3) scale(zoom)
-
-      // Translate by (position.x / zoom) scaled to canvas
-      ctx.translate(
-        (position.x / zoom) * scaleToCanvas,
-        (position.y / zoom) * scaleToCanvas
-      );
-
-      // Rotate around center
-      ctx.rotate((rotation * Math.PI) / 180);
-
-      // Scale (zoom)
-      ctx.scale(zoom, zoom);
-
-      // Draw image centered at origin
-      ctx.drawImage(img, -canvasImgW / 2, -canvasImgH / 2, canvasImgW, canvasImgH);
-
-      ctx.restore();
-
-      // CRITICAL: Clip to circle AFTER drawing (outside the transformed area)
-      ctx.save();
-      ctx.globalCompositeOperation = 'destination-in';
-      ctx.beginPath();
-      ctx.arc(cropSize / 2, cropSize / 2, cropSize / 2, 0, Math.PI * 2);
-      ctx.fill();
-      ctx.restore();
-
-      // Convert to blob
-      const blob = await new Promise(resolve => {
-        canvas.toBlob(resolve, 'image/jpeg', 0.9);
-      });
+      // El recorte lo produce <PhotoCropper> reproduciendo EXACTO la vista previa
+      // (mide el <img> real, landmine #2). Escritorio: círculo 256 → JPEG.
+      const blob = await cropperRef.current?.getCroppedBlob();
 
       if (!blob) {
         throw new Error('Error al procesar la imagen');
@@ -505,7 +393,7 @@ export const Header = () => {
       }
 
       // Save photo - either from storage URL or fallback data URL
-      const dataUrl = publicUrl || canvas.toDataURL('image/jpeg', 0.9);
+      const dataUrl = publicUrl || await blobToDataURL(blob);
 
       // Always save to localStorage
       localStorage.setItem('userPhoto', dataUrl);
@@ -915,138 +803,16 @@ export const Header = () => {
           </>
         }
       >
-        <div className="space-y-4">
-          {/* Image Preview - Full Image with Circular Guide Overlay */}
-          <div className="relative flex items-center justify-center" style={{ height: '280px' }}>
-            {/* Dark Background for visibility */}
-            <div className="absolute inset-0 bg-neutral-900 rounded-xl" />
-
-            {/* Draggable Image Container - NO clipping, shows full image */}
-            <div
-              className="relative cursor-move"
-              onPointerDown={handlePointerDown}
-              style={{
-                cursor: isDragging ? 'grabbing' : 'grab',
-                touchAction: 'none',
-              }}
-            >
-              {previewUrl && (
-                <img
-                  src={previewUrl}
-                  alt="Preview"
-                  className="max-w-none"
-                  style={{
-                    transform: `scale(${zoom}) rotate(${rotation}deg) translate(${position.x / zoom}px, ${position.y / zoom}px)`,
-                    transition: isDragging ? 'none' : 'transform 0.2s ease',
-                    maxHeight: '260px',
-                    maxWidth: '100%',
-                    objectFit: 'contain'
-                  }}
-                  draggable={false}
-                />
-              )}
-            </div>
-
-            {/* Circular Guide Overlay - Semi-transparent, non-clipped */}
-            <div
-              className="absolute inset-0 flex items-center justify-center pointer-events-none"
-            >
-              <div
-                className="w-64 h-64 rounded-full border-[3px] border-white/60 shadow-[0_0_0_9999px_rgba(0,0,0,0.5)]"
-              />
-            </div>
-
-            {/* Corner Handles on the guide */}
-            <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-64 h-64 pointer-events-none">
-              <div className="absolute -top-[3px] -left-[3px] w-6 h-6 border-t-4 border-l-4 border-white rounded-tl-full" />
-              <div className="absolute -top-[3px] -right-[3px] w-6 h-6 border-t-4 border-r-4 border-white rounded-tr-full" />
-              <div className="absolute -bottom-[3px] -left-[3px] w-6 h-6 border-b-4 border-l-4 border-white rounded-bl-full" />
-              <div className="absolute -bottom-[3px] -right-[3px] w-6 h-6 border-b-4 border-r-4 border-white rounded-br-full" />
-            </div>
-
-            {/* Drag Hint */}
-            {isDragging && (
-              <div className="absolute bottom-4 left-1/2 -translate-x-1/2 bg-black/70 text-white text-xs px-3 py-1.5 rounded-full flex items-center gap-1.5 z-10">
-                <Move size={12} />
-                Soltá para posicionar
-              </div>
-            )}
-          </div>
-
-          {/* Controls */}
-          <div className="space-y-4 p-4 bg-neutral-800/50 rounded-xl">
-            {/* Zoom Control */}
-            <div className="space-y-2">
-              <div className="flex items-center justify-between">
-                <div className="flex items-center gap-2 text-gray-400">
-                  <ZoomOut size={16} />
-                  <span className="text-xs">Zoom</span>
-                </div>
-                <span className="text-xs text-white font-medium">{Math.round(zoom * 100)}%</span>
-              </div>
-              <div className="relative">
-                <input
-                  type="range"
-                  min="0.5"
-                  max="2.5"
-                  step="0.05"
-                  value={zoom}
-                  onChange={(e) => setZoom(parseFloat(e.target.value))}
-                  className="w-full h-2 bg-neutral-700 rounded-lg appearance-none cursor-pointer accent-gold-500"
-                />
-              </div>
-            </div>
-
-            {/* Rotation Control */}
-            <div className="space-y-2">
-              <div className="flex items-center justify-between">
-                <div className="flex items-center gap-2 text-gray-400">
-                  <RotateCcw size={16} />
-                  <span className="text-xs">Rotación</span>
-                </div>
-                <span className="text-xs text-white font-medium">{rotation}°</span>
-              </div>
-              <div className="relative">
-                <input
-                  type="range"
-                  min="-180"
-                  max="180"
-                  step="5"
-                  value={rotation}
-                  onChange={(e) => setRotation(parseInt(e.target.value))}
-                  className="w-full h-2 bg-neutral-700 rounded-lg appearance-none cursor-pointer accent-gold-500"
-                />
-              </div>
-            </div>
-
-            {/* Quick Actions */}
-            <div className="flex gap-2 pt-2">
-              <button
-                onClick={() => { setZoom(1); setRotation(0); setPosition({ x: 0, y: 0 }); }}
-                className="flex-1 px-3 py-2 bg-neutral-700 hover:bg-neutral-600 rounded-lg text-sm text-gray-300 transition-colors flex items-center justify-center gap-1.5"
-              >
-                <RotateCcw size={14} />
-                Restablecer
-              </button>
-              <button
-                onClick={() => setRotation(prev => prev + 90)}
-                className="flex-1 px-3 py-2 bg-neutral-700 hover:bg-neutral-600 rounded-lg text-sm text-gray-300 transition-colors"
-              >
-                +90°
-              </button>
-              <button
-                onClick={() => setRotation(prev => prev - 90)}
-                className="flex-1 px-3 py-2 bg-neutral-700 hover:bg-neutral-600 rounded-lg text-sm text-gray-300 transition-colors"
-              >
-                -90°
-              </button>
-            </div>
-          </div>
-
-          <p className="text-xs text-gray-500 text-center">
-            Arrastrá la imagen para posicionarla dentro del círculo. Ajustá el zoom y rotación según sea necesario.
-          </p>
-        </div>
+        <PhotoCropper
+          ref={cropperRef}
+          previewUrl={previewUrl}
+          circleSize={256}
+          stageHeight={280}
+          imgMaxHeight={260}
+          canvasSize={400}
+          outputType="image/jpeg"
+          outputQuality={0.9}
+        />
       </Modal>
 
       {/* Password Change Modal */}
