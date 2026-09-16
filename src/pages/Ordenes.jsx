@@ -148,6 +148,32 @@ export const Ordenes = () => {
   // Guardado pendiente {orderId, feedback} en un ref: así el flush no depende de que
   // viewingOrder siga cargado (el gesto "atrás" puede cerrar el detalle sin blur).
   const pendingFeedback = useRef(null);
+  // Guarda la devolución UNA vez (no por tecla), espera el resultado y avisa si falló.
+  // `feedback` no es campo de contenido → updateOrder no da falso choque de concurrencia
+  // (re-aplica sobre lo fresco). Patchea viewingOrder para que el PDF y la vista lean el
+  // valor recién guardado. (Definido ANTES de los efectos que lo usan — no-use-before-define.)
+  const saveFeedback = async (orderId, feedback) => {
+    setFeedbackSaveState('saving');
+    const res = await updateOrder(orderId, { feedback });
+    setFeedbackSaveState(res ? 'saved' : 'error');
+    if (res) setViewingOrder(prev => (prev && prev.id === orderId ? { ...prev, feedback } : prev));
+  };
+  const handleFeedbackChange = (orderId, value) => {
+    setFeedbackDraft(value);              // se muestra al instante
+    setFeedbackSaveState('saving');
+    pendingFeedback.current = { orderId, feedback: value };
+    if (feedbackTimer.current) clearTimeout(feedbackTimer.current);
+    feedbackTimer.current = setTimeout(() => {
+      feedbackTimer.current = null;
+      const p = pendingFeedback.current; pendingFeedback.current = null;
+      if (p) saveFeedback(p.orderId, p.feedback);
+    }, 700);
+  };
+  const flushFeedback = () => {
+    if (feedbackTimer.current) { clearTimeout(feedbackTimer.current); feedbackTimer.current = null; }
+    const p = pendingFeedback.current; pendingFeedback.current = null;
+    if (p) saveFeedback(p.orderId, p.feedback); // persiste ya lo que quedó pendiente
+  };
   // Sincroniza el borrador al abrir/cambiar de orden (por id, no por cada patch de viewingOrder).
   useEffect(() => {
     setFeedbackDraft(viewingOrder?.feedback || '');
@@ -545,33 +571,6 @@ export const Ordenes = () => {
         }
       }
     });
-  };
-
-  // Guarda la devolución UNA vez (no por tecla), espera el resultado y avisa si
-  // falló. `feedback` no es campo de contenido → updateOrder no da falso choque de
-  // concurrencia (re-aplica sobre lo fresco). Patchea viewingOrder para que el PDF
-  // y la vista lean el valor recién guardado.
-  const saveFeedback = async (orderId, feedback) => {
-    setFeedbackSaveState('saving');
-    const res = await updateOrder(orderId, { feedback });
-    setFeedbackSaveState(res ? 'saved' : 'error');
-    if (res) setViewingOrder(prev => (prev && prev.id === orderId ? { ...prev, feedback } : prev));
-  };
-  const handleFeedbackChange = (orderId, value) => {
-    setFeedbackDraft(value);              // se muestra al instante
-    setFeedbackSaveState('saving');
-    pendingFeedback.current = { orderId, feedback: value };
-    if (feedbackTimer.current) clearTimeout(feedbackTimer.current);
-    feedbackTimer.current = setTimeout(() => {
-      feedbackTimer.current = null;
-      const p = pendingFeedback.current; pendingFeedback.current = null;
-      if (p) saveFeedback(p.orderId, p.feedback);
-    }, 700);
-  };
-  const flushFeedback = () => {
-    if (feedbackTimer.current) { clearTimeout(feedbackTimer.current); feedbackTimer.current = null; }
-    const p = pendingFeedback.current; pendingFeedback.current = null;
-    if (p) saveFeedback(p.orderId, p.feedback); // persiste ya lo que quedó pendiente
   };
 
   // Export order summary (without chords)
