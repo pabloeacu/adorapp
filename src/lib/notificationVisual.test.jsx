@@ -25,6 +25,11 @@ describe('notifTypeBg', () => {
     expect(notifTypeBg('alert', 'bg-blue-500/20')).toBe('bg-blue-500/20');
     expect(notifTypeBg('birthday', 'bg-blue-500/20')).toBe('bg-blue-500/20');
   });
+
+  it('una clave del prototipo (toString/constructor) cae al fallback, no a la función heredada', () => {
+    expect(notifTypeBg('toString')).toBe('bg-green-500/20');
+    expect(notifTypeBg('constructor', 'bg-blue-500/20')).toBe('bg-blue-500/20');
+  });
 });
 
 describe('NotifIcon', () => {

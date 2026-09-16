@@ -24,7 +24,9 @@ const TYPE_BG = {
 };
 
 export function notifTypeBg(type, fallbackBg = 'bg-green-500/20') {
-  return TYPE_BG[type] || fallbackBg;
+  // Object.hasOwn: un `type` que fuese clave del prototipo (p. ej. 'toString')
+  // no debe devolver la función heredada — cae al fallback, como el ternario viejo.
+  return Object.hasOwn(TYPE_BG, type) ? TYPE_BG[type] : fallbackBg;
 }
 
 const ICONS = {
@@ -42,7 +44,7 @@ const ICONS = {
 // El ícono de la notificación según `notif.icon`. Devuelve null para un ícono
 // desconocido (igual que antes: ninguna de las condiciones matcheaba).
 export function NotifIcon({ icon }) {
-  return ICONS[icon] || null;
+  return Object.hasOwn(ICONS, icon) ? ICONS[icon] : null;
 }
 
 // Medalla completa (contenedor coloreado + ícono). `radiusClass` y `fallbackBg`
