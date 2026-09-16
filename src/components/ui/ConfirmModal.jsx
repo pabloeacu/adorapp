@@ -51,7 +51,7 @@ export const ConfirmModal = ({
           </Button>
           <Button
             onClick={onConfirm}
-            className={styles.confirmBtn}
+            variant={type === 'danger' ? 'danger' : type === 'success' ? 'success' : 'warning'}
             disabled={loading}
           >
             {loading ? (
