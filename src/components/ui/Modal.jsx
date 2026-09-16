@@ -31,6 +31,22 @@ function ensureModalPopstateListener() {
   });
 }
 
+// Escape cierra el modal MÁS RECIENTE (accesibilidad de teclado en escritorio; en
+// celular ya lo hace el gesto "atrás"). Un solo listener a nivel de módulo, como el
+// de popstate: cierra sólo el top del stack, así con modales apilados (p. ej. una
+// confirmación sobre un editor) el 1er Escape cierra la confirmación y el 2º el editor.
+// Se respeta `defaultPrevented` para no pisar a un control que ya haya manejado Escape.
+let escKeydownListenerBound = false;
+function ensureModalEscListener() {
+  if (escKeydownListenerBound) return;
+  escKeydownListenerBound = true;
+  window.addEventListener('keydown', (e) => {
+    if (e.key !== 'Escape' || e.defaultPrevented) return;
+    const top = openModalStack[openModalStack.length - 1];
+    if (top) top.close();
+  });
+}
+
 export const Modal = ({
   isOpen,
   onClose,
@@ -46,6 +62,9 @@ export const Modal = ({
   useEffect(() => {
     onCloseRef.current = onClose;
   });
+
+  // Ref al card para la gestión de foco (foco inicial, trampa de Tab, devolver foco).
+  const containerRef = useRef(null);
 
   // Lock body scroll while open.
   useEffect(() => {
@@ -71,6 +90,7 @@ export const Modal = ({
     if (!isOpen) return;
 
     ensureModalPopstateListener();
+    ensureModalEscListener();
     const entry = { close: () => onCloseRef.current?.() };
     openModalStack.push(entry);
     window.history.pushState({ adorappModal: true }, '');
@@ -87,6 +107,37 @@ export const Modal = ({
       }
     };
   }, [isOpen]);
+
+  // Gestión de foco (accesibilidad): al abrir, guarda quién tenía el foco y lo pone
+  // en el card (lector de pantalla anuncia el diálogo por aria-labelledby); al cerrar,
+  // DEVUELVE el foco al elemento que abrió el modal. La trampa de Tab (onKeyDown del
+  // card) mantiene el foco adentro. En modales apilados, el onKeyDown vive en el card
+  // de cada uno → sólo atrapa el que tiene el foco (el de arriba). No toca el historial.
+  useEffect(() => {
+    if (!isOpen) return;
+    const prevFocused = document.activeElement;
+    const t = setTimeout(() => { containerRef.current?.focus(); }, 0);
+    return () => {
+      clearTimeout(t);
+      if (prevFocused && typeof prevFocused.focus === 'function') {
+        try { prevFocused.focus(); } catch { /* el trigger pudo desmontarse */ }
+      }
+    };
+  }, [isOpen]);
+
+  const FOCUSABLE = 'a[href],button:not([disabled]),textarea:not([disabled]),input:not([disabled]),select:not([disabled]),[tabindex]:not([tabindex="-1"])';
+  const handleTrapTab = (e) => {
+    if (e.key !== 'Tab') return;
+    const c = containerRef.current;
+    if (!c) return;
+    const items = Array.from(c.querySelectorAll(FOCUSABLE)).filter((el) => el.offsetParent !== null);
+    if (items.length === 0) { e.preventDefault(); c.focus(); return; }
+    const first = items[0];
+    const last = items[items.length - 1];
+    const active = document.activeElement;
+    if (e.shiftKey && (active === first || active === c)) { e.preventDefault(); last.focus(); }
+    else if (!e.shiftKey && active === last) { e.preventDefault(); first.focus(); }
+  };
 
   if (!isOpen) return null;
 
@@ -122,11 +173,14 @@ export const Modal = ({
           - explicit padding-bottom from env(safe-area-inset-bottom) so the
             footer never overlaps the home indicator on notched phones. */}
       <div
+        ref={containerRef}
+        tabIndex={-1}
+        onKeyDown={handleTrapTab}
         className={`
         relative bg-neutral-900 border border-neutral-800 rounded-2xl
         w-full ${sizes[size]} max-h-[calc(100dvh-160px)]
         flex flex-col
-        animate-scale-in shadow-2xl
+        animate-scale-in shadow-2xl focus:outline-none
       `}
         // El max-height también descuenta el inset superior: con el card
         // corrido hacia abajo, sin esto podría no entrar en el alto visible.
