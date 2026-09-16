@@ -2,8 +2,9 @@
 // Photo Cropper fix - Canvas API image processing
 import React, { useState, useRef, useEffect, useMemo } from 'react';
 import { PhotoCropper } from '../profile/PhotoCropper';
+import { NotifIconBadge } from '../../lib/notificationVisual';
 import { useLocation, useNavigate } from 'react-router-dom';
-import { Bell, Search, ChevronRight, User, Mail, Shield, Camera, X, Check, LogOut, Trash2, Phone, Cross, Users2, Calendar, Loader2, Lock, Eye, EyeOff, RefreshCw, Music, Heart, FileText, Send, Sunset, Cake } from 'lucide-react';
+import { Bell, Search, ChevronRight, User, Mail, Shield, Camera, X, Check, LogOut, Trash2, Phone, Cross, Users2, Calendar, Loader2, Lock, Eye, EyeOff, RefreshCw } from 'lucide-react';
 import { useAuthStore } from '../../stores/authStore';
 import { useAppStore } from '../../stores/appStore';
 import { supabase } from '../../lib/supabase';
@@ -987,26 +988,7 @@ export const Header = () => {
                       <X size={16} />
                     </button>
                     <div className="flex items-start gap-3 pr-8">
-                      <div className={`p-2 rounded-lg ${
-                        notif.type === 'song' ? 'bg-purple-500/20' :
-                        notif.type === 'band' ? 'bg-blue-500/20' :
-                        notif.type === 'order' ? 'bg-emerald-500/20' :
-                        notif.type === 'devotional' ? 'bg-amber-500/20' :
-                        notif.type === 'reflection' ? 'bg-indigo-500/20' :
-                        notif.type === 'request' ? 'bg-yellow-500/20' :
-                        notif.type === 'communication' ? 'bg-blue-500/20' :
-                        'bg-green-500/20'
-                      }`}>
-                        {notif.icon === 'music' && <Music size={18} className="text-purple-400" />}
-                        {notif.icon === 'users' && <Users2 size={18} className="text-blue-400" />}
-                        {notif.icon === 'heart' && <Heart size={18} className="text-green-400" />}
-                        {notif.icon === 'cross' && <Cross size={18} className="text-amber-400" />}
-                        {notif.icon === 'sunset' && <Sunset size={18} className="text-indigo-400" />}
-                        {notif.icon === 'calendar' && <Calendar size={18} className="text-emerald-400" />}
-                        {notif.icon === 'file' && <FileText size={18} className="text-yellow-400" />}
-                        {notif.icon === 'cake' && <Cake size={18} className="text-pink-400" />}
-                        {notif.icon === 'send' && <Send size={18} className="text-blue-400" />}
-                      </div>
+                      <NotifIconBadge type={notif.type} icon={notif.icon} radiusClass="rounded-lg" />
                       <div className="flex-1">
                         {notif.type === 'communication' ? (
                           <>
