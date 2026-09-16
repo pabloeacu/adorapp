@@ -2,7 +2,7 @@
 
 Este archivo se carga automáticamente al iniciar cualquier sesión de Claude Code en este repo. Es el contrato mínimo para no perder contexto entre sesiones.
 
-> 📐 **Mapa del proyecto:** `ARCHITECTURE.md` (raíz) es un mapa útil pero **parcialmente desactualizado** (fiel hasta ~PR #105; sus subsistemas nuevos están en la sección "Subsistemas Sep 2026 (sincronización)"). Leé PRIMERO este `CLAUDE.md` (el contrato: Regla de Oro + reglas + los landmines numerados hasta #80): es **la fuente de verdad**, junto con la base en vivo (Supabase MCP), para todo lo posterior a #105 (correos, suspender ensamble, multi-área, ministración, member_activity, feedback, colaboración, banners). Usá `ARCHITECTURE.md` para el núcleo previo (órdenes/repertorio/práctica/bandas, motor de transposición, converters/regla #8, formación, push).
+> 📐 **Mapa del proyecto:** `ARCHITECTURE.md` (raíz) es un mapa útil pero **parcialmente desactualizado** (fiel hasta ~PR #105; sus subsistemas nuevos están en la sección "Subsistemas Sep 2026 (sincronización)"). Leé PRIMERO este `CLAUDE.md` (el contrato: Regla de Oro + reglas + los landmines numerados hasta #98): es **la fuente de verdad**, junto con la base en vivo (Supabase MCP), para todo lo posterior a #105 (correos, suspender ensamble, multi-área, ministración, member_activity, feedback, colaboración, banners). Usá `ARCHITECTURE.md` para el núcleo previo (órdenes/repertorio/práctica/bandas, motor de transposición, converters/regla #8, formación, push).
 
 ## ⭐ REGLA DE ORO — método obligatorio para CADA pedido (innegociable)
 
@@ -63,7 +63,7 @@ PWA en Vite/React 18 + Supabase + Vercel para ~8 usuarios reales del **ministeri
 - `src/stores/{authStore,appStore}.js` — Zustand. `authStore.refreshProfile()` dispara `appStore.initialize()`.
 - `src/lib/supabase.js` — cliente público, `callAdminFunction()` para Edge Functions.
 - `src/lib/{csv,orders}.ts` — únicos archivos TS hasta ahora; resto del código es JS.
-- `src/components/layout/{Header,MobileNav}.jsx` — los dos archivos monstruo (1712 + 1242 líneas, ~40% duplicado). Refactor pendiente en backlog.
+- `src/components/layout/{Header,MobileNav}.jsx` — los dos archivos grandes de layout (Header ~1068, MobileNav ~1323 líneas). La **dedup segura ya se cerró** (Estado 2026-09-16 II, PRs #162-168): campanita (`useNotificationsPanel`), recortador (`PhotoCropper`), ícono/color de aviso (`notificationVisual`), fechas (`dates.js`) y cambio de contraseña (`usePasswordChange`) viven en hooks/componentes compartidos. Lo que queda duplicado (contenedor de la tarjeta de aviso, chrome del form de contraseña) es divergencia de diseño A PROPÓSITO, no deuda. Pendiente estratégico (a conversar): partir estos archivos-página en piezas más chicas.
 - `src/components/ui/PageLoader.jsx` — loader unificado.
 - `supabase/` — migrations + edge functions.
 - `presentation/` — generador del PDF para pastores generales (`render.cjs` + `render-mobile.cjs`).
