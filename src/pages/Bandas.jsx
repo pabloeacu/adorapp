@@ -188,14 +188,23 @@ export const Bandas = () => {
     setEditingBand(null);
   };
 
-  const handleSubmit = (e) => {
+  const handleSubmit = async (e) => {
     e.preventDefault();
     if (!formData.name.trim()) return;
 
-    if (editingBand) {
-      updateBand(editingBand.id, formData);
-    } else {
-      addBand(formData);
+    // Esperar el resultado y avisar si falló, en vez de cerrar el formulario a
+    // ciegas (con mala señal se perdía un alta creyendo que quedó). addBand/updateBand
+    // devuelven la fila en éxito o null en error (mismo contrato que los DELETE).
+    const res = editingBand
+      ? await updateBand(editingBand.id, formData)
+      : await addBand(formData);
+    if (!res) {
+      setErrorModal({
+        isOpen: true,
+        title: 'No se pudo guardar la banda',
+        message: useAppStore.getState().error || 'Intentá de nuevo. Si el problema sigue, avisale al pastor.',
+      });
+      return;
     }
     handleCloseModal();
   };

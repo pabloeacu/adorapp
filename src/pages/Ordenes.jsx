@@ -139,6 +139,53 @@ export const Ordenes = () => {
   const [keyHistoryLoading, setKeyHistoryLoading] = useState(false);
   const [keyHistoryTooltip, setKeyHistoryTooltip] = useState(null);
 
+  // Devolución del Pastor: borrador LOCAL + autoguardado con debounce. Antes se
+  // escribía en la base POR CADA TECLA (a ciegas, sin await, sin avisar si fallaba,
+  // y sin mostrar lo tipeado porque el textarea estaba atado a viewingOrder.feedback).
+  const [feedbackDraft, setFeedbackDraft] = useState('');
+  const [feedbackSaveState, setFeedbackSaveState] = useState('idle'); // idle|saving|saved|error
+  const feedbackTimer = useRef(null);
+  // Guardado pendiente {orderId, feedback} en un ref: así el flush no depende de que
+  // viewingOrder siga cargado (el gesto "atrás" puede cerrar el detalle sin blur).
+  const pendingFeedback = useRef(null);
+  // Guarda la devolución UNA vez (no por tecla), espera el resultado y avisa si falló.
+  // `feedback` no es campo de contenido → updateOrder no da falso choque de concurrencia
+  // (re-aplica sobre lo fresco). Patchea viewingOrder para que el PDF y la vista lean el
+  // valor recién guardado. (Definido ANTES de los efectos que lo usan — no-use-before-define.)
+  const saveFeedback = async (orderId, feedback) => {
+    setFeedbackSaveState('saving');
+    const res = await updateOrder(orderId, { feedback });
+    setFeedbackSaveState(res ? 'saved' : 'error');
+    if (res) setViewingOrder(prev => (prev && prev.id === orderId ? { ...prev, feedback } : prev));
+  };
+  const handleFeedbackChange = (orderId, value) => {
+    setFeedbackDraft(value);              // se muestra al instante
+    setFeedbackSaveState('saving');
+    pendingFeedback.current = { orderId, feedback: value };
+    if (feedbackTimer.current) clearTimeout(feedbackTimer.current);
+    feedbackTimer.current = setTimeout(() => {
+      feedbackTimer.current = null;
+      const p = pendingFeedback.current; pendingFeedback.current = null;
+      if (p) saveFeedback(p.orderId, p.feedback);
+    }, 700);
+  };
+  const flushFeedback = () => {
+    if (feedbackTimer.current) { clearTimeout(feedbackTimer.current); feedbackTimer.current = null; }
+    const p = pendingFeedback.current; pendingFeedback.current = null;
+    if (p) saveFeedback(p.orderId, p.feedback); // persiste ya lo que quedó pendiente
+  };
+  // Sincroniza el borrador al abrir/cambiar de orden (por id, no por cada patch de viewingOrder).
+  useEffect(() => {
+    setFeedbackDraft(viewingOrder?.feedback || '');
+    setFeedbackSaveState('idle');
+  }, [viewingOrder?.id]);
+  // Al cerrar el detalle (incluido el gesto "atrás", que no dispara onBlur) o desmontar,
+  // persistir cualquier borrador pendiente para no perder ni una tecla.
+  useEffect(() => {
+    if (!isDetailOpen) flushFeedback();
+  }, [isDetailOpen]); // eslint-disable-line react-hooks/exhaustive-deps
+  useEffect(() => () => { flushFeedback(); }, []); // eslint-disable-line react-hooks/exhaustive-deps
+
   // Formación del servicio: paso 2 del alta ('form' → 'lineup'), borrador y
   // modal de edición desde el detalle. Ver docs/PLAN_formacion_orden.md.
   const [formStep, setFormStep] = useState('form');
@@ -524,10 +571,6 @@ export const Ordenes = () => {
         }
       }
     });
-  };
-
-  const handleUpdateFeedback = (orderId, feedback) => {
-    updateOrder(orderId, { feedback });
   };
 
   // Export order summary (without chords)
@@ -2176,9 +2219,15 @@ export const Ordenes = () => {
                 <textarea
                   className="w-full h-24 bg-neutral-800 border border-neutral-700 rounded-xl px-4 py-3 resize-none focus:outline-none focus:ring-2 focus:ring-gold-500/40"
                   placeholder="Agregar comentarios sobre la ejecución del servicio..."
-                  value={viewingOrder.feedback || ''}
-                  onChange={(e) => handleUpdateFeedback(viewingOrder.id, e.target.value)}
+                  value={feedbackDraft}
+                  onChange={(e) => handleFeedbackChange(viewingOrder.id, e.target.value)}
+                  onBlur={() => flushFeedback()}
                 />
+                <div className="mt-1 h-4 text-xs flex items-center gap-1" aria-live="polite">
+                  {feedbackSaveState === 'saving' && (<span className="flex items-center gap-1 text-gray-400"><Clock size={12} className="animate-pulse" /> Guardando…</span>)}
+                  {feedbackSaveState === 'saved' && (<span className="flex items-center gap-1 text-green-400"><CheckCircle size={12} /> Guardado</span>)}
+                  {feedbackSaveState === 'error' && (<span className="flex items-center gap-1 text-red-400"><AlertCircle size={12} /> No se pudo guardar. Reintentá.</span>)}
+                </div>
               </CollapsibleSection>
             )}
 
