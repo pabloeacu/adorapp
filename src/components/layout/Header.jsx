@@ -3,6 +3,7 @@
 import React, { useState, useRef, useEffect, useMemo } from 'react';
 import { PhotoCropper } from '../profile/PhotoCropper';
 import { NotifIconBadge } from '../../lib/notificationVisual';
+import { usePasswordChange } from '../../hooks/usePasswordChange';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { Bell, Search, ChevronRight, User, Mail, Shield, Camera, X, Check, LogOut, Trash2, Phone, Cross, Users2, Calendar, Loader2, Lock, Eye, EyeOff, RefreshCw } from 'lucide-react';
 import { useAuthStore } from '../../stores/authStore';
@@ -32,6 +33,17 @@ function blobToDataURL(blob) {
   });
 }
 
+// Copy EXACTO de los avisos de "cambiar contraseña" en ESCRITORIO (idéntico al
+// que tenía el handler viejo). El hook usePasswordChange sólo emite el código;
+// el texto lo decide esta pantalla, para no cambiar ni una coma de lo que ve
+// el usuario. MobileNav tiene su propio mapa con SU copy.
+const HEADER_PW_ERRORS = {
+  empty: { title: 'Campo requerido', message: 'Por favor, ingresá la nueva contraseña.' },
+  short: { title: 'Contraseña muy corta', message: 'La contraseña debe tener al menos 6 caracteres.' },
+  mismatch: { title: 'Contraseñas no coinciden', message: 'Las contraseñas ingresadas no son iguales. Por favor, verificá.' },
+  failed: { title: 'Error', message: 'No se pudo cambiar la contraseña. Por favor, intentá de nuevo.' },
+};
+
 export const Header = () => {
   const location = useLocation();
   const navigate = useNavigate();
@@ -50,13 +62,10 @@ export const Header = () => {
   const [userPhoto, setUserPhoto] = useState(null);
   const cropperRef = useRef(null);
   const [isSaving, setIsSaving] = useState(false);
-  // Password change state
+  // Password change state — solo el flag de "mostrar el formulario" es local;
+  // el estado de los campos + la validación + updateUser viven en el hook
+  // compartido usePasswordChange (ver más abajo, tras los modales de éxito/error).
   const [showPasswordChange, setShowPasswordChange] = useState(false);
-  const [newPassword, setNewPassword] = useState('');
-  const [confirmPassword, setConfirmPassword] = useState('');
-  const [showNewPassword, setShowNewPassword] = useState(false);
-  const [showConfirmPassword, setShowConfirmPassword] = useState(false);
-  const [passwordSaving, setPasswordSaving] = useState(false);
   const [isSyncing, setIsSyncing] = useState(false);
   const [showNotifications, setShowNotifications] = useState(false);
 
@@ -69,6 +78,31 @@ export const Header = () => {
   // Custom success/error modals - replaces browser alerts
   const [successModal, setSuccessModal] = useState({ isOpen: false, title: '', message: '' });
   const [errorModal, setErrorModal] = useState({ isOpen: false, title: '', message: '' });
+
+  // Cambiar contraseña: estado + validación + updateUser viven en el hook
+  // compartido usePasswordChange (antes duplicado verbatim con MobileNav). El
+  // hook emite un CÓDIGO de error y ESTA pantalla lo mapea a su copy exacto —
+  // así los avisos de escritorio quedan idénticos a como estaban. Se aliasan los
+  // nombres (showNew→showNewPassword, saving→passwordSaving, submit→handleChangePassword…)
+  // para no tocar el formulario JSX de abajo.
+  const {
+    newPassword, setNewPassword,
+    confirmPassword, setConfirmPassword,
+    showNew: showNewPassword, setShowNew: setShowNewPassword,
+    showConfirm: showConfirmPassword, setShowConfirm: setShowConfirmPassword,
+    saving: passwordSaving, submit: handleChangePassword,
+  } = usePasswordChange({
+    onError: (code) => setErrorModal({ isOpen: true, ...HEADER_PW_ERRORS[code] }),
+    onSuccess: () => {
+      setShowPasswordChange(false);
+      setSuccessModal({
+        isOpen: true,
+        title: '¡Contraseña actualizada!',
+        message: 'Tu contraseña se ha cambiado correctamente.',
+      });
+    },
+  });
+
   const fileInputRef = useRef(null);
   const title = titleForPath(location.pathname);
 
@@ -205,55 +239,6 @@ export const Header = () => {
   };
 
   // Change own password
-  const handleChangePassword = async () => {
-    if (!newPassword.trim()) {
-      setErrorModal({
-        isOpen: true,
-        title: 'Campo requerido',
-        message: 'Por favor, ingresá la nueva contraseña.'
-      });
-      return;
-    }
-    if (newPassword.length < 6) {
-      setErrorModal({
-        isOpen: true,
-        title: 'Contraseña muy corta',
-        message: 'La contraseña debe tener al menos 6 caracteres.'
-      });
-      return;
-    }
-    if (newPassword !== confirmPassword) {
-      setErrorModal({
-        isOpen: true,
-        title: 'Contraseñas no coinciden',
-        message: 'Las contraseñas ingresadas no son iguales. Por favor, verificá.'
-      });
-      return;
-    }
-    setPasswordSaving(true);
-    try {
-      const { error } = await supabase.auth.updateUser({ password: newPassword });
-      if (error) throw error;
-      setShowPasswordChange(false);
-      setNewPassword('');
-      setConfirmPassword('');
-      setSuccessModal({
-        isOpen: true,
-        title: '¡Contraseña actualizada!',
-        message: 'Tu contraseña se ha cambiado correctamente.'
-      });
-    } catch (err) {
-      console.error('Error changing password:', err);
-      setErrorModal({
-        isOpen: true,
-        title: 'Error',
-        message: 'No se pudo cambiar la contraseña. Por favor, intentá de nuevo.'
-      });
-    } finally {
-      setPasswordSaving(false);
-    }
-  };
-
   const handleCameraClick = () => {
     if (userPhoto) {
       setShowPhotoOptions(true);
