@@ -29,6 +29,26 @@ module.exports = defineConfig({
   base: '/',
   build: {
     outDir: 'dist',
-    assetsDir: 'assets'
+    assetsDir: 'assets',
+    rollupOptions: {
+      output: {
+        // Separar las librerías SIEMPRE-cargadas y ESTABLES en chunks propios con
+        // caché larga. Antes iban dentro del bundle de entrada, que cambia de hash
+        // en CADA publicación → el teléfono re-bajaba ~600 KB aunque las librerías no
+        // hubieran cambiado (la lentitud del "Cargando AdorAPP…" que reportó Paul).
+        // Ahora, tras una publicación que sólo toca código de la app, estos chunks
+        // conservan su hash y se reusan de la caché.
+        //
+        // Sólo se agrupan libs siempre-cargadas: las perezosas (jspdf, docx,
+        // html2canvas — cargadas con import() dinámico) NO se tocan, así vite las sigue
+        // poniendo en su propio chunk que se baja recién al usarlas.
+        manualChunks(id) {
+          if (!id.includes('node_modules')) return;
+          if (/node_modules\/(react|react-dom|react-router|react-router-dom|scheduler|zustand)\//.test(id)) return 'react-vendor';
+          if (id.includes('node_modules/@supabase')) return 'supabase';
+          if (/node_modules\/(lucide-react|@phosphor-icons)\//.test(id)) return 'icons';
+        }
+      }
+    }
   }
 })
