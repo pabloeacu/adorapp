@@ -1,6 +1,7 @@
 import { create } from 'zustand';
 import { supabase } from '../lib/supabase';
 import { useAppStore } from './appStore';
+import { invalidateRefresh } from '../lib/refreshThrottle';
 
 export const useAuthStore = create((set, get) => ({
   user: null,
@@ -221,6 +222,9 @@ export const useAuthStore = create((set, get) => ({
 
       // App caches (members/bands/songs/orders) — handled inside the store reset.
       useAppStore.getState().reset();
+      // El store quedó vacío: la próxima sesión tiene que volver a cargar todo
+      // aunque entre dentro de la ventana de 15 s del auto-refresco.
+      invalidateRefresh();
 
       set({ user: null, profile: null, loading: false, error: null });
     } catch (err) {

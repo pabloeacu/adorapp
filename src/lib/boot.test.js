@@ -25,13 +25,17 @@ describe('runBoot', () => {
     expect(bootProfile).toHaveBeenCalledWith('u1');
   });
 
-  it('sin sesión: no pide ficha, igual carga las tablas y termina', async () => {
+  it('sin sesión: no pide NADA (ni ficha ni tablas) y termina', async () => {
     const bootProfile = vi.fn();
     const initializeApp = vi.fn(async () => {});
-    const user = await runBoot({ restoreSession: async () => null, bootProfile, initializeApp });
+    const onSession = vi.fn();
+    const user = await runBoot({ restoreSession: async () => null, bootProfile, initializeApp, onSession });
     expect(user).toBeNull();
     expect(bootProfile).not.toHaveBeenCalled();
-    expect(initializeApp).toHaveBeenCalledTimes(1);
+    // Landmine #62(a): sin credencial no se piden datos (la base los deniega y
+    // una respuesta de anónimo no debe llegar al store ni a la caché).
+    expect(initializeApp).not.toHaveBeenCalled();
+    expect(onSession).toHaveBeenCalledWith(null);
   });
 
   it('si la ficha falla, el arranque igual espera a las tablas y propaga el error', async () => {
