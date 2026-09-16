@@ -19,10 +19,6 @@ import {
   FileText,
   Send,
   Bell,
-  Music,
-  Heart,
-  Sunset,
-  Cake,
   Search,
   Menu,
   Lock,
@@ -43,6 +39,7 @@ import { formatDateLocal } from '../../lib/dates';
 import { PhotoCropper } from '../profile/PhotoCropper';
 import { Modal } from '../ui/Modal';
 import { Button } from '../ui/Button';
+import { NotifIconBadge } from '../../lib/notificationVisual';
 
 
 // The mobile bottom strip is split in two:
@@ -1189,27 +1186,7 @@ export const MobileNav = () => {
                           <X size={16} />
                         </button>
                         <div className="flex items-start gap-3 pr-8">
-                          <div className={`p-2 rounded-xl ${
-                            notif.type === 'song' ? 'bg-purple-500/20' :
-                            notif.type === 'band' ? 'bg-blue-500/20' :
-                            notif.type === 'member' ? 'bg-green-500/20' :
-                            notif.type === 'order' ? 'bg-emerald-500/20' :
-                            notif.type === 'request' ? 'bg-yellow-500/20' :
-                            notif.type === 'devotional' ? 'bg-amber-500/20' :
-                            notif.type === 'reflection' ? 'bg-indigo-500/20' :
-                            notif.type === 'communication' ? 'bg-blue-500/20' :
-                            'bg-blue-500/20'
-                          }`}>
-                            {notif.icon === 'music' && <Music size={18} className="text-purple-400" />}
-                            {notif.icon === 'users' && <Users2 size={18} className="text-blue-400" />}
-                            {notif.icon === 'heart' && <Heart size={18} className="text-green-400" />}
-                            {notif.icon === 'file' && <FileText size={18} className="text-yellow-400" />}
-                            {notif.icon === 'cross' && <Cross size={18} className="text-amber-400" />}
-                            {notif.icon === 'sunset' && <Sunset size={18} className="text-indigo-400" />}
-                            {notif.icon === 'calendar' && <Calendar size={18} className="text-emerald-400" />}
-                            {notif.icon === 'cake' && <Cake size={18} className="text-pink-400" />}
-                            {notif.icon === 'send' && <Send size={18} className="text-blue-400" />}
-                          </div>
+                          <NotifIconBadge type={notif.type} icon={notif.icon} radiusClass="rounded-xl" fallbackBg="bg-blue-500/20" />
                           <div className="flex-1">
                             {notif.type === 'communication' ? (
                               <>
