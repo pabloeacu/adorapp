@@ -47,7 +47,7 @@ const AreaBanner = ({ area, order, state }) => {
 
   const band = order.bandId ? getBandById?.(order.bandId) : null;
   const hasSchema = !!getServiceSchema?.(order.id);
-  const fecha = parseLocalDate(order.date).toLocaleDateString('es-ES', {
+  const fecha = parseLocalDate(order.date).toLocaleDateString('es-AR', {
     weekday: 'long', day: 'numeric', month: 'long',
   });
   const isEnsambleState = state === 'ensamble' || state === 'ensamble_suspendido';

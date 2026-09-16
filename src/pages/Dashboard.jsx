@@ -324,7 +324,7 @@ export const Dashboard = () => {
                     <CalendarDots size={24} weight="duotone" className="text-gold-100" />
                   </div>
                   <div className="flex-1 min-w-0">
-                    <p className="font-medium">{parseLocalDate(order.date).toLocaleDateString('es-ES', { weekday: 'short', month: 'short', day: 'numeric' })}</p>
+                    <p className="font-medium">{parseLocalDate(order.date).toLocaleDateString('es-AR', { weekday: 'short', month: 'short', day: 'numeric' })}</p>
                     <p className="text-sm text-gray-400">{order.time} - {band?.name}</p>
                     {chip && (
                       <span className="mt-1 inline-block" data-testid="upcoming-lineup-chip">

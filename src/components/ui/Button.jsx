@@ -9,7 +9,10 @@ export const Button = ({
   iconPosition = 'left',
   ...props
 }) => {
-  const baseStyles = 'font-medium rounded-lg transition-all duration-200 flex items-center justify-center gap-2';
+  // focus-visible: anillo dorado SOLO al navegar con teclado (no al click con mouse),
+  // para que el foco sea visible en toda la app (accesibilidad). Los botones que ya
+  // tenían su propio focus:ring simplemente lo refuerzan.
+  const baseStyles = 'font-medium rounded-lg transition-all duration-200 flex items-center justify-center gap-2 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-gold-500/60';
 
   const variants = {
     primary: 'bg-gold-gradient text-black font-semibold hover:brightness-110 active:scale-95 shadow-[0_2px_14px_-3px_rgba(212,175,55,0.45)]',

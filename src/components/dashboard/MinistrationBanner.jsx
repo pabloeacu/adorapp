@@ -32,7 +32,7 @@ const errorCopy = (msg) => {
 };
 
 const fmtDate = (d) => {
-  try { return new Date(`${d}T00:00:00`).toLocaleDateString('es-ES', { weekday: 'long', day: 'numeric', month: 'long' }); } catch { return ''; }
+  try { return new Date(`${d}T00:00:00`).toLocaleDateString('es-AR', { weekday: 'long', day: 'numeric', month: 'long' }); } catch { return ''; }
 };
 
 export const MinistrationBanner = ({ member, role }) => {

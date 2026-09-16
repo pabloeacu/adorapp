@@ -853,7 +853,7 @@ export const Repertorio = () => {
 
               {song.lastUsed && (
                 <p className="text-xs text-gray-500 mb-3">
-                  Última vez: {new Date(song.lastUsed).toLocaleDateString('es-ES')}
+                  Última vez: {new Date(song.lastUsed).toLocaleDateString('es-AR')}
                 </p>
               )}
 
@@ -963,7 +963,7 @@ export const Repertorio = () => {
                       </Badge>
                     </td>
                     <td className="px-4 py-3 text-sm text-gray-500">
-                      {song.lastUsed ? new Date(song.lastUsed).toLocaleDateString('es-ES') : 'Nunca'}
+                      {song.lastUsed ? new Date(song.lastUsed).toLocaleDateString('es-AR') : 'Nunca'}
                     </td>
                     <td className="px-4 py-3">
                       <div className="flex items-center justify-end gap-1">
