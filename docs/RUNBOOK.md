@@ -107,6 +107,90 @@ Supabase Pro tiene **Point-in-Time Recovery** (PITR) con retención de 7 días.
 
 ---
 
+## Si se traba el correo (el "latido" que envía TODOS los mails)
+
+**Qué es**: NINGÚN correo se manda en el acto. Se ENCOLA en `email_queue` y un cron
+lo procesa. La cadena es: SQL → `encolar_email(...)` → fila en `email_queue` → cron
+**`send-emails-worker`** (jobid 14, corre cada minuto) → `trigger_send_emails()` → Edge
+Function **`send-emails`** → Gmail. Si esa cadena se traba, se frena TODO: aprobaciones
+de registro, recordatorios de ensamble, feedback, comunicaciones, alertas.
+
+**Síntoma**: no llegan correos que deberían; o el monitor avisa "correo(s) atascados sin
+enviarse (>1 h)".
+
+1. Ver cuántos hay encolados y fallados (SQL Editor de Supabase):
+   ```sql
+   SELECT status, count(*), min(created_at) AS mas_viejo
+   FROM public.email_queue GROUP BY status ORDER BY status;
+   ```
+   - Muchos `pending` viejos → el worker no está corriendo o la EF falla.
+   - Muchos `failed` → problema de credenciales/cupo de Gmail (ver paso 4).
+2. Ver el cron y su última corrida:
+   ```sql
+   SELECT jobid, schedule, active FROM cron.job WHERE jobname='send-emails-worker';
+   SELECT status, return_message, start_time
+   FROM cron.job_run_details
+   WHERE jobid=(SELECT jobid FROM cron.job WHERE jobname='send-emails-worker')
+   ORDER BY start_time DESC LIMIT 10;
+   ```
+   - Si `active=false`: re-activar con `SELECT cron.alter_job((SELECT jobid FROM cron.job WHERE jobname='send-emails-worker'), active:=true);`
+   - Si el job no existe: re-crear `SELECT cron.schedule('send-emails-worker','* * * * *',$$select public.trigger_send_emails()$$);`
+3. Empujar la cola a mano una vez (seguro; hace lo mismo que el cron):
+   ```sql
+   SELECT public.trigger_send_emails();
+   ```
+   Volvé a mirar `email_queue`: los `pending` deberían bajar. Si no, el problema está en la EF.
+4. Si la EF `send-emails` falla (credenciales/cupo de Gmail): revisar sus logs en
+   Supabase → Edge Functions → `send-emails` → Logs. La config de Gmail la lee
+   `get_email_config()`; si Gmail rechaza (cupo diario, token vencido), los correos
+   quedan `failed`. **No reintentar en loop**: corregir la credencial y recién ahí
+   re-encolar. En una QA NUNCA dispares correos reales a los 8 usuarios: pausá el
+   worker (`active:=false`) antes de probar cualquier flujo de correo.
+
+---
+
+## Cuando salta una alerta del monitor (⚠️ "Alerta del sistema AdorAPP")
+
+**Qué es**: el cron **`check_system_health()`** (jobid 18, cada 15 min) vigila 4 señales
+y, ante una anomalía real, te avisa por **campanita + push + correo** (plantilla
+`sistema-alerta`). Está en silencio cuando todo está sano. El correo dice cuál de las 4
+señales se disparó. Qué hacer según cuál sea:
+
+1. **"correo(s) atascados sin enviarse (>1 h)"** → seguí la sección **"Si se traba el
+   correo"** de arriba. Es lo más urgente (frena todo el correo).
+2. **"correo(s) fallaron"** → algo rebotó en Gmail. Mirá los `failed`:
+   ```sql
+   SELECT to_email, template_slug, ultimo_error, created_at FROM public.email_queue
+   WHERE status='failed' AND created_at > now()-interval '24 hours' ORDER BY created_at DESC;
+   ```
+   Suele ser un correo mal escrito de un miembro o un cupo de Gmail. Si es un solo
+   destinatario, no es grave; si son muchos, revisá credenciales (sección anterior).
+3. **"corrida(s) de tareas automáticas fallaron"** → un cron falló. Cuál y por qué:
+   ```sql
+   SELECT j.jobname, d.return_message, d.start_time
+   FROM cron.job_run_details d JOIN cron.job j ON j.jobid=d.jobid
+   WHERE d.status='failed' AND d.start_time > now()-interval '24 hours'
+   ORDER BY d.start_time DESC;
+   ```
+   El `return_message` dice el error. Muchos crons son idempotentes: se pueden re-correr
+   a mano (p. ej. `SELECT public.send_daily_reflection_notification();`).
+4. **"error(es) nuevos serios"** → errores del cliente/servidor sin resolver:
+   ```sql
+   SELECT message, severity, context->>'kind' AS kind, occurred_at
+   FROM public.error_log
+   WHERE severity IN ('error','fatal') AND COALESCE(resolved,false)=false
+     AND occurred_at > now()-interval '24 hours' ORDER BY occurred_at DESC;
+   ```
+   Cuando lo resolviste (o si es ruido), marcalo: `UPDATE public.error_log SET resolved=true WHERE id=<id>;`
+
+> **Nota**: hoy la alerta te manda a la base. Está planificado un panel de **"Salud del
+> sistema"** dentro de la app (solo lectura, solo pastor) para no depender del SQL Editor.
+> Y para QA: **nunca** llames a `check_system_health()` "en vivo" — puede mandar un correo
+> real; probalo siempre dentro de una transacción con `RAISE` que revierta y el trigger
+> `push_on_notification_insert` deshabilitado (landmine #84).
+
+---
+
 ## Despliegue manual (escape hatch)
 
 **Cuándo**: GitHub Actions caído y necesitás pushear un fix.
