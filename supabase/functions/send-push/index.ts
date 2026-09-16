@@ -221,8 +221,17 @@ Deno.serve(async (req) => {
     const { data: subs, error: sErr } = await q;
     if (sErr) return jres({ error: sErr.message }, 500);
 
+    // Un miembro DESACTIVADO no debe recibir NINGÚN push — ni siquiera los globales
+    // (to:'all') — aunque la suscripción de su dispositivo siga registrada (no puede
+    // entrar, pero el push llega igual al aparato). Filtramos por members.active.
+    // (Reporte: un pastor inactivo seguía recibiendo todas las notificaciones.)
+    const { data: activeRows, error: aErr } = await sb.from('members').select('id').eq('active', true);
+    if (aErr) return jres({ error: aErr.message }, 500);
+    const activeIds = new Set((activeRows || []).map((m: { id: string }) => m.id));
+    const subsActive = (subs || []).filter((s: { member_id: string }) => activeIds.has(s.member_id));
+
     const results = await Promise.all(
-      (subs || []).map(async (s: { id: string; endpoint: string; p256dh: string; auth: string }) => {
+      subsActive.map(async (s: { id: string; endpoint: string; p256dh: string; auth: string }) => {
         try {
           const r = await sendOne(
             { endpoint: s.endpoint, p256dh: s.p256dh, auth: s.auth },
