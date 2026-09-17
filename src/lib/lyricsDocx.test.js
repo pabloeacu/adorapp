@@ -9,9 +9,11 @@ import { describe, it, expect, beforeEach, vi } from 'vitest';
 // Registro de los Paragraph creados (sus opts), para inspeccionar la estructura.
 const paras = vi.hoisted(() => ({ list: [] }));
 vi.mock('docx', () => {
-  const Paragraph = vi.fn((opts) => { paras.list.push(opts); return { __p: opts }; });
-  const TextRun = vi.fn((opts) => (typeof opts === 'string' ? { text: opts } : opts));
-  const Document = vi.fn((opts) => ({ __doc: opts }));
+  // El módulo hace `new Paragraph(...)`, así que deben ser funciones new-ables
+  // (una arrow / vi.fn(arrow) NO es constructor). Registramos vía el array `paras`.
+  function Paragraph(opts) { paras.list.push(opts); return { __p: opts }; }
+  function TextRun(opts) { return typeof opts === 'string' ? { text: opts } : opts; }
+  function Document(opts) { return { __doc: opts }; }
   const Packer = { toBlob: vi.fn(async () => ({ size: 1, type: 'application/vnd' })) };
   const HeadingLevel = { TITLE: 'Title', HEADING_1: 'Heading1' };
   return { Document, Packer, Paragraph, TextRun, HeadingLevel };
