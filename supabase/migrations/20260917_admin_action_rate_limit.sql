@@ -8,6 +8,14 @@
 -- Diseño FAIL-OPEN: si el chequeo de rate-limit falla (hipo de la base), la EF
 -- SIGUE (nunca bloquea a un pastor legítimo por un bug del limitador). Las EFs
 -- llaman admin_action_gate() como service_role tras autenticar.
+--
+-- LIMITACIÓN CONOCIDA (auditoría adversarial, hallazgo low): el freno es POR ACTOR.
+-- Una cuenta de pastor comprometida puede usar admin-create-member para crear
+-- nuevos pastores (cada uno con su propio cupo fresco) y así amplificar el daño.
+-- Es INHERENTE al privilegio de crear pastores (un pastor comprometido ya es
+-- catastrófico); la defensa real ante eso es la DETECCIÓN + respuesta, no el
+-- rate-limit. Mejora ofrecida a Paul (no implementada acá): avisar a los pastores
+-- cuando se crea una ficha con role='pastor'.
 
 CREATE TABLE IF NOT EXISTS public.admin_action_events (
   id      bigint GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
@@ -52,6 +60,14 @@ BEGIN
     -- Sin identidad/acción no podemos limitar: fail-open (la EF ya autenticó).
     RETURN true;
   END IF;
+
+  -- Serializa las llamadas CONCURRENTES del MISMO actor (lock por-actor, NO
+  -- por-acción, así también cubre el backstop total). Sin esto, N pedidos en
+  -- paralelo leen el count ANTES de que cualquiera inserte (TOCTOU) y todos
+  -- pasan → el tope se supera en ráfaga (justo el abuso scripteado que el freno
+  -- busca frenar). El lock es de transacción (cada rpc() es su propia tx, dura
+  -- microsegundos) y por-actor → cero contención entre pastores legítimos.
+  PERFORM pg_advisory_xact_lock(hashtext('admin_action_gate:' || p_actor::text)::bigint);
 
   SELECT count(*) INTO v_action_count FROM public.admin_action_events
     WHERE actor = p_actor AND action = p_action AND at > v_since;
