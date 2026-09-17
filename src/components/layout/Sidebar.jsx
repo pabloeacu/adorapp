@@ -8,7 +8,8 @@ import {
   UserCircle,
   LogOut,
   FileText,
-  Send
+  Send,
+  Activity
 } from 'lucide-react';
 import { useAuthStore } from '../../stores/authStore';
 import { useCurrentRole } from '../../hooks/useCurrentMember';
@@ -33,7 +34,8 @@ export const Sidebar = () => {
     ...(canSeeMembers ? [{ path: '/miembros', icon: UserCircle, label: 'Miembros' }] : []),
     ...(isPastor ? [
       { path: '/solicitudes', icon: FileText, label: 'Solicitudes' },
-      { path: '/comunicaciones', icon: Send, label: 'Comunicaciones' }
+      { path: '/comunicaciones', icon: Send, label: 'Comunicaciones' },
+      { path: '/salud', icon: Activity, label: 'Salud del sistema' }
     ] : []),
   ];
 
