@@ -33,6 +33,7 @@ const Solicitudes = lazyPage(() => import('./pages/Solicitudes'), 'Solicitudes')
 const Comunicaciones = lazyPage(() => import('./pages/Comunicaciones'), 'Comunicaciones');
 const Practica = lazyPage(() => import('./pages/Practica'), 'Practica');
 const IniciarServicio = lazyPage(() => import('./pages/IniciarServicio'), 'IniciarServicio');
+const SaludSistema = lazyPage(() => import('./pages/SaludSistema'), 'SaludSistema');
 
 const RouteFallback = () => <PageLoader />;
 
@@ -43,6 +44,15 @@ const RouteFallback = () => <PageLoader />;
 const MembersOnlyRoles = ({ children }) => {
   const role = useCurrentRole();
   if (role === 'member') return <Navigate to="/" replace />;
+  return children;
+};
+
+// Guards a route so only pastors pass through (redirect everyone else home).
+// Used for /salud (system health): defense-in-depth alongside the server-side
+// is_pastor() gate on the RPC — a non-pastor typing the URL lands on Inicio.
+const PastorOnly = ({ children }) => {
+  const role = useCurrentRole();
+  if (role !== 'pastor') return <Navigate to="/" replace />;
   return children;
 };
 
@@ -168,6 +178,7 @@ function App() {
               <Route path="miembros" element={<MembersOnlyRoles><Miembros /></MembersOnlyRoles>} />
               <Route path="solicitudes" element={<Solicitudes />} />
               <Route path="comunicaciones" element={<Comunicaciones />} />
+              <Route path="salud" element={<PastorOnly><SaludSistema /></PastorOnly>} />
             </Route>
           </Routes>
         </Suspense>

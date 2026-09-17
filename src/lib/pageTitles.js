@@ -10,6 +10,7 @@ export const pageTitles = {
   '/miembros': 'Miembros',
   '/solicitudes': 'Solicitudes',
   '/comunicaciones': 'Comunicaciones',
+  '/salud': 'Salud del sistema',
 };
 
 export const titleForPath = (pathname) => {

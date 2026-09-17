@@ -885,6 +885,16 @@ export const useAppStore = create((set, get) => ({
     }
   },
 
+  // ---------- Salud del sistema (panel solo-pastor) ----------
+  // Foto de solo-lectura del estado del sistema (correos, tareas automáticas, sitio,
+  // errores). Va por la RPC system_health_snapshot (gate is_pastor server-side; NO
+  // escribe nada). Devuelve el jsonb o lanza (la pantalla muestra el error).
+  getSystemHealth: async () => {
+    const { data, error } = await supabase.rpc('system_health_snapshot');
+    if (error) throw error;
+    return data;
+  },
+
   // Relee UN orden desde la base y lo funde en el store (best-effort, sin throw).
   refetchOrder: async (id) => {
     try {

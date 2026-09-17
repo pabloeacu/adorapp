@@ -28,6 +28,7 @@ import {
   Shield,
   Trash2,
   RefreshCw,
+  Activity,
 } from 'lucide-react';
 import { useAuthStore } from '../../stores/authStore';
 import { supabase } from '../../lib/supabase';
@@ -58,6 +59,7 @@ const SECONDARY_NAV = [
   { path: '/miembros', icon: UserCircle, label: 'Miembros', roles: ['pastor', 'leader'] },
   { path: '/solicitudes', icon: FileText, label: 'Solicitudes', roles: ['pastor'] },
   { path: '/comunicaciones', icon: Send, label: 'Comunicaciones', roles: ['pastor'] },
+  { path: '/salud', icon: Activity, label: 'Salud del sistema', roles: ['pastor'] },
 ];
 
 // pageTitles lives in src/lib/pageTitles.js — single source of truth shared
