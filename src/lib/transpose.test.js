@@ -1,19 +1,11 @@
-import { describe, it, expect, vi } from 'vitest';
-
-// appStore imports supabase at module load; stub it so the import graph
-// resolves under jsdom (same pattern as appStore.realtime.test.js).
-vi.mock('../lib/supabase', () => ({
-  supabase: {
-    from: () => ({ select: () => ({ order: () => Promise.resolve({ data: [], error: null }) }) }),
-    auth: { getSession: () => Promise.resolve({ data: { session: null } }) },
-  },
-}));
-
-import { transposeSongStructure } from './appStore';
+import { describe, it, expect } from 'vitest';
+import { transposeSongStructure } from './transpose';
 
 // Locks in the chord-transposition engine used by the song viewer, the
 // Repertorio PDF export and the Órdenes "Imprimir" PDF. Regressions here
 // silently produce wrong chord charts, so keep this green.
+// (Motor extraído de appStore.js a src/lib/transpose.js — este test ahora apunta
+//  directo al módulo puro, sin necesidad de mockear supabase.)
 
 const struct = (chords) => [{ type: 'verse', label: 'V', chords, content: '' }];
 const chordsOf = (s) => s[0].chords;
