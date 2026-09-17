@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeEach, vi } from 'vitest';
+import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 
 // Export de letras a Word (.docx) para Multimedia. Verificamos la ESTRUCTURA que
 // se arma (título, numeración por canción SALTEANDO las que no están, etiquetas
@@ -26,6 +26,9 @@ const textOf = (p) => p.text ?? (Array.isArray(p.children) ? p.children.map((c) 
 const texts = () => paras.list.map(textOf);
 
 let capturedAnchor;
+// Se captura UNA sola vez, antes de cualquier spy: si se bindea dentro de
+// beforeEach, en el 2do test bindea el spy anterior → recursión infinita.
+const realCreateElement = document.createElement.bind(document);
 
 beforeEach(() => {
   paras.list.length = 0;
@@ -33,13 +36,14 @@ beforeEach(() => {
   // Stubs de descarga que jsdom no implementa.
   globalThis.URL.createObjectURL = vi.fn(() => 'blob:fake');
   globalThis.URL.revokeObjectURL = vi.fn();
-  const realCreate = document.createElement.bind(document);
   vi.spyOn(document, 'createElement').mockImplementation((tag) => {
-    const el = realCreate(tag);
+    const el = realCreateElement(tag);
     if (tag === 'a') { el.click = vi.fn(); capturedAnchor = el; }
     return el;
   });
 });
+
+afterEach(() => { vi.restoreAllMocks(); });
 
 const songs = {
   s1: { title: 'Océanos', structure: [
