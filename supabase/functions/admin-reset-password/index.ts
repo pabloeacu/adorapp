@@ -38,6 +38,13 @@ Deno.serve(async (req: Request) => {
   if ("error" in auth) return auth.error;
   const { admin } = auth;
 
+  // Freno de velocidad (defensa en profundidad, FAIL-OPEN): acota el daño si una
+  // cuenta de pastor se ve comprometida; la seguridad real es el gate de pastor.
+  try {
+    const { data: rlOk } = await admin.rpc("admin_action_gate", { p_actor: auth.user.id, p_action: "reset-password" });
+    if (rlOk === false) return json({ error: "Demasiadas operaciones seguidas. Esperá un momento y probá de nuevo." }, 429);
+  } catch (_) { /* fail-open: nunca bloquear a un pastor legítimo por un hipo del limitador */ }
+
   let body: any;
   try { body = await req.json(); } catch { return json({ error: "Invalid JSON" }, 400); }
 
