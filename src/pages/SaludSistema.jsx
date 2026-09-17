@@ -100,9 +100,11 @@ export const SaludSistema = () => {
       if (!mounted.current) return;
       setError(true);
     } finally {
-      if (!mounted.current) return;
-      setLoading(false);
-      setRefreshing(false);
+      // Sin `return` dentro de finally (no-unsafe-finally): guardamos con un if.
+      if (mounted.current) {
+        setLoading(false);
+        setRefreshing(false);
+      }
     }
   }, [getSystemHealth]);
 
