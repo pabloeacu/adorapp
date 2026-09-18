@@ -5,6 +5,7 @@ import { MobileNav } from './MobileNav';
 import { CommandPalette } from '../CommandPalette';
 import { OnboardingWizard } from '../OnboardingWizard';
 import { UpdateBanner } from '../UpdateBanner';
+import { OfflineBanner } from '../OfflineBanner';
 import { EngagementNudge } from '../EngagementNudge';
 import { Navigate, Outlet } from 'react-router-dom';
 import { useAuthStore } from '../../stores/authStore';
@@ -76,6 +77,9 @@ export const Layout = () => {
 
       {/* New-build available toast (driven by the service worker) */}
       <UpdateBanner />
+
+      {/* Aviso global "Sin conexión" (aparece/desaparece solo) */}
+      <OfflineBanner />
 
       {/* Welcome wizard for newly-approved members */}
       {currentMember && currentMember.onboarded === false && !wizardDismissed && (
