@@ -40,9 +40,13 @@
   <!-- PWA Manifest -->
   <link rel="manifest" href="/manifest.json">
 
-  <link rel="preconnect" href="https://fonts.googleapis.com">
-  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Caveat:wght@600;700&display=swap" rel="stylesheet">
+  <!-- Preconexión al servidor de datos: abre el handshake TLS con Supabase durante el
+       parseo del HTML, antes de que el arranque dispare sus primeros pedidos. -->
+  <link rel="preconnect" href="https://gvsoexomzfaimagnaqzm.supabase.co" crossorigin>
+  <!-- Fuentes self-hosted (ver @font-face en src/index.css): ya NO bloqueamos el primer
+       pintado con Google Fonts. Precargamos Inter (la del cuerpo, en el camino crítico);
+       Caveat (solo anotaciones) carga on-demand. -->
+  <link rel="preload" href="/fonts/inter-variable.woff2" as="font" type="font/woff2" crossorigin>
 
   <!-- Structured data: who runs the platform. Helps social/search platforms surface the right entity. -->
   <script type="application/ld+json">
