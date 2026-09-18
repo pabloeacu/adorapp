@@ -49,21 +49,29 @@ export const isMobileDevice = () => {
   } catch { return false; }
 };
 
+// Fallback en memoria del reloj para cuando localStorage no está disponible (modo
+// privado / cuota llena) — justo el público del cartel de instalar. No sobrevive a
+// una recarga (imposible sin storage), pero degrada con gracia: dentro de la vida
+// del módulo el reloj se respeta igual, así el cartel no se repite en cada lectura.
+let memState = { lastShownAt: 0, shownCount: 0 };
+
 // Estado del reloj (por dispositivo). Sin datos = nunca se mostró.
 export const readNudgeState = () => {
   try {
     const raw = JSON.parse(localStorage.getItem(KEY) || 'null');
-    return { lastShownAt: Number(raw?.lastShownAt) || 0, shownCount: Number(raw?.shownCount) || 0 };
-  } catch { return { lastShownAt: 0, shownCount: 0 }; }
+    if (raw) return { lastShownAt: Number(raw.lastShownAt) || 0, shownCount: Number(raw.shownCount) || 0 };
+  } catch { /* sin storage → cae al fallback en memoria */ }
+  return { ...memState };
 };
 
 // Registra que se mostró un cartel: sella el reloj (para los próximos 10 días) y
 // avanza el contador (para rotar A ↔ B la próxima vez).
 export const recordNudgeShown = (now) => {
+  const next = { lastShownAt: now, shownCount: (readNudgeState().shownCount || 0) + 1 };
+  memState = next; // siempre queda el reloj en memoria (fallback si el storage falla)
   try {
-    const s = readNudgeState();
-    localStorage.setItem(KEY, JSON.stringify({ lastShownAt: now, shownCount: (s.shownCount || 0) + 1 }));
-  } catch { /* sin storage: no pasa nada, se re-evalúa la próxima */ }
+    localStorage.setItem(KEY, JSON.stringify(next));
+  } catch { /* sin storage: queda el fallback en memoria, se re-evalúa la próxima carga */ }
 };
 
 /**

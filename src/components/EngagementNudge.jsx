@@ -18,6 +18,14 @@ import {
 
 // Una sola aparición por apertura de la app (no en cada cambio de sección).
 let SHOWN_THIS_SESSION = false;
+// Miembros que en ESTA sesión arrancaron sin onboarding (recién aprobados). Al
+// terminar el asistente de bienvenida su ficha pasa a onboarded:true en vivo
+// (refreshProfile + reloadApp recargan el store SIN refrescar la página), lo que
+// re-dispara este efecto con SHOWN_THIS_SESSION todavía en false. Sin esta memoria
+// el cartel de instalar aparecería pegado al paso 4/5 del asistente (que YA cubre
+// instalar/activar) — justo lo que el diseño quería evitar. Se re-evalúa limpio en
+// la próxima apertura (no se sella el reloj de 10 días, así que no se pierde).
+const ONBOARDING_THIS_SESSION = new Set();
 
 export const EngagementNudge = ({ member }) => {
   const [nudge, setNudge] = useState(null); // { type, variant, denied } | null
@@ -28,7 +36,13 @@ export const EngagementNudge = ({ member }) => {
   useEffect(() => {
     const memberId = member?.id;
     if (!memberId) return;
-    if (member?.onboarded === false) return; // los nuevos ven el asistente de bienvenida
+    if (member?.onboarded === false) {
+      // Los nuevos ven el asistente de bienvenida. Marcamos que arrancaron sin
+      // onboarding para no encimarles el cartel cuando termine (ver nota arriba).
+      ONBOARDING_THIS_SESSION.add(memberId);
+      return;
+    }
+    if (ONBOARDING_THIS_SESSION.has(memberId)) return; // recién completó el asistente en esta sesión
     if (SHOWN_THIS_SESSION) return;
 
     let cancelled = false;
@@ -36,6 +50,7 @@ export const EngagementNudge = ({ member }) => {
     const t = setTimeout(async () => {
       try {
         const isMobile = isMobileDevice();
+        if (!isMobile) return; // solo teléfono: evita el sondeo async del service worker en la compu
         const installed = isInstalled();
         const supported = isPushSupported();
         const perm = supported ? notificationPermission() : 'granted';

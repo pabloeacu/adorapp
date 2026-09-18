@@ -1,5 +1,8 @@
-import { describe, it, expect } from 'vitest';
-import { decideNudge, copyForNudge, NUDGE_COPY, NOTIF_BLOCKED_COPY, NUDGE_CADENCE_MS } from './engagementNudge';
+import { describe, it, expect, vi, afterEach } from 'vitest';
+import {
+  decideNudge, copyForNudge, readNudgeState, recordNudgeShown,
+  NUDGE_COPY, NOTIF_BLOCKED_COPY, NUDGE_CADENCE_MS,
+} from './engagementNudge';
 
 const NOW = 1_000_000_000_000;
 const base = { isMobile: true, isInstalled: false, notifEnabled: false, notifDenied: false, lastShownAt: 0, shownCount: 0, now: NOW };
@@ -83,5 +86,35 @@ describe('copyForNudge — resuelve rotación + bloqueado', () => {
   });
   it('notif bloqueado → copy de instrucciones', () => {
     expect(copyForNudge({ type: 'notif', variant: 0, denied: true })).toBe(NOTIF_BLOCKED_COPY);
+  });
+});
+
+describe('readNudgeState / recordNudgeShown — fallback con storage roto (modo privado / cuota)', () => {
+  afterEach(() => {
+    vi.unstubAllGlobals();
+    try { localStorage.clear(); } catch { /* noop */ }
+  });
+
+  it('con localStorage que lanza, sella el reloj en memoria y readNudgeState lo devuelve', () => {
+    vi.stubGlobal('localStorage', {
+      getItem: () => { throw new Error('blocked'); },
+      setItem: () => { throw new Error('quota'); },
+      removeItem: () => {},
+      clear: () => {},
+    });
+    const t = 1_700_000_000_000;
+    recordNudgeShown(t); // no debe tirar aunque setItem lance
+    const s = readNudgeState(); // getItem lanza → cae al fallback en memoria
+    expect(s.lastShownAt).toBe(t);
+    expect(s.shownCount).toBe(1);
+  });
+
+  it('con storage sano persiste y lee el reloj (camino feliz)', () => {
+    try { localStorage.clear(); } catch { /* noop */ }
+    const t = 1_700_000_100_000;
+    recordNudgeShown(t);
+    const s = readNudgeState();
+    expect(s.lastShownAt).toBe(t);
+    expect(s.shownCount).toBeGreaterThanOrEqual(1);
   });
 });
