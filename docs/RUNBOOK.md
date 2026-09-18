@@ -21,7 +21,7 @@ Guía rápida en lenguaje llano para Paul o Ana cuando algo parece andar mal. Ni
 **"No llegan los correos / las notificaciones"**
 1. Entrá a **Salud del sistema** (menú, solo pastores): de un vistazo te dice si los correos están saliendo bien.
 2. Si Salud del sistema está todo en verde, probablemente el correo cayó en la carpeta de spam del destinatario.
-3. Si marca algo en ámbar/rojo, o si a nadie le llega hace más de una hora, hay que revisarlo (ver más abajo: **Worker de correo**).
+3. Si marca algo en **amarillo**, o si a nadie le llega hace más de una hora, hay que revisarlo (ver más abajo: **Si se traba el correo**).
 
 **"Alguien no puede entrar / olvidó la contraseña"**
 1. Desde **Miembros** (solo pastores) usá **Restablecer contraseña** de esa persona.

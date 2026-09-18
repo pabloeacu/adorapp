@@ -26,7 +26,7 @@ import { Input } from '../components/ui/Input';
 import { ConfirmModal, SuccessModal, ErrorModal } from '../components/ui/ConfirmModal';
 import { toCSV, downloadCSV } from '../lib/csv';
 import { supabase } from '../lib/supabase';
-import { saveErrorMessage } from '../lib/saveError';
+import { saveErrorMessage, looksOffline, OFFLINE_SAVE_MESSAGE } from '../lib/saveError';
 import { formatDateLocalShort as formatDateLocal } from '../lib/dates';
 
 
@@ -284,7 +284,7 @@ export const Miembros = () => {
                 setErrorModal({
                   isOpen: true,
                   title: 'No se pudo cambiar el correo',
-                  message: typeof error === 'string' ? error : 'Ocurrió un error al actualizar el correo del miembro.',
+                  message: saveErrorMessage(error, 'Ocurrió un error al actualizar el correo del miembro.'),
                 });
                 return; // dejar el modal de edición abierto para corregir
               }
@@ -437,7 +437,7 @@ export const Miembros = () => {
       setErrorModal({
         isOpen: true,
         title: 'Error',
-        message: 'No se pudo restablecer la contraseña: ' + error,
+        message: looksOffline(error) ? OFFLINE_SAVE_MESSAGE : ('No se pudo restablecer la contraseña: ' + error),
       });
       return;
     }
