@@ -8,7 +8,10 @@
    el comportamiento previo (fallback del sistema → fuente al cargar). El
    unicode-range latin cubre los acentos del español (á é í ó ú ñ ü ç…); cualquier
    glifo fuera de rango cae con gracia a la fuente del sistema. Los woff2 viven en
-   public/fonts/ (Vite los copia con hash + caché inmutable). */
+   public/fonts/ y Vite los copia VERBATIM (nombre fijo, sin hash); el service
+   worker los cachea cache-first (isImageRequest). Si algún día se regenera un
+   subset, versioná el nombre del archivo o bumpeá CACHE_VERSION en sw.js, o el
+   usuario con el SW instalado seguiría con la fuente vieja. */
 @font-face {
   font-family: 'Inter';
   font-style: normal;
