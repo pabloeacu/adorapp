@@ -4,6 +4,33 @@ Procedimientos operativos. La idea es que cualquier persona (humano o agente) qu
 
 ---
 
+## Primeros auxilios (para el pastor — sin tocar nada técnico)
+
+Guía rápida en lenguaje llano para Paul o Ana cuando algo parece andar mal. Ninguno de estos pasos toca la base de datos ni rompe nada: son seguros de probar, en el orden dado.
+
+**"La app no carga o quedó en «Cargando AdorAPP…»"**
+1. Esperá unos segundos: en un teléfono recién encendido puede tardar.
+2. Cerrá la app del todo (deslizala para cerrarla) y volvé a abrirla.
+3. Probá tu conexión abriendo otra web (ej. google.com). Si esa tampoco carga, es tu internet.
+4. Si aparece el cartel **"¡Hay una versión nueva!"**, tocá **"Actualizar la app"**.
+5. Si a vos te anda pero a otra persona no (o al revés), el problema es del teléfono de esa persona, no de la app.
+
+**"Me aparece «Sin conexión»"**
+- Es un aviso normal: el teléfono perdió internet. Lo que cambies puede no guardarse hasta que la conexión vuelva. Cuando vuelve, el aviso desaparece solo — no hace falta hacer nada.
+
+**"No llegan los correos / las notificaciones"**
+1. Entrá a **Salud del sistema** (menú, solo pastores): de un vistazo te dice si los correos están saliendo bien.
+2. Si Salud del sistema está todo en verde, probablemente el correo cayó en la carpeta de spam del destinatario.
+3. Si marca algo en ámbar/rojo, o si a nadie le llega hace más de una hora, hay que revisarlo (ver más abajo: **Worker de correo**).
+
+**"Alguien no puede entrar / olvidó la contraseña"**
+1. Desde **Miembros** (solo pastores) usá **Restablecer contraseña** de esa persona.
+2. Si cambió de correo, editá su ficha desde Miembros: el sistema sincroniza el acceso solo (te pide confirmar antes de cambiarlo).
+
+**¿Cuándo escalar a soporte técnico?** Si después de estos pasos el problema sigue **para todos** (no un teléfono suelto), o si **Salud del sistema** muestra alertas, es momento de mirar las secciones técnicas de abajo.
+
+---
+
 ## Stack
 
 - **Hosting**: Vercel proyecto `adorapp` (team `pabloeacus-projects`), región `gru1` (São Paulo).

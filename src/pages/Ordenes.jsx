@@ -42,6 +42,7 @@ import { LineupSummary } from '../components/orders/LineupSummary';
 import { LineupModal } from '../components/orders/LineupModal';
 import { RehearsalActionModal } from '../components/orders/RehearsalActionModal';
 import { isChunkLoadError, recoverFromStaleChunk } from '../lib/chunkRecovery';
+import { saveErrorMessage } from '../lib/saveError';
 import { CollapsibleSection } from '../components/ui/CollapsibleSection';
 import { buildLineup, lineupSummaryText, isCustomLineup, directorIdsOf, pendingChoiceIds } from '../lib/lineup';
 import { numberOrderSongs, addEnganchadaAfter, unlinkEnganchada, normalizeEnganchadas, moveOrderSongs } from '../lib/orderNumbering';
@@ -459,7 +460,7 @@ export const Ordenes = () => {
         setErrorModal({
           isOpen: true,
           title: 'No se pudo guardar el orden',
-          message: useAppStore.getState().error || 'Intentá de nuevo. Si el problema sigue, avisale al pastor.',
+          message: saveErrorMessage(useAppStore.getState().error),
         });
         return;
       }
@@ -475,7 +476,7 @@ export const Ordenes = () => {
         setErrorModal({
           isOpen: true,
           title: 'No se pudo guardar el orden',
-          message: useAppStore.getState().error || 'Intentá de nuevo. Si el problema sigue, avisale al pastor.',
+          message: saveErrorMessage(useAppStore.getState().error),
         });
         return;
       }
@@ -535,7 +536,7 @@ export const Ordenes = () => {
           setErrorModal({
             isOpen: true,
             title: 'No se pudo duplicar',
-            message: 'Hubo un problema al duplicar el orden. Intentá de nuevo.'
+            message: saveErrorMessage(null, 'Hubo un problema al duplicar el orden. Intentá de nuevo.')
           });
         }
       }
@@ -568,7 +569,7 @@ export const Ordenes = () => {
           setErrorModal({
             isOpen: true,
             title: 'No se pudo eliminar',
-            message: 'Hubo un problema al eliminar el orden. Intentá de nuevo.'
+            message: saveErrorMessage(null, 'Hubo un problema al eliminar el orden. Intentá de nuevo.')
           });
         }
       }

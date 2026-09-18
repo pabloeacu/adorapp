@@ -26,6 +26,7 @@ import { Input } from '../components/ui/Input';
 import { ConfirmModal, SuccessModal, ErrorModal } from '../components/ui/ConfirmModal';
 import { toCSV, downloadCSV } from '../lib/csv';
 import { supabase } from '../lib/supabase';
+import { saveErrorMessage } from '../lib/saveError';
 import { formatDateLocalShort as formatDateLocal } from '../lib/dates';
 
 
@@ -371,7 +372,7 @@ export const Miembros = () => {
           setErrorModal({
             isOpen: true,
             title: 'Error',
-            message: 'No se pudo desactivar el miembro. Contactá al administrador.'
+            message: saveErrorMessage(null, 'No se pudo desactivar el miembro. Contactá al administrador.')
           });
         }
       }
@@ -402,7 +403,7 @@ export const Miembros = () => {
           setErrorModal({
             isOpen: true,
             title: 'Error',
-            message: 'No se pudo eliminar el miembro. Contactá al administrador.'
+            message: saveErrorMessage(null, 'No se pudo eliminar el miembro. Contactá al administrador.')
           });
         }
       }

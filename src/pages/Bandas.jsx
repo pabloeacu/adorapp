@@ -20,6 +20,7 @@ import { ConfirmModal, SuccessModal, ErrorModal } from '../components/ui/Confirm
 import { RequestCollaborationButton } from '../components/dashboard/RequestCollaborationButton';
 
 import { dayLabels, dayPluralLabels, compareBandsByCalendar } from '../lib/days';
+import { saveErrorMessage } from '../lib/saveError';
 
 export const Bandas = () => {
   useDocumentTitle('Bandas');
@@ -108,7 +109,7 @@ export const Bandas = () => {
           : `${who} se sumó a "${band.name}".`,
       });
     } else {
-      setErrorModal({ isOpen: true, title: 'No se pudo agregar', message: res?.error || 'Intentá de nuevo.' });
+      setErrorModal({ isOpen: true, title: 'No se pudo agregar', message: saveErrorMessage(res?.error, 'Intentá de nuevo.') });
     }
   };
 
@@ -132,7 +133,7 @@ export const Bandas = () => {
         if (res?.ok) {
           setSuccessModal({ isOpen: true, title: 'Temporal quitado', message: `"${member.name}" ya no integra "${band.name}".` });
         } else {
-          setErrorModal({ isOpen: true, title: 'No se pudo quitar', message: res?.error || 'Intentá de nuevo.' });
+          setErrorModal({ isOpen: true, title: 'No se pudo quitar', message: saveErrorMessage(res?.error, 'Intentá de nuevo.') });
         }
       },
     });
@@ -202,7 +203,7 @@ export const Bandas = () => {
       setErrorModal({
         isOpen: true,
         title: 'No se pudo guardar la banda',
-        message: useAppStore.getState().error || 'Intentá de nuevo. Si el problema sigue, avisale al pastor.',
+        message: saveErrorMessage(useAppStore.getState().error),
       });
       return;
     }
@@ -234,7 +235,7 @@ export const Bandas = () => {
           setErrorModal({
             isOpen: true,
             title: 'No se pudo eliminar',
-            message: `Hubo un problema al eliminar "${band.name}". Intentá de nuevo.`
+            message: saveErrorMessage(null, `Hubo un problema al eliminar "${band.name}". Intentá de nuevo.`)
           });
         }
       }

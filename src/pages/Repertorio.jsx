@@ -35,6 +35,7 @@ import {
 } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
 import { isChunkLoadError, recoverFromStaleChunk } from '../lib/chunkRecovery';
+import { saveErrorMessage } from '../lib/saveError';
 import { generateSongPdf } from '../lib/songPdf';
 
 // Wraps each song-structure section so it can be dragged to reorder. The
@@ -306,7 +307,7 @@ export const Repertorio = () => {
         setErrorModal({
           isOpen: true,
           title: 'No se pudo guardar la canción',
-          message: useAppStore.getState().error || 'Intentá de nuevo. Si el problema sigue, avisale al pastor.',
+          message: saveErrorMessage(useAppStore.getState().error),
         });
         return;
       }
@@ -317,7 +318,7 @@ export const Repertorio = () => {
         setErrorModal({
           isOpen: true,
           title: 'No se pudo guardar la canción',
-          message: useAppStore.getState().error || 'Intentá de nuevo. Si el problema sigue, avisale al pastor.',
+          message: saveErrorMessage(useAppStore.getState().error),
         });
         return;
       }
@@ -350,7 +351,7 @@ export const Repertorio = () => {
           setErrorModal({
             isOpen: true,
             title: 'No se pudo eliminar',
-            message: `Hubo un problema al eliminar "${song.title}". Intentá de nuevo.`
+            message: saveErrorMessage(null, `Hubo un problema al eliminar "${song.title}". Intentá de nuevo.`)
           });
         }
       }
