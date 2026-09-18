@@ -5,6 +5,7 @@ import { MobileNav } from './MobileNav';
 import { CommandPalette } from '../CommandPalette';
 import { OnboardingWizard } from '../OnboardingWizard';
 import { UpdateBanner } from '../UpdateBanner';
+import { EngagementNudge } from '../EngagementNudge';
 import { Navigate, Outlet } from 'react-router-dom';
 import { useAuthStore } from '../../stores/authStore';
 import { useCurrentMember } from '../../hooks/useCurrentMember';
@@ -83,6 +84,10 @@ export const Layout = () => {
           onClose={() => setWizardDismissed(true)}
         />
       )}
+
+      {/* Recordatorio cada 10 días (solo teléfono): instalar app / activar notificaciones.
+          Se auto-gatea (no toca a los nuevos, que ven el asistente). 100% cliente. */}
+      <EngagementNudge member={currentMember} />
 
       {/* Mobile Navigation */}
       <MobileNav />
