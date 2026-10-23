@@ -5,9 +5,22 @@
    igual por prolijidad. Portado 1:1 de la maqueta aprobada por Paul.
    ============================================================================ */
 
-/* Fondo de página a pantalla completa mientras se ve el evento. */
-html.evt-active { overflow-x: hidden; }
-body.evt-active { margin: 0; overflow-x: hidden; background: #0a0806; }
+/* Página del evento a pantalla completa con SCROLL NORMAL del documento.
+   La app usa un shell FIJO (body + #root en position:fixed, #root overflow:hidden)
+   para scrollear DENTRO de su Layout. El sitio del evento NO vive en ese Layout,
+   así que liberamos body + #root para que scrollee el documento. El clip del
+   sangrado horizontal del remolino va SOLO en .evt (clip, NUNCA hidden en
+   body/#root/html: crearía un contenedor de scroll y rompería el scroll vertical). */
+body.evt-active {
+  margin: 0; background: #0a0806;
+  position: static !important; inset: auto !important;
+  height: auto !important; min-height: 100% !important;
+  overflow: visible !important; overscroll-behavior: auto !important;
+}
+body.evt-active #root {
+  position: static !important; inset: auto !important;
+  height: auto !important; min-height: 100vh !important; overflow: visible !important;
+}
 
 .evt {
   --bg:#0a0806; --bg-2:#100c07; --panel:#15110a; --panel-2:#1c160d;
@@ -18,7 +31,7 @@ body.evt-active { margin: 0; overflow-x: hidden; background: #0a0806; }
   --serif:'Cinzel',Georgia,'Times New Roman',serif;
   --sans:'Mulish',system-ui,-apple-system,sans-serif;
   color-scheme:dark;
-  position:relative; min-height:100vh; overflow-x:hidden;
+  position:relative; min-height:100vh; overflow-x:clip;
   color:var(--cream); font-family:var(--sans); font-weight:400; line-height:1.6;
   -webkit-font-smoothing:antialiased; letter-spacing:.1px;
   background:
