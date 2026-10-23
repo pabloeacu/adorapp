@@ -1,0 +1,183 @@
+/* ============================================================================
+   Estilos del SITIO DEL EVENTO (The Chosen). AISLADOS bajo .evt para no chocar
+   con el index.css de la app (que define button/input/body globales). El sitio
+   del evento vive en su propia isla (ver App.jsx early-return), pero scopeamos
+   igual por prolijidad. Portado 1:1 de la maqueta aprobada por Paul.
+   ============================================================================ */
+
+/* Fondo de página a pantalla completa mientras se ve el evento. */
+html.evt-active { overflow-x: hidden; }
+body.evt-active { margin: 0; overflow-x: hidden; background: #0a0806; }
+
+.evt {
+  --bg:#0a0806; --bg-2:#100c07; --panel:#15110a; --panel-2:#1c160d;
+  --gold:#d9b45a; --gold-bright:#f0cd72; --gold-deep:#a9863c; --gold-ghost:rgba(217,180,90,.14);
+  --cream:#f3ecdc; --muted:#b7ac93; --faint:#7d745f;
+  --line:rgba(217,180,90,.26); --line-soft:rgba(217,180,90,.12);
+  --danger:#e4b7b7;
+  --serif:'Cinzel',Georgia,'Times New Roman',serif;
+  --sans:'Mulish',system-ui,-apple-system,sans-serif;
+  color-scheme:dark;
+  position:relative; min-height:100vh; overflow-x:hidden;
+  color:var(--cream); font-family:var(--sans); font-weight:400; line-height:1.6;
+  -webkit-font-smoothing:antialiased; letter-spacing:.1px;
+  background:
+    radial-gradient(120% 60% at 50% -5%, #1a130a 0%, rgba(26,19,10,0) 55%),
+    radial-gradient(90% 50% at 50% 105%, #140f08 0%, rgba(20,15,8,0) 60%),
+    var(--bg);
+}
+.evt *{box-sizing:border-box}
+.evt img{max-width:100%;display:block}
+.evt .wrap{max-width:640px;margin:0 auto;padding-inline:18px;padding-block:0 54px;position:relative;z-index:1}
+
+/* ---- CARDUMEN EN CIRCULO (se ve la mitad), detras de todo ---- */
+.evt .decor{position:absolute;inset:0;overflow:hidden;z-index:0;pointer-events:none}
+.evt .vortex{position:absolute;width:auto;max-width:none}
+.evt .vortex-top{top:24px;right:-430px;width:900px;opacity:.5}
+.evt .form-region{position:relative;z-index:1}
+.evt .form-region .formwrap{position:relative;z-index:1}
+.evt .vortex-form{top:50%;left:-430px;width:900px;transform:translateY(-50%) scaleX(-1);opacity:.5;
+  z-index:0;pointer-events:none}
+
+/* ---- HERO ---- */
+.evt .hero{margin-top:18px;position:relative;border-radius:16px;overflow:hidden;
+  border:1px solid var(--line);box-shadow:0 24px 70px -30px rgba(0,0,0,.9), inset 0 0 0 1px rgba(255,235,190,.04)}
+.evt .hero img{width:100%;height:auto}
+.evt .hero::after{content:"";position:absolute;inset:0;pointer-events:none;
+  box-shadow:inset 0 -60px 70px -40px #0a0806, inset 0 0 120px -40px rgba(0,0,0,.6)}
+
+/* ---- HOOK ---- */
+.evt .hook{text-align:center;padding:40px 6px 8px}
+.evt .kicker{font-family:var(--serif);font-weight:700;font-size:12.5px;letter-spacing:.42em;
+  color:var(--gold);text-transform:uppercase;margin:0 0 18px;padding-left:.42em}
+.evt .hook h1{font-family:var(--serif);font-weight:600;color:var(--cream);
+  font-size:clamp(27px,7.4vw,42px);line-height:1.18;margin:0;text-wrap:balance;
+  text-shadow:0 2px 30px rgba(0,0,0,.5)}
+.evt .hook h1 em{font-style:italic;color:var(--gold-bright)}
+.evt .hook .sub{color:var(--muted);font-size:15.5px;max-width:34em;margin:20px auto 0;line-height:1.7}
+
+/* ---- COUNTDOWN ---- */
+.evt .count{display:flex;justify-content:center;gap:10px;margin:30px auto 4px;flex-wrap:wrap}
+.evt .count .cell{min-width:68px;background:linear-gradient(170deg,var(--panel-2),var(--panel));
+  border:1px solid var(--line-soft);border-radius:12px;padding:12px 8px 9px;text-align:center}
+.evt .count .n{font-family:var(--serif);font-weight:700;font-size:26px;color:var(--gold-bright);
+  font-variant-numeric:tabular-nums;line-height:1}
+.evt .count .l{font-size:10px;letter-spacing:.18em;text-transform:uppercase;color:var(--faint);margin-top:6px}
+.evt .count.today .cell{min-width:auto;padding:12px 22px}
+.evt .count.today .n{font-size:18px}
+
+/* ---- rule ---- */
+.evt .rule{height:1px;background:linear-gradient(90deg,transparent,var(--line),transparent);margin:40px 0}
+
+/* ---- DETAILS ---- */
+.evt .facts{display:grid;gap:2px;background:var(--line-soft);border:1px solid var(--line-soft);
+  border-radius:14px;overflow:hidden}
+.evt .fact{display:flex;gap:14px;align-items:center;background:
+  linear-gradient(180deg,rgba(28,22,13,.6),rgba(21,17,10,.6));padding:16px 18px}
+.evt .fact .ic{flex:0 0 22px;color:var(--gold);opacity:.95}
+.evt .fact .t{font-size:11px;letter-spacing:.14em;text-transform:uppercase;color:var(--faint)}
+.evt .fact .v{font-size:16px;color:var(--cream);font-weight:600;margin-top:2px;line-height:1.35}
+.evt .fact .v small{display:block;font-weight:400;font-size:13px;color:var(--muted);letter-spacing:0;text-transform:none;margin-top:3px}
+.evt .free .v{color:var(--gold-bright)}
+
+/* ---- intro ---- */
+.evt .lead{color:var(--muted);font-size:15.5px;line-height:1.75;text-align:center;margin:34px auto 0;max-width:36em}
+.evt .lead b{color:var(--cream);font-weight:700}
+
+/* ---- FORM ---- */
+.evt .formwrap{margin-top:34px;background:linear-gradient(180deg,var(--panel-2),var(--panel));
+  border:1px solid var(--line);border-radius:18px;padding:26px 20px 24px;
+  box-shadow:0 30px 60px -40px rgba(0,0,0,.9)}
+.evt .formwrap h2{font-family:var(--serif);font-weight:600;font-size:21px;color:var(--cream);margin:0 0 4px;text-align:center}
+.evt .formwrap .note{text-align:center;color:var(--muted);font-size:13.5px;margin:0 0 22px}
+.evt .field{margin-bottom:15px}
+.evt label{display:block;font-size:12px;letter-spacing:.1em;text-transform:uppercase;color:var(--muted);margin-bottom:7px;font-weight:600}
+.evt label .req{color:var(--gold-deep)}
+.evt input,.evt select{width:100%;background:#0c0905;border:1px solid var(--line-soft);border-radius:11px;
+  color:var(--cream);font-family:var(--sans);font-size:16px;padding:13px 14px;min-height:0;
+  transition:border-color .15s,box-shadow .15s;-webkit-appearance:none;appearance:none}
+.evt input::placeholder{color:#6a6150}
+.evt input:focus,.evt select:focus{outline:none;border-color:var(--gold-deep);box-shadow:0 0 0 3px rgba(217,180,90,.14)}
+.evt input.bad{border-color:var(--danger)}
+.evt select{background-image:linear-gradient(45deg,transparent 50%,var(--gold) 50%),linear-gradient(135deg,var(--gold) 50%,transparent 50%);
+  background-position:calc(100% - 20px) 55%,calc(100% - 14px) 55%;background-size:6px 6px,6px 6px;background-repeat:no-repeat;padding-right:38px}
+.evt .row2{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+.evt .guests{margin-top:6px}
+.evt .guest-card{border:1px dashed var(--line-soft);border-radius:12px;padding:14px;margin-top:12px;background:rgba(12,9,5,.5)}
+.evt .guest-card .gh{font-size:11px;letter-spacing:.12em;text-transform:uppercase;color:var(--gold-deep);margin-bottom:10px;font-weight:700}
+.evt .cta{width:100%;margin-top:22px;border:none;cursor:pointer;border-radius:12px;
+  background:linear-gradient(180deg,var(--gold-bright),var(--gold));color:#2a1e07;
+  font-family:var(--sans);font-weight:800;font-size:16.5px;letter-spacing:.02em;padding:16px;
+  box-shadow:0 12px 30px -12px rgba(217,180,90,.5);transition:transform .12s,filter .12s;
+  -webkit-appearance:none;appearance:none}
+.evt .cta:hover{filter:brightness(1.06)}
+.evt .cta:active{transform:translateY(1px)}
+.evt .cta:disabled{opacity:.6;cursor:default}
+.evt .cta small{display:block;font-weight:600;font-size:12px;opacity:.8;margin-top:2px}
+.evt .fineprint{text-align:center;color:var(--faint);font-size:12px;margin:14px 2px 0;line-height:1.6}
+.evt .err{color:var(--danger);font-size:13.5px;text-align:center;margin:14px 2px 0;line-height:1.5}
+
+/* ---- FOOTER ---- */
+.evt .foot{margin-top:46px;text-align:center}
+.evt .orgs{display:flex;align-items:center;justify-content:center;gap:22px;flex-wrap:wrap;margin-bottom:18px}
+.evt .orgs img{height:56px;width:auto;opacity:.95}
+.evt .orgs .caf{height:42px}
+.evt .foot .org-line{font-size:13px;color:var(--muted);letter-spacing:.04em}
+.evt .foot .org-line b{color:var(--cream);font-weight:700}
+.evt .foot .courtesy{font-size:12.5px;color:var(--faint);margin-top:10px}
+.evt .powered{margin-top:26px;padding-top:20px;border-top:1px solid var(--line-soft);
+  font-size:12px;letter-spacing:.18em;text-transform:uppercase;color:var(--faint)}
+.evt .powered b{color:var(--gold);font-weight:700;letter-spacing:.18em}
+.evt .presenta{display:flex;flex-direction:column;align-items:center;gap:10px;padding-top:28px}
+.evt .presenta img{width:76px;height:76px;border-radius:50%;box-shadow:0 0 0 1.5px var(--line),0 8px 26px rgba(0,0,0,.6)}
+.evt .presenta span{font-family:var(--serif);font-size:11px;letter-spacing:.44em;text-transform:uppercase;color:var(--gold-deep);padding-left:.44em}
+
+@media (max-width:420px){ .evt .row2{grid-template-columns:1fr} .evt .count .cell{min-width:60px} }
+@media (prefers-reduced-motion:no-preference){
+  .evt .fade{opacity:0;transform:translateY(10px);animation:evt-rise .9s ease forwards}
+  .evt .d1{animation-delay:.1s}.evt .d2{animation-delay:.25s}.evt .d3{animation-delay:.4s}
+  @keyframes evt-rise{to{opacity:1;transform:none}}
+}
+
+/* ---- ENTRADA (ticket con QR) + VALIDACION ---- */
+.evt .ticket-page{max-width:460px;margin:0 auto;padding:26px 18px 54px;position:relative;z-index:1}
+.evt .ticket{background:linear-gradient(180deg,var(--panel-2),var(--panel));border:1px solid var(--line);border-radius:20px;overflow:hidden;box-shadow:0 30px 70px -36px rgba(0,0,0,.9)}
+.evt .ticket-hero{position:relative}
+.evt .ticket-hero img{width:100%;height:auto;display:block}
+.evt .ticket-hero::after{content:"";position:absolute;inset:0;box-shadow:inset 0 -55px 55px -30px var(--panel-2)}
+.evt .ticket-body{padding:22px 22px 26px;text-align:center}
+.evt .ticket-kicker{font-family:var(--serif);font-size:11px;letter-spacing:.4em;text-transform:uppercase;color:var(--gold-deep)}
+.evt .ticket-name{font-family:var(--serif);font-weight:700;font-size:24px;color:var(--cream);margin:8px 0 2px;line-height:1.2}
+.evt .ticket-grupo{color:var(--muted);font-size:14px}
+.evt .qr-panel{background:#fff;border-radius:16px;padding:14px;width:min(258px,72vw);margin:20px auto 4px;box-shadow:0 10px 30px -14px rgba(0,0,0,.7)}
+.evt .qr-panel svg{width:100%;height:auto;display:block}
+.evt .ticket-code{font-family:var(--serif);letter-spacing:.3em;color:var(--gold-bright);font-size:19px;margin-top:14px}
+.evt .ticket-code small{display:block;letter-spacing:.14em;font-size:10px;color:var(--faint);text-transform:uppercase;margin-top:5px;font-family:var(--sans)}
+.evt .ticket-meta{margin-top:18px;border-top:1px solid var(--line-soft);padding-top:16px;text-align:left;display:grid;gap:12px}
+.evt .ticket-meta .t{font-size:10px;letter-spacing:.14em;text-transform:uppercase;color:var(--faint)}
+.evt .ticket-meta .v{font-size:14.5px;color:var(--cream);font-weight:600;margin-top:2px}
+.evt .ticket-status{margin:16px auto 0;font-size:13px;border-radius:20px;padding:8px 16px;display:inline-block;font-weight:600}
+.evt .ticket-status.ok{background:rgba(217,180,90,.12);color:var(--gold-bright);border:1px solid var(--line)}
+.evt .ticket-status.used{background:rgba(120,200,140,.12);color:#9ad8a6;border:1px solid rgba(120,200,140,.3)}
+.evt .ticket-status.bad{background:rgba(228,183,183,.12);color:var(--danger);border:1px solid rgba(228,183,183,.3)}
+.evt .ticket-note{color:var(--faint);font-size:12px;margin-top:20px;text-align:center;line-height:1.6}
+.evt .ticket-foot{text-align:center;margin-top:22px;font-size:11px;letter-spacing:.18em;text-transform:uppercase;color:var(--faint)}
+.evt .ticket-foot b{color:var(--gold);font-weight:700}
+.evt .evt-center{min-height:72vh;display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;padding:40px 22px;position:relative;z-index:1}
+.evt .evt-center .seal{width:64px;height:64px;border-radius:50%;display:flex;align-items:center;justify-content:center;margin-bottom:16px;background:radial-gradient(circle at 50% 35%,rgba(217,180,90,.22),rgba(217,180,90,.05));border:1px solid var(--line)}
+.evt .evt-center h2{font-family:var(--serif);color:var(--cream);font-size:23px;margin:0 0 8px}
+.evt .evt-center p{color:var(--muted);max-width:28em;margin:0 auto}
+.evt .evt-center a.back{margin-top:22px;color:var(--gold);text-decoration:none;font-size:14px;border-bottom:1px solid var(--line)}
+
+/* ---- VALIDACION (puerta) ---- */
+.evt .validate{max-width:420px;margin:0 auto;padding:40px 20px;position:relative;z-index:1;min-height:100vh;display:flex;flex-direction:column;justify-content:center}
+.evt .validate-card{background:linear-gradient(180deg,var(--panel-2),var(--panel));border:1px solid var(--line);border-radius:20px;padding:30px 24px;text-align:center}
+.evt .validate-icon{width:76px;height:76px;border-radius:50%;margin:0 auto 18px;display:flex;align-items:center;justify-content:center}
+.evt .validate-icon.ok{background:rgba(217,180,90,.14);border:1px solid var(--line)}
+.evt .validate-icon.used{background:rgba(120,200,140,.14);border:1px solid rgba(120,200,140,.35)}
+.evt .validate-icon.bad{background:rgba(228,183,183,.12);border:1px solid rgba(228,183,183,.35)}
+.evt .validate h2{font-family:var(--serif);font-size:24px;margin:0 0 6px}
+.evt .validate .vname{color:var(--cream);font-size:20px;font-weight:700;margin-top:10px}
+.evt .validate .vgrupo{color:var(--muted);font-size:15px;margin-top:2px}
+.evt .validate .vmsg{color:var(--muted);font-size:14px;margin-top:14px;line-height:1.6}
+.evt .validate .vcode{margin-top:16px;font-family:var(--serif);letter-spacing:.28em;color:var(--gold-bright)}

@@ -29,6 +29,7 @@ import {
   Trash2,
   RefreshCw,
   Activity,
+  Ticket,
 } from 'lucide-react';
 import { useAuthStore } from '../../stores/authStore';
 import { supabase } from '../../lib/supabase';
@@ -59,6 +60,7 @@ const SECONDARY_NAV = [
   { path: '/miembros', icon: UserCircle, label: 'Miembros', roles: ['pastor', 'leader'] },
   { path: '/solicitudes', icon: FileText, label: 'Solicitudes', roles: ['pastor'] },
   { path: '/comunicaciones', icon: Send, label: 'Comunicaciones', roles: ['pastor'] },
+  { path: '/eventos', icon: Ticket, label: 'Evento', roles: ['pastor'] },
   { path: '/salud', icon: Activity, label: 'Salud del sistema', roles: ['pastor'] },
 ];
 

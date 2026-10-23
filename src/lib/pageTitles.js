@@ -11,6 +11,7 @@ export const pageTitles = {
   '/solicitudes': 'Solicitudes',
   '/comunicaciones': 'Comunicaciones',
   '/salud': 'Salud del sistema',
+  '/eventos': 'Evento',
 };
 
 export const titleForPath = (pathname) => {

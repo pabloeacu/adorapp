@@ -9,7 +9,8 @@ import {
   LogOut,
   FileText,
   Send,
-  Activity
+  Activity,
+  Ticket
 } from 'lucide-react';
 import { useAuthStore } from '../../stores/authStore';
 import { useCurrentRole } from '../../hooks/useCurrentMember';
@@ -35,6 +36,7 @@ export const Sidebar = () => {
     ...(isPastor ? [
       { path: '/solicitudes', icon: FileText, label: 'Solicitudes' },
       { path: '/comunicaciones', icon: Send, label: 'Comunicaciones' },
+      { path: '/eventos', icon: Ticket, label: 'Evento' },
       { path: '/salud', icon: Activity, label: 'Salud del sistema' }
     ] : []),
   ];
