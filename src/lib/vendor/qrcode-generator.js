@@ -2288,14 +2288,7 @@ var qrcode = function() {
 
 }();
 
-(function (factory) {
-  if (typeof define === 'function' && define.amd) {
-      define([], factory);
-  } else if (typeof exports === 'object') {
-      module.exports = factory();
-  }
-}(function () {
-    return qrcode;
-}));
+/* UMD footer removido: usamos solo el export ESM de abajo. */
+
 
 export default qrcode;
