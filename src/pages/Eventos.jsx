@@ -1,7 +1,7 @@
 import React, { useEffect, useMemo, useState, useCallback } from 'react';
 import {
-  Ticket, Users, DoorOpen, RefreshCw, Search, CheckCircle2, Clock,
-  Mail, Download, Lock, Unlock, Send, Pencil, X, AlertTriangle, QrCode,
+  Ticket, Users, RefreshCw, Search, CheckCircle2, Clock,
+  Mail, Download, Lock, Unlock, Send, Pencil, X, QrCode,
 } from 'lucide-react';
 import { useDocumentTitle } from '../hooks/useDocumentTitle';
 import { supabase } from '../lib/supabase';
@@ -31,7 +31,6 @@ export function Eventos() {
   const [loading, setLoading] = useState(true);
   const [ev, setEv] = useState(null);
   const [regs, setRegs] = useState([]);
-  const [guestCounts, setGuestCounts] = useState({});
   const [q, setQ] = useState('');
   const [busyId, setBusyId] = useState(null);
   const [editId, setEditId] = useState(null);
@@ -39,16 +38,12 @@ export function Eventos() {
   const [toast, setToast] = useState('');
 
   const load = useCallback(async () => {
-    const [{ data: evs }, { data: rows }, { data: guests }] = await Promise.all([
+    const [{ data: evs }, { data: rows }] = await Promise.all([
       supabase.from('event_events').select('*').eq('slug', SLUG).maybeSingle().then((r) => ({ data: r.data })),
       supabase.from('event_registrations').select('*').eq('event_slug', SLUG).order('created_at', { ascending: false }),
-      supabase.from('event_guests').select('registration_id'),
     ]);
     setEv(evs || null);
     setRegs(rows || []);
-    const gc = {};
-    (guests || []).forEach((g) => { gc[g.registration_id] = (gc[g.registration_id] || 0) + 1; });
-    setGuestCounts(gc);
     setLoading(false);
   }, []);
 
