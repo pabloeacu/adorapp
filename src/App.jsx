@@ -23,6 +23,11 @@ import { withChunkRecovery } from './lib/chunkRecovery';
 const lazyPage = (importer, name) =>
   lazy(withChunkRecovery(() => importer().then(m => ({ default: m[name] }))));
 
+// Sitio público del evento (The Chosen). Isla aislada: se monta por el
+// early-return de App() cuando la ruta es /thechosen/*, SIN pasar por el
+// arranque (auth/stores/realtime/boot). No afecta a la app ni a la PWA.
+const EventApp = lazyPage(() => import('./pages/thechosen/EventApp'), 'EventApp');
+
 const Login = lazyPage(() => import('./pages/Login'), 'Login');
 const Dashboard = lazyPage(() => import('./pages/Dashboard'), 'Dashboard');
 const Ordenes = lazyPage(() => import('./pages/Ordenes'), 'Ordenes');
@@ -34,6 +39,7 @@ const Comunicaciones = lazyPage(() => import('./pages/Comunicaciones'), 'Comunic
 const Practica = lazyPage(() => import('./pages/Practica'), 'Practica');
 const IniciarServicio = lazyPage(() => import('./pages/IniciarServicio'), 'IniciarServicio');
 const SaludSistema = lazyPage(() => import('./pages/SaludSistema'), 'SaludSistema');
+const Eventos = lazyPage(() => import('./pages/Eventos'), 'Eventos');
 
 const RouteFallback = () => <PageLoader />;
 
@@ -110,7 +116,7 @@ const useUpdateProgress = () => {
   return state;
 };
 
-function App() {
+function AppMain() {
   const [initialized, setInitialized] = useState(false);
   const restoreSession = useAuthStore((state) => state.restoreSession);
   const bootProfile = useAuthStore((state) => state.bootProfile);
@@ -179,12 +185,27 @@ function App() {
               <Route path="solicitudes" element={<Solicitudes />} />
               <Route path="comunicaciones" element={<Comunicaciones />} />
               <Route path="salud" element={<PastorOnly><SaludSistema /></PastorOnly>} />
+              <Route path="eventos" element={<PastorOnly><Eventos /></PastorOnly>} />
             </Route>
           </Routes>
         </Suspense>
       </RouteSync>
     </BrowserRouter>
   );
+}
+
+// Decide ANTES de cualquier hook de arranque: el sitio del evento es una isla
+// aparte; el resto es la app de siempre (AppMain, intacta). App() no usa hooks,
+// así que el return condicional no viola las reglas de hooks.
+function App() {
+  if (typeof window !== 'undefined' && window.location.pathname.startsWith('/thechosen')) {
+    return (
+      <Suspense fallback={<div style={{ minHeight: '100vh', background: '#0a0806' }} />}>
+        <EventApp />
+      </Suspense>
+    );
+  }
+  return <AppMain />;
 }
 
 export default App;
