@@ -64,8 +64,13 @@ function EventMusic() {
     a.volume = 0.5;
     const start = () => { if (wantRef.current) a.play().catch(() => {}); };
     start();
+    // Reintenta en CUALQUIER interacción hasta que el navegador la deje sonar.
+    // Incluye scroll/wheel/touchmove para que arranque apenas el usuario desplaza
+    // la página (en el celu el scroll ya trae touchstart; en desktop el primer
+    // click/tecla la habilita — la rueda sola no cuenta como gesto para el audio).
     const onFirst = () => { if (wantRef.current && a.paused) start(); };
-    const evs = ['pointerdown', 'touchstart', 'keydown'];
+    const evs = ['pointerdown', 'mousedown', 'click', 'touchstart', 'touchend',
+      'touchmove', 'keydown', 'scroll', 'wheel'];
     evs.forEach((e) => window.addEventListener(e, onFirst, { passive: true }));
     const onPlay = () => setOn(true);
     const onPause = () => setOn(false);
@@ -160,6 +165,7 @@ export function EventLanding() {
 
   const onSubmit = async (ev) => {
     ev.preventDefault();
+    if (submitting) return; // guard de reentrada: un doble-tap no crea 2 reservas
     setSubmitError('');
     if (!validate()) {
       setSubmitError('Revisá los campos marcados para completar tu reserva.');
