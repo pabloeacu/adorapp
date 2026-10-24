@@ -6,6 +6,9 @@ import { useEventShell } from './useEventShell';
 import './fonts.css';
 import './event.css';
 import heroDesktop from '../../assets/thechosen/hero-desktop.webp';
+import fishVortex from '../../assets/thechosen/fish-vortex.png';
+import logoAvivamiento from '../../assets/thechosen/logo-avivamiento.png';
+import logoCaf from '../../assets/thechosen/logo-caf-white.png';
 
 function formatCheckedIn(iso) {
   try {
@@ -21,12 +24,25 @@ export function EventTicket() {
 
   useEffect(() => {
     let alive = true;
-    (async () => {
-      const { data, error } = await supabase.rpc('event_ticket', { p_token: token });
+    // Carga con red de seguridad: si una llamada se cuelga (red lenta tras
+    // reservar), reintenta una vez; nunca queda en "Cargando…" para siempre.
+    const fetchTicket = async (attempt = 0) => {
+      const timeout = new Promise((resolve) => setTimeout(() => resolve({ __timeout: true }), 7000));
+      let res;
+      try {
+        res = await Promise.race([supabase.rpc('event_ticket', { p_token: token }), timeout]);
+      } catch {
+        res = { error: true };
+      }
       if (!alive) return;
-      if (error || !data) setState({ loading: false, data: null, error: true });
-      else setState({ loading: false, data, error: false });
-    })();
+      if (res?.__timeout || res?.error) {
+        if (attempt < 2) return fetchTicket(attempt + 1);
+        return setState({ loading: false, data: null, error: true });
+      }
+      if (!res.data) return setState({ loading: false, data: null, error: true });
+      setState({ loading: false, data: res.data, error: false });
+    };
+    fetchTicket();
     return () => { alive = false; };
   }, [token]);
 
@@ -61,8 +77,12 @@ export function EventTicket() {
     <div className="evt">
       <div className="ticket-page">
         <div className="ticket">
-          <div className="ticket-hero">
+          <div className="ticket-band">
             <img src={heroDesktop} alt="The Chosen — Temporada 6" />
+            <div className="band-lbl">
+              <div className="k">The Chosen</div>
+              <div className="t">Temporada 6<small>Episodio 1 · Acceso anticipado</small></div>
+            </div>
           </div>
           <div className="ticket-body">
             <div className="ticket-kicker">Tu entrada</div>
@@ -73,7 +93,12 @@ export function EventTicket() {
               <div className="ticket-status bad">Esta reserva fue cancelada</div>
             ) : (
               <>
-                <div className="qr-panel" dangerouslySetInnerHTML={{ __html: qrMarkup }} />
+                <div className="ticket-seal">
+                  <img className="seal-broche" src={logoAvivamiento} alt="Avivamiento Jóvenes" />
+                  <span className="seal-glow" aria-hidden="true"></span>
+                  <img className="seal-vortex" src={fishVortex} alt="" aria-hidden="true" />
+                  <div className="qr-tile" dangerouslySetInnerHTML={{ __html: qrMarkup }} />
+                </div>
                 <div className="ticket-code">{t.code}<small>Mostrá este código en la puerta</small></div>
                 {used
                   ? <div className="ticket-status used">✓ Ingreso registrado · {formatCheckedIn(t.checked_in_at)}</div>
@@ -90,7 +115,11 @@ export function EventTicket() {
             <p className="ticket-note">Guardá esta entrada en tu teléfono. En la puerta escaneamos el QR o te buscamos por tu código. ¡Nos vemos el 31! 🙌</p>
           </div>
         </div>
-        <div className="ticket-foot">Organiza <b>Avivamiento Jóvenes</b> · Powered by <b>AdorApp</b></div>
+        <div className="ticket-foot">
+          <div className="ticket-org">Organiza <b>Avivamiento Jóvenes</b></div>
+          <img className="ticket-caf" src={logoCaf} alt="Centro de Avivamiento Familiar" />
+          <div className="ticket-pw">Powered by <b>AdorApp</b></div>
+        </div>
       </div>
     </div>
   );
