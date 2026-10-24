@@ -1,7 +1,7 @@
 import React, { useEffect, useMemo, useState, useCallback } from 'react';
 import {
   Ticket, Users, RefreshCw, Search, CheckCircle2, Clock,
-  Mail, Download, Lock, Unlock, Send, Pencil, X, QrCode,
+  Mail, Download, Lock, Unlock, Send, Pencil, X, QrCode, ChevronDown, ChevronRight,
 } from 'lucide-react';
 import { useDocumentTitle } from '../hooks/useDocumentTitle';
 import { supabase } from '../lib/supabase';
@@ -26,30 +26,54 @@ const EMAIL_CHIP = {
 };
 const EMAIL_LABEL = { sent: 'Enviado', pending: 'En cola', failed: 'Falló', bounced: 'Rebotó' };
 
+// Neutraliza inyección de fórmulas en CSV (un nombre que empiece con = + - @ o
+// un carácter de control podría ejecutarse como fórmula al abrir en Excel/Sheets).
+const csvCell = (v) => {
+  let s = v == null ? '' : String(v);
+  if (/^[=+\-@\t\r]/.test(s)) s = `'${s}`;
+  return `"${s.replace(/"/g, '""')}"`;
+};
+
 export function Eventos() {
   useDocumentTitle('Eventos');
   const [loading, setLoading] = useState(true);
   const [ev, setEv] = useState(null);
   const [regs, setRegs] = useState([]);
+  const [guestsByReg, setGuestsByReg] = useState({});
   const [q, setQ] = useState('');
   const [busyId, setBusyId] = useState(null);
   const [editId, setEditId] = useState(null);
   const [editEmail, setEditEmail] = useState('');
+  const [expanded, setExpanded] = useState(() => new Set());
   const [toast, setToast] = useState('');
 
   const load = useCallback(async () => {
-    const [{ data: evs }, { data: rows }] = await Promise.all([
-      supabase.from('event_events').select('*').eq('slug', SLUG).maybeSingle().then((r) => ({ data: r.data })),
+    const [{ data: evData }, { data: rows }] = await Promise.all([
+      supabase.from('event_events').select('*').eq('slug', SLUG).maybeSingle(),
       supabase.from('event_registrations').select('*').eq('event_slug', SLUG).order('created_at', { ascending: false }),
     ]);
-    setEv(evs || null);
-    setRegs(rows || []);
+    const regRows = rows || [];
+    setEv(evData || null);
+    setRegs(regRows);
+    const ids = regRows.map((r) => r.id);
+    const gmap = {};
+    if (ids.length) {
+      const { data: gs } = await supabase.from('event_guests').select('*').in('registration_id', ids);
+      (gs || []).forEach((g) => { (gmap[g.registration_id] ||= []).push(g); });
+    }
+    setGuestsByReg(gmap);
     setLoading(false);
   }, []);
 
   useEffect(() => { load(); }, [load]);
 
   const flash = (m) => { setToast(m); setTimeout(() => setToast(''), 3500); };
+
+  const toggleExpand = (id) => setExpanded((s) => {
+    const n = new Set(s);
+    if (n.has(id)) n.delete(id); else n.add(id);
+    return n;
+  });
 
   const stats = useMemo(() => {
     const active = regs.filter((r) => r.status !== 'cancelled');
@@ -61,10 +85,14 @@ export function Eventos() {
   const filtered = useMemo(() => {
     const nq = norm(q.trim());
     if (!nq) return regs;
-    return regs.filter((r) =>
-      norm(r.nombre).includes(nq) || norm(r.email).includes(nq) ||
-      norm(r.ticket_token?.slice(0, 6)).includes(nq) || norm(r.celular).includes(nq));
-  }, [regs, q]);
+    return regs.filter((r) => {
+      if (norm(r.nombre).includes(nq) || norm(r.email).includes(nq) ||
+        norm(r.ticket_token?.slice(0, 6)).includes(nq) || norm(r.celular).includes(nq)) return true;
+      // también matchea por el nombre/correo de un acompañante
+      return (guestsByReg[r.id] || []).some((g) =>
+        norm(g.nombre).includes(nq) || norm(g.email).includes(nq) || norm(g.celular).includes(nq));
+    });
+  }, [regs, q, guestsByReg]);
 
   const toggleOpen = async () => {
     if (!ev) return;
@@ -95,14 +123,26 @@ export function Eventos() {
     flash(`Correo reencolado a ${data.email}.`);
   };
 
+  // Exporta UNA fila por persona: el titular y, debajo, cada acompañante marcado
+  // como "Dependiente" (así se aprovecha toda la información recolectada).
   const exportCsv = () => {
-    const head = ['Nombre', 'Email', 'Celular', 'Iglesia', 'Como se entero', 'Acompanantes', 'Personas', 'Codigo', 'Estado correo', 'Ingreso', 'Fecha reserva'];
-    const rows = regs.map((r) => [
-      r.nombre, r.email, r.celular, r.iglesia || '', r.como_se_entero || '',
-      r.acompanantes || 0, 1 + (r.acompanantes || 0), (r.ticket_token || '').slice(0, 6).toUpperCase(),
-      EMAIL_LABEL[r.email_status] || r.email_status, r.checked_in_at ? fmtDate(r.checked_in_at) : '', fmtDate(r.created_at),
-    ]);
-    const csv = [head, ...rows].map((row) => row.map((c) => `"${String(c).replace(/"/g, '""')}"`).join(',')).join('\n');
+    const head = ['Tipo', 'Codigo reserva', 'Nombre', 'Email', 'Celular', 'Iglesia',
+      'Como se entero', 'Acompanantes', 'Personas en la reserva', 'Estado correo',
+      'Ingreso', 'Fecha reserva', 'Reserva cancelada'];
+    const rows = [];
+    regs.forEach((r) => {
+      const code = (r.ticket_token || '').slice(0, 6).toUpperCase();
+      const cancelada = r.status === 'cancelled' ? 'Sí' : 'No';
+      rows.push(['Titular (principal)', code, r.nombre, r.email, r.celular,
+        r.iglesia || '', r.como_se_entero || '', r.acompanantes || 0, 1 + (r.acompanantes || 0),
+        EMAIL_LABEL[r.email_status] || r.email_status, r.checked_in_at ? fmtDate(r.checked_in_at) : '',
+        fmtDate(r.created_at), cancelada]);
+      (guestsByReg[r.id] || []).forEach((g) => {
+        rows.push(['Dependiente (acompañante)', code, g.nombre || '', g.email || '', g.celular || '',
+          '', '', '', '', '', '', '', cancelada]);
+      });
+    });
+    const csv = [head, ...rows].map((row) => row.map(csvCell).join(',')).join('\n');
     const blob = new Blob(['﻿' + csv], { type: 'text/csv;charset=utf-8' });
     const a = document.createElement('a');
     a.href = URL.createObjectURL(blob);
@@ -154,7 +194,7 @@ export function Eventos() {
           {ev?.registration_open ? 'Cerrar inscripciones' : 'Abrir inscripciones'}
         </Button>
         <Button variant="secondary" onClick={load}><RefreshCw className="h-4 w-4 mr-1" />Actualizar</Button>
-        <Button variant="secondary" onClick={exportCsv}><Download className="h-4 w-4 mr-1" />Exportar</Button>
+        <Button variant="secondary" onClick={exportCsv}><Download className="h-4 w-4 mr-1" />Exportar todo</Button>
       </div>
 
       {/* Buscador / check-in */}
@@ -180,6 +220,8 @@ export function Eventos() {
             const personas = 1 + (r.acompanantes || 0);
             const used = !!r.checked_in_at;
             const cancelled = r.status === 'cancelled';
+            const gs = guestsByReg[r.id] || [];
+            const isOpen = expanded.has(r.id);
             return (
               <Card key={r.id} padding="md" className={cancelled ? 'opacity-60' : ''}>
                 <div className="flex items-start justify-between gap-3 flex-wrap">
@@ -187,6 +229,9 @@ export function Eventos() {
                     <div className="flex items-center gap-2 flex-wrap">
                       <span className="font-semibold text-gray-100">{r.nombre}</span>
                       <span className="text-xs font-mono px-1.5 py-0.5 rounded bg-neutral-800 text-gold-300">{(r.ticket_token || '').slice(0, 6).toUpperCase()}</span>
+                      {gs.length > 0 && (
+                        <span className="text-[10px] uppercase tracking-wide px-1.5 py-0.5 rounded bg-gold-500/10 text-gold-300 ring-1 ring-gold-500/20">titular</span>
+                      )}
                       {personas > 1 && <span className="text-xs text-gray-400 inline-flex items-center gap-1"><Users className="h-3 w-3" />{personas} personas</span>}
                       {cancelled && <span className="text-xs text-red-300">cancelada</span>}
                     </div>
@@ -211,6 +256,35 @@ export function Eventos() {
                       {r.iglesia && <span>· {r.iglesia}</span>}
                       <span className="inline-flex items-center gap-1"><Clock className="h-3 w-3" />{fmtDate(r.created_at)}</span>
                     </div>
+
+                    {/* Acompañantes (dependientes de esta reserva) */}
+                    {gs.length > 0 && (
+                      <div className="mt-2">
+                        <button
+                          className="text-xs text-gold-300 inline-flex items-center gap-1 hover:text-gold-200"
+                          onClick={() => toggleExpand(r.id)}
+                          aria-expanded={isOpen}
+                        >
+                          {isOpen ? <ChevronDown className="h-3.5 w-3.5" /> : <ChevronRight className="h-3.5 w-3.5" />}
+                          {isOpen ? 'Ocultar' : 'Ver'} {gs.length} acompañante{gs.length > 1 ? 's' : ''}
+                        </button>
+                        {isOpen && (
+                          <ul className="mt-1.5 space-y-1 border-l-2 border-gold-500/20 pl-3">
+                            {gs.map((g) => (
+                              <li key={g.id} className="text-xs text-gray-400">
+                                <span className="text-[9px] uppercase tracking-wide text-gray-500 mr-1.5">dependiente</span>
+                                <span className="text-gray-200">{g.nombre || '—'}</span>
+                                {(g.email || g.celular) ? (
+                                  <span className="text-gray-500"> · {[g.email, g.celular].filter(Boolean).join(' · ')}</span>
+                                ) : (
+                                  <span className="text-gray-600"> · sin datos de contacto</span>
+                                )}
+                              </li>
+                            ))}
+                          </ul>
+                        )}
+                      </div>
+                    )}
                   </div>
                   <div className="flex items-center gap-2 shrink-0">
                     {!cancelled && (

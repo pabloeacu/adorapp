@@ -13,9 +13,14 @@ import './index.css';
 installGlobalErrorReporter();
 // Si tras una publicación falla la precarga de un chunk viejo, recarga una vez (versión nueva).
 installChunkRecovery();
-registerSW();
-// Listen for `beforeinstallprompt` ASAP — Chrome can fire it before React mounts.
-initInstallPrompt();
+// El Service Worker y el prompt de "instalar app" son de la PWA del ministerio:
+// NO deben activarse en la isla pública del evento (/thechosen), para no cachearle
+// ni ofrecerle la app de adoración a un visitante anónimo del evento (aislamiento).
+if (!window.location.pathname.startsWith('/thechosen')) {
+  registerSW();
+  // Listen for `beforeinstallprompt` ASAP — Chrome can fire it before React mounts.
+  initInstallPrompt();
+}
 
 ReactDOM.createRoot(document.getElementById('root')).render(
   <React.StrictMode>
