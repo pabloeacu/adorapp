@@ -52,6 +52,17 @@ body.evt-active #root {
 .evt .vortex-form{top:50%;left:-430px;width:900px;transform:translateY(-50%) scaleX(-1);opacity:.5;
   z-index:0;pointer-events:none}
 
+/* ---- botón de música (parlantito flotante) ---- */
+.evt .music-btn{position:fixed;right:16px;bottom:16px;z-index:40;width:46px;height:46px;border-radius:50%;padding:0;
+  border:1px solid var(--line);background:rgba(21,17,10,.86);-webkit-backdrop-filter:blur(6px);backdrop-filter:blur(6px);
+  color:var(--gold-bright);display:flex;align-items:center;justify-content:center;cursor:pointer;
+  box-shadow:0 8px 24px -10px rgba(0,0,0,.8);transition:transform .12s,border-color .12s,box-shadow .2s}
+.evt .music-btn:hover{border-color:var(--gold-deep);transform:translateY(-1px)}
+.evt .music-btn svg{width:22px;height:22px}
+.evt .music-btn.on{box-shadow:0 0 0 1px var(--line),0 0 18px -2px rgba(217,180,90,.4)}
+@media (prefers-reduced-motion:no-preference){ .evt .music-btn.on{animation:evt-pulse 2.4s ease-in-out infinite} }
+@keyframes evt-pulse{0%,100%{box-shadow:0 0 0 1px var(--line),0 0 16px -4px rgba(217,180,90,.35)}50%{box-shadow:0 0 0 1px var(--line),0 0 22px 0 rgba(217,180,90,.5)}}
+
 /* ---- HERO ---- */
 .evt .hero{margin-top:18px;position:relative;border-radius:16px;overflow:hidden;
   border:1px solid var(--line);box-shadow:0 24px 70px -30px rgba(0,0,0,.9), inset 0 0 0 1px rgba(255,235,190,.04)}

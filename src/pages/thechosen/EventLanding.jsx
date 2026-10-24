@@ -9,6 +9,7 @@ import heroMobile from '../../assets/thechosen/hero-mobile.webp';
 import fishVortex from '../../assets/thechosen/fish-vortex.png';
 import logoAvivamiento from '../../assets/thechosen/logo-avivamiento.png';
 import logoCaf from '../../assets/thechosen/logo-caf-white.png';
+import eventSong from '../../assets/thechosen/thechosen-opening.mp3';
 
 const TARGET = new Date('2026-10-31T19:30:00-03:00').getTime();
 const EMAIL_RE = /^[^@\s]+@[^@\s]+\.[^@\s]+$/;
@@ -45,6 +46,70 @@ function useCountdown() {
     h: String(Math.floor((diff % 864e5) / 36e5)).padStart(2, '0'),
     m: String(Math.floor((diff % 36e5) / 6e4)).padStart(2, '0'),
   };
+}
+
+// Música de fondo (opening de The Chosen). Intenta arrancar sola; si el navegador
+// bloquea el autoplay con sonido (lo hacen todos sin un gesto del usuario), arranca
+// en el PRIMER toque/scroll. Botón de parlantito para silenciar/retomar; recuerda
+// la elección en localStorage.
+function EventMusic() {
+  const ref = useRef(null);
+  const [on, setOn] = useState(false);
+  const wantRef = useRef(true);
+
+  useEffect(() => {
+    try { if (localStorage.getItem('evt_music') === 'off') wantRef.current = false; } catch { /* modo privado */ }
+    const a = ref.current;
+    if (!a) return;
+    a.volume = 0.5;
+    const start = () => { if (wantRef.current) a.play().catch(() => {}); };
+    start();
+    const onFirst = () => { if (wantRef.current && a.paused) start(); };
+    const evs = ['pointerdown', 'touchstart', 'keydown'];
+    evs.forEach((e) => window.addEventListener(e, onFirst, { passive: true }));
+    const onPlay = () => setOn(true);
+    const onPause = () => setOn(false);
+    a.addEventListener('play', onPlay);
+    a.addEventListener('pause', onPause);
+    return () => {
+      evs.forEach((e) => window.removeEventListener(e, onFirst));
+      a.removeEventListener('play', onPlay);
+      a.removeEventListener('pause', onPause);
+      try { a.pause(); } catch { /* noop */ }
+    };
+  }, []);
+
+  const toggle = () => {
+    const a = ref.current;
+    if (!a) return;
+    if (a.paused) {
+      wantRef.current = true;
+      try { localStorage.setItem('evt_music', 'on'); } catch { /* noop */ }
+      a.play().catch(() => {});
+    } else {
+      wantRef.current = false;
+      try { localStorage.setItem('evt_music', 'off'); } catch { /* noop */ }
+      a.pause();
+    }
+  };
+
+  return (
+    <>
+      <audio ref={ref} src={eventSong} loop preload="auto" />
+      <button type="button" className={`music-btn${on ? ' on' : ''}`} onClick={toggle}
+        aria-label={on ? 'Silenciar música' : 'Reproducir música'} aria-pressed={on}>
+        {on ? (
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+            <path d="M11 5 6 9H3v6h3l5 4V5Z" /><path d="M15.5 8.5a5 5 0 0 1 0 7" /><path d="M18.5 6a9 9 0 0 1 0 12" />
+          </svg>
+        ) : (
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+            <path d="M11 5 6 9H3v6h3l5 4V5Z" /><path d="M22 9l-6 6M16 9l6 6" />
+          </svg>
+        )}
+      </button>
+    </>
+  );
 }
 
 const ACOMP_OPTIONS = [
@@ -281,6 +346,7 @@ export function EventLanding() {
           <div className="powered">Powered by <b>AdorApp</b></div>
         </footer>
       </div>
+      <EventMusic />
     </div>
   );
 }
