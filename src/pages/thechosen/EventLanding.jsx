@@ -24,6 +24,7 @@ const ERR_MAP = {
   demasiados_acompanantes: 'Son demasiados acompañantes para una sola reserva.',
   demasiadas_solicitudes: 'Estamos recibiendo muchas reservas. Probá de nuevo en un minuto.',
   evento_inexistente: 'No pudimos encontrar el evento. Probá de nuevo más tarde.',
+  acompanante_invalido: 'Completá los datos de cada acompañante: nombre, correo y celular son obligatorios.',
 };
 function friendlyError(err) {
   const raw = (err?.message || '').toLowerCase();
@@ -158,7 +159,12 @@ export function EventLanding() {
     if (form.nombre.trim().length < 2) e.nombre = true;
     if (!EMAIL_RE.test(form.email.trim())) e.email = true;
     if (form.celu.replace(/\D/g, '').length < 6) e.celu = true;
-    guests.forEach((g, i) => { if (g.nombre.trim().length < 2) e[`g${i}`] = true; });
+    // Datos mínimos obligatorios para TODOS: nombre + email + celular (también cada acompañante).
+    guests.forEach((g, i) => {
+      if (g.nombre.trim().length < 2) e[`g${i}_nombre`] = true;
+      if (!EMAIL_RE.test(g.email.trim())) e[`g${i}_email`] = true;
+      if (g.celu.replace(/\D/g, '').length < 6) e[`g${i}_celu`] = true;
+    });
     setErrors(e);
     return Object.keys(e).length === 0;
   };
@@ -308,18 +314,18 @@ export function EventLanding() {
                     <div className="gh">Acompañante {i + 1}</div>
                     <div className="field">
                       <label>Nombre y apellido <span className="req">*</span></label>
-                      <input type="text" placeholder="Nombre del acompañante" className={errors[`g${i}`] ? 'bad' : ''}
+                      <input type="text" placeholder="Nombre del acompañante" className={errors[`g${i}_nombre`] ? 'bad' : ''}
                         value={g.nombre} onChange={(e) => setGuest(i, 'nombre', e.target.value)} />
                     </div>
                     <div className="row2">
                       <div className="field" style={{ marginBottom: 0 }}>
-                        <label>Email</label>
-                        <input type="email" inputMode="email" placeholder="correo@mail.com"
+                        <label>Email <span className="req">*</span></label>
+                        <input type="email" inputMode="email" placeholder="correo@mail.com" className={errors[`g${i}_email`] ? 'bad' : ''}
                           value={g.email} onChange={(e) => setGuest(i, 'email', e.target.value)} />
                       </div>
                       <div className="field" style={{ marginBottom: 0 }}>
-                        <label>Celular</label>
-                        <input type="tel" inputMode="tel" placeholder="11 2345 6789"
+                        <label>Celular <span className="req">*</span></label>
+                        <input type="tel" inputMode="tel" placeholder="11 2345 6789" className={errors[`g${i}_celu`] ? 'bad' : ''}
                           value={g.celu} onChange={(e) => setGuest(i, 'celu', e.target.value)} />
                       </div>
                     </div>
