@@ -2,6 +2,7 @@ import React, { useEffect, useMemo, useState, useCallback } from 'react';
 import {
   Ticket, Users, RefreshCw, Search, CheckCircle2, Clock,
   Mail, Download, Lock, Unlock, Send, Pencil, X, QrCode, ChevronDown, ChevronRight,
+  ScanLine, Copy, Power, Link2,
 } from 'lucide-react';
 import { useDocumentTitle } from '../hooks/useDocumentTitle';
 import { supabase } from '../lib/supabase';
@@ -46,6 +47,9 @@ export function Eventos() {
   const [editEmail, setEditEmail] = useState('');
   const [expanded, setExpanded] = useState(() => new Set());
   const [toast, setToast] = useState('');
+  const [staff, setStaff] = useState({ loading: true, hasKey: false, enabled: false, key: null });
+  const [staffBusy, setStaffBusy] = useState(false);
+  const [copied, setCopied] = useState(false);
 
   const load = useCallback(async () => {
     const [{ data: evData }, { data: rows }] = await Promise.all([
@@ -62,8 +66,41 @@ export function Eventos() {
       (gs || []).forEach((g) => { (gmap[g.registration_id] ||= []).push(g); });
     }
     setGuestsByReg(gmap);
+    const { data: st } = await supabase.rpc('event_staff_status', { p_slug: SLUG });
+    setStaff({ loading: false, hasKey: !!st?.has_key, enabled: !!st?.enabled, key: st?.key || null });
     setLoading(false);
   }, []);
+
+  const staffLink = staff.key ? `${window.location.origin}/thechosen/control?k=${staff.key}` : '';
+  const genStaffKey = async () => {
+    setStaffBusy(true);
+    const { data, error } = await supabase.rpc('event_staff_key_ensure', { p_slug: SLUG });
+    setStaffBusy(false);
+    if (error || !data?.ok) { flash('No se pudo generar el enlace.'); return; }
+    setStaff((s) => ({ ...s, hasKey: true, key: data.key, enabled: !!data.enabled }));
+  };
+  const toggleStaff = async () => {
+    const next = !staff.enabled;
+    setStaffBusy(true);
+    const { data, error } = await supabase.rpc('event_staff_set_enabled', { p_slug: SLUG, p_enabled: next });
+    setStaffBusy(false);
+    if (error || !data?.ok) { flash('No se pudo cambiar el estado.'); return; }
+    setStaff((s) => ({ ...s, enabled: next }));
+    flash(next ? 'Control de acceso ACTIVADO.' : 'Control de acceso DESACTIVADO.');
+  };
+  const rotateStaffKey = async () => {
+    if (!window.confirm('¿Regenerar el enlace? El anterior dejará de funcionar y tendrás que compartir el nuevo con el equipo.')) return;
+    setStaffBusy(true);
+    const { data, error } = await supabase.rpc('event_staff_rotate', { p_slug: SLUG });
+    setStaffBusy(false);
+    if (error || !data?.ok) { flash('No se pudo regenerar.'); return; }
+    setStaff((s) => ({ ...s, hasKey: true, key: data.key }));
+    flash('Enlace regenerado. Compartí el nuevo.');
+  };
+  const copyStaffLink = async () => {
+    try { await navigator.clipboard.writeText(staffLink); setCopied(true); setTimeout(() => setCopied(false), 1800); }
+    catch { flash('No se pudo copiar; seleccioná y copiá el enlace a mano.'); }
+  };
 
   useEffect(() => { load(); }, [load]);
 
@@ -196,6 +233,40 @@ export function Eventos() {
         <Button variant="secondary" onClick={load}><RefreshCw className="h-4 w-4 mr-1" />Actualizar</Button>
         <Button variant="secondary" onClick={exportCsv}><Download className="h-4 w-4 mr-1" />Exportar todo</Button>
       </div>
+
+      {/* Control de acceso en la puerta (enlace para el equipo de puerta) */}
+      <Card padding="md" className="mb-4">
+        <div className="flex items-center gap-2 mb-2">
+          <ScanLine className="h-4 w-4 text-gold-300" />
+          <h2 className="text-sm font-semibold text-gray-100">Control de acceso en la puerta</h2>
+        </div>
+        {staff.loading ? (
+          <p className="text-xs text-gray-500">Cargando…</p>
+        ) : !staff.hasKey ? (
+          <div>
+            <p className="text-xs text-gray-400 mb-2">Generá un enlace para que el equipo de puerta escanee las entradas y marque los ingresos, sin cuenta de AdorApp. Podés dárselo a varias personas a la vez.</p>
+            <Button variant="secondary" onClick={genStaffKey} disabled={staffBusy}><Link2 className="h-4 w-4 mr-1" />Generar enlace de acceso</Button>
+          </div>
+        ) : (
+          <div className="space-y-2">
+            <div className="flex items-center gap-2 flex-wrap">
+              <span className={`text-xs px-2 py-1 rounded inline-flex items-center gap-1 ${staff.enabled ? 'bg-green-500/15 text-green-300' : 'bg-neutral-800 text-gray-400'}`}>
+                <Power className="h-3 w-3" />{staff.enabled ? 'Activado' : 'Desactivado'}
+              </span>
+              <Button variant="secondary" onClick={toggleStaff} disabled={staffBusy}>{staff.enabled ? 'Desactivar' : 'Activar'}</Button>
+              <Button variant="ghost" onClick={rotateStaffKey} disabled={staffBusy} title="Regenerar enlace"><RefreshCw className="h-4 w-4" /></Button>
+            </div>
+            <div className="flex items-center gap-2">
+              <input readOnly value={staffLink} onFocus={(e) => e.target.select()}
+                className="flex-1 min-w-0 px-2 py-1.5 rounded bg-neutral-900 border border-neutral-700 text-gray-300 text-xs" />
+              <Button variant="secondary" onClick={copyStaffLink}><Copy className="h-4 w-4 mr-1" />{copied ? 'Copiado' : 'Copiar'}</Button>
+            </div>
+            <p className="text-xs text-gray-500">
+              Compartilo SOLO con el equipo de puerta (por WhatsApp). {staff.enabled ? 'Está activo ahora.' : 'Activalo antes del evento.'} Desactivalo o regeneralo cuando termine.
+            </p>
+          </div>
+        )}
+      </Card>
 
       {/* Buscador / check-in */}
       <div className="relative mb-4">

@@ -31,7 +31,10 @@ export async function reportError(payload) {
       message: String(payload.message || 'Unknown error').slice(0, 8000),
       stack: payload.stack ? String(payload.stack).slice(0, 8000) : undefined,
       componentStack: payload.componentStack ? String(payload.componentStack).slice(0, 8000) : undefined,
-      url: typeof window !== 'undefined' ? window.location.pathname + window.location.search : undefined,
+      // Nunca filtrar la llave de puerta del evento (?k=...) a error_log.
+      url: typeof window !== 'undefined'
+        ? (window.location.pathname + window.location.search).replace(/([?&]k=)[^&]*/gi, '$1REDACTED')
+        : undefined,
       severity: payload.severity || 'error',
       context: payload.context || {},
     };
