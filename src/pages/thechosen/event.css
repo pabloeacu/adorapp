@@ -224,3 +224,70 @@ body.evt-active #root {
 .evt .validate .vgrupo{color:var(--muted);font-size:15px;margin-top:2px}
 .evt .validate .vmsg{color:var(--muted);font-size:14px;margin-top:14px;line-height:1.6}
 .evt .validate .vcode{margin-top:16px;font-family:var(--serif);letter-spacing:.28em;color:var(--gold-bright)}
+
+/* ===================== Control de acceso en la puerta (/control) ===================== */
+.evt .ctrl-lock{max-width:420px;margin:0 auto;min-height:88vh;display:flex;flex-direction:column;
+  align-items:center;justify-content:center;text-align:center;padding:40px 22px;gap:12px}
+.evt .ctrl-lock img{border-radius:50%;box-shadow:0 0 0 1.5px var(--line),0 8px 26px rgba(0,0,0,.5)}
+.evt .ctrl-lock h2{font-family:var(--serif);color:var(--cream);font-size:24px;margin:8px 0 0}
+.evt .ctrl-lock .ctrl-sub{color:var(--muted);font-size:14.5px;max-width:26em}
+.evt .ctrl-lock form{width:100%;margin-top:6px}
+.evt .ctrl-lock input{width:100%;padding:14px;border-radius:12px;background:var(--panel);
+  border:1px solid var(--line);color:var(--cream);font-size:15px;text-align:center}
+.evt .ctrl-lock input:focus{outline:none;border-color:var(--gold)}
+.evt .ctrl-note{color:var(--faint);font-size:12px;margin-top:4px}
+
+.evt .ctrl{max-width:520px;margin:0 auto;padding:16px 14px 28px;min-height:100vh;display:flex;flex-direction:column}
+.evt .ctrl-head{display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:14px}
+.evt .ctrl-head .ctrl-k{font-family:var(--serif);font-size:11px;letter-spacing:.28em;text-transform:uppercase;color:var(--gold-deep)}
+.evt .ctrl-head .ctrl-t{font-family:var(--serif);font-size:17px;color:var(--cream);margin-top:2px;line-height:1.15}
+.evt .ctrl-count{flex-shrink:0;text-align:center;background:var(--gold-ghost);border:1px solid var(--line);
+  border-radius:12px;padding:8px 14px;color:var(--gold-bright)}
+.evt .ctrl-count span{display:block;font-family:var(--serif);font-size:22px;line-height:1}
+.evt .ctrl-count{font-size:10px;letter-spacing:.12em;text-transform:uppercase}
+
+.evt .ctrl-scanner{position:relative;width:100%;aspect-ratio:1;max-height:62vh;border-radius:18px;overflow:hidden;
+  background:#000;border:1px solid var(--line);box-shadow:0 20px 50px -24px rgba(0,0,0,.8)}
+.evt .ctrl-video{width:100%;height:100%;object-fit:cover;display:block}
+.evt .ctrl-frame{position:absolute;inset:16%;border-radius:16px;
+  box-shadow:0 0 0 2px rgba(240,205,114,.85),0 0 0 100vmax rgba(10,8,6,.45);pointer-events:none}
+.evt .ctrl-frame::before,.evt .ctrl-frame::after{content:"";position:absolute;left:-2px;right:-2px;height:2px;
+  background:linear-gradient(90deg,transparent,var(--gold-bright),transparent)}
+.evt .ctrl-frame::before{top:-2px}.evt .ctrl-frame::after{bottom:-2px}
+.evt .ctrl-hint{position:absolute;left:0;right:0;bottom:12px;text-align:center;color:var(--cream);
+  font-size:13px;text-shadow:0 1px 6px rgba(0,0,0,.8)}
+.evt .ctrl-camerr{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;text-align:center;
+  padding:24px;color:var(--muted);font-size:14px;background:var(--panel)}
+
+.evt .ctrl-manual{display:flex;gap:8px;margin-top:14px}
+.evt .ctrl-manual input{flex:1;min-width:0;padding:13px 14px;border-radius:12px;background:var(--panel);
+  border:1px solid var(--line);color:var(--cream);font-size:15px;letter-spacing:.08em}
+.evt .ctrl-manual input:focus{outline:none;border-color:var(--gold)}
+.evt .ctrl-manual button{flex-shrink:0;padding:0 18px;border-radius:12px;border:1px solid var(--line);
+  background:var(--gold-ghost);color:var(--gold-bright);font-family:var(--sans);font-weight:700;font-size:14px;cursor:pointer}
+.evt .ctrl-manual button:disabled{opacity:.5;cursor:default}
+
+.evt .ctrl-sheet{position:fixed;inset:0;z-index:50;display:flex;align-items:flex-end;justify-content:center;
+  background:rgba(10,8,6,.55);backdrop-filter:blur(2px);padding:0 0 env(safe-area-inset-bottom)}
+.evt .ctrl-result{width:100%;max-width:520px;background:linear-gradient(180deg,var(--panel-2),var(--panel));
+  border-top:3px solid var(--gold);border-radius:20px 20px 0 0;padding:26px 22px calc(26px + env(safe-area-inset-bottom));
+  text-align:center;animation:ctrlup .18s ease-out}
+@keyframes ctrlup{from{transform:translateY(16px);opacity:.4}to{transform:translateY(0);opacity:1}}
+.evt .ctrl-result.ok{border-top-color:var(--gold-bright)}
+.evt .ctrl-result.done{border-top-color:#9ad8a6}
+.evt .ctrl-result.used{border-top-color:#9ad8a6}
+.evt .ctrl-result.bad,.evt .ctrl-result.err{border-top-color:var(--danger)}
+.evt .ctrl-result-title{font-family:var(--serif);font-size:24px;margin-bottom:6px;
+  color:var(--gold-bright)}
+.evt .ctrl-result.done .ctrl-result-title,.evt .ctrl-result.used .ctrl-result-title{color:#9ad8a6}
+.evt .ctrl-result.bad .ctrl-result-title,.evt .ctrl-result.err .ctrl-result-title{color:var(--danger)}
+.evt .ctrl-result-name{font-size:20px;color:var(--cream);font-weight:700}
+.evt .ctrl-result-grp{color:var(--muted);font-size:14px;margin-top:2px}
+.evt .ctrl-result-meta{color:var(--faint);font-size:13px;margin-top:6px}
+.evt .ctrl-confirm{width:100%;margin-top:18px;border:none;cursor:pointer;border-radius:14px;padding:16px;
+  font-family:var(--sans);font-weight:800;font-size:17px;color:#2a1e07;
+  background:linear-gradient(180deg,var(--gold-bright),var(--gold))}
+.evt .ctrl-confirm:active{transform:translateY(1px)}
+.evt .ctrl-confirm:disabled{opacity:.7;cursor:default}
+.evt .ctrl-next{width:100%;margin-top:10px;border:1px solid var(--line);background:transparent;cursor:pointer;
+  border-radius:12px;padding:13px;font-family:var(--sans);font-weight:600;font-size:15px;color:var(--muted)}

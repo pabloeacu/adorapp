@@ -8,6 +8,7 @@ import { withChunkRecovery } from '../../lib/chunkRecovery';
 const EventLanding = lazy(withChunkRecovery(() => import('./EventLanding').then((m) => ({ default: m.EventLanding }))));
 const EventTicket = lazy(withChunkRecovery(() => import('./EventTicket').then((m) => ({ default: m.EventTicket }))));
 const EventValidate = lazy(withChunkRecovery(() => import('./EventValidate').then((m) => ({ default: m.EventValidate }))));
+const EventControl = lazy(withChunkRecovery(() => import('./EventControl').then((m) => ({ default: m.EventControl }))));
 
 const Blank = () => <div style={{ minHeight: '100vh', background: '#0a0806' }} />;
 
@@ -19,6 +20,7 @@ export function EventApp() {
           <Route path="/thechosen" element={<EventLanding />} />
           <Route path="/thechosen/entrada/:token" element={<EventTicket />} />
           <Route path="/thechosen/validar/:token" element={<EventValidate />} />
+          <Route path="/thechosen/control" element={<EventControl />} />
           <Route path="/thechosen/*" element={<Navigate to="/thechosen" replace />} />
         </Routes>
       </Suspense>
