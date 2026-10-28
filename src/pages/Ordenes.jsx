@@ -655,10 +655,9 @@ export const Ordenes = () => {
   // agrega directo. El conteo es global (excluye canceladas y la orden en edición).
   const addSongToOrder = (song) => {
     if (!song) return;
-    const uses = countRecentUses(orders, song.id, {
-      nowMs: Date.now(),
-      excludeOrderId: editingOrder?.id,
-    });
+    // countRecentUses toma "ahora" internamente (Date.now() vive en songUsage.js,
+    // una lib pura, no en el render de este componente — react-hooks/purity).
+    const uses = countRecentUses(orders, song.id, { excludeOrderId: editingOrder?.id });
     if (isOverused(uses) && !warnedSongsRef.current.has(song.id)) {
       setOveruseModal({ song, uses });
       return;
