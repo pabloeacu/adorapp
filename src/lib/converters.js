@@ -192,7 +192,13 @@ const normalizeName = (s) => (s ?? '').toString().trim().replace(/\s+/g, ' ');
 // persistirse (landmine #51). Se stripean acá, en la única puerta a la base.
 const stripSongRefs = (songs) => (Array.isArray(songs) ? songs : []).map((s) => {
   if (!s || typeof s !== 'object') return s;
-  const { _localId, _pendingHistory, _suggestedDirector, ...rest } = s;
+  // `_dueto` es UI-only (si el 2º casillero de director está visible); NO se persiste.
+  // El 2º director sí persiste en `directorId2` (sin `_`), como songId/key/directorId.
+  const { _localId, _pendingHistory, _suggestedDirector, _dueto, ...rest } = s;
+  // Un 2º director vacío se persiste como clave AUSENTE (no null): así una canción sin
+  // dueto serializa idéntica, haya o no abierto el casillero → no finge un cambio de
+  // contenido (evitaría avisos/banner/digest falsos — clase landmine #63).
+  if (rest.directorId2 == null) delete rest.directorId2;
   return rest;
 });
 

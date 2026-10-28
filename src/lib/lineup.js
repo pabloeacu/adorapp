@@ -119,8 +119,9 @@ export const groupByInstrument = (order, participants) => {
 };
 
 // Directores de las canciones del orden (participan siempre — decisión de producto).
+// Incluye el 2º director (dueto): ambos son cantantes de la banda y participan igual.
 export const directorIdsOf = (songs) =>
-  new Set((songs || []).map((s) => s?.directorId).filter(Boolean));
+  new Set((songs || []).flatMap((s) => [s?.directorId, s?.directorId2]).filter(Boolean));
 
 // Instrumentos que existen en la banda pero que nadie cubre en la selección.
 // `entries` = [{ memberId, instruments }] seleccionados; `bandMembers` = objetos miembro.

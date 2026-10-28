@@ -2,7 +2,7 @@ import { describe, it, expect } from 'vitest';
 import {
   participantIdsOf, isOrderParticipant, lineupInstrumentsFor, groupByInstrument, coverageGaps,
   suggestRotation, buildLineup, lineupEntries, lineupSummaryText, sortInstruments, formatShortDate,
-  defaultInstrumentsFor, pendingChoiceIds,
+  defaultInstrumentsFor, pendingChoiceIds, directorIdsOf,
 } from './lineup';
 
 const luca = { id: 'luca', name: 'Luca Molina', instruments: ['Batería', 'Bajo'], active: true };
@@ -12,6 +12,22 @@ const karen = { id: 'karen', name: 'Karen García', instruments: ['Voz'], active
 const damaris = { id: 'damaris', name: 'Damaris', instruments: [], active: true };
 const band = [luca, marcos, gus, karen, damaris];
 const effective = new Set(band.map((m) => m.id));
+
+describe('directorIdsOf (incluye el 2º director / dueto)', () => {
+  it('junta directorId y directorId2, sin vacíos ni duplicados', () => {
+    const songs = [
+      { songId: 's1', directorId: 'karen', directorId2: 'luca' },
+      { songId: 's2', directorId: 'marcos' },
+      { songId: 's3', directorId: null, directorId2: 'gus' },
+      { songId: 's4', directorId: 'karen' }, // duplicado de s1
+    ];
+    expect(directorIdsOf(songs)).toEqual(new Set(['karen', 'luca', 'marcos', 'gus']));
+  });
+  it('tolera songs vacío o nulo', () => {
+    expect(directorIdsOf([])).toEqual(new Set());
+    expect(directorIdsOf(null)).toEqual(new Set());
+  });
+});
 
 describe('participantes', () => {
   it('sin formación (null) → toda la banda efectiva', () => {
