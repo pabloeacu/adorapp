@@ -7,7 +7,7 @@ import {
   User, Zap, AlertCircle, FileDown, History, Award,
   FileText, Printer, Copy as CopyIcon,
   Edit, CheckCircle, XCircle, RotateCcw, Target, ChevronRight, ListChecks, Play, CalendarClock, SlidersHorizontal, Ban,
-  Link2, Unlink
+  Link2, Unlink, Mic
 } from 'lucide-react';
 import {
   CalendarDots,
@@ -485,10 +485,13 @@ export const Ordenes = () => {
 
     // saveKeyHistory es upsert (onConflict member_id,song_id) → idempotente,
     // así que editar no duplica historial.
+    // Dueto: el tono queda asociado a AMBOS directores (cada uno su fila en la
+    // memoria — onConflict member_id,song_id → idempotente, no duplica).
     await Promise.all(
-      formData.songs
-        .filter(s => s.directorId)
-        .map(s => saveKeyHistory(s.directorId, s.songId, s.key, orderId))
+      formData.songs.flatMap(s => [
+        s.directorId ? saveKeyHistory(s.directorId, s.songId, s.key, orderId) : null,
+        s.directorId2 ? saveKeyHistory(s.directorId2, s.songId, s.key, orderId) : null,
+      ].filter(Boolean))
     );
 
     const created = !editingOrder;
@@ -717,6 +720,31 @@ export const Ordenes = () => {
       // Director cleared - reset tooltip
       setKeyHistoryTooltip(null);
     }
+  };
+
+  // Dueto: cambia el 2º director de una canción. No toca el tono (hay un solo tono
+  // por canción); matchea por _localId (no por índice) por si se insertó una
+  // enganchada en el medio. El tono se guarda para AMBOS al guardar el orden.
+  const handleDirector2Change = (index, directorId2, localId) => {
+    const matchRow = (s, i) => (localId ? s._localId === localId : i === index);
+    setFormData(prev => ({
+      ...prev,
+      songs: prev.songs.map((s, i) => (matchRow(s, i) ? { ...s, directorId2 } : s)),
+    }));
+  };
+
+  // Toggle "Dueto": muestra/oculta el casillero del 2º director. `_dueto` es UI-only
+  // (no se persiste; lo saca stripSongRefs). Al quitarlo, se limpia el 2º director.
+  const toggleDueto = (index, localId) => {
+    const matchRow = (s, i) => (localId ? s._localId === localId : i === index);
+    setFormData(prev => ({
+      ...prev,
+      songs: prev.songs.map((s, i) => {
+        if (!matchRow(s, i)) return s;
+        const on = s._dueto || !!s.directorId2;
+        return on ? { ...s, _dueto: false, directorId2: null } : { ...s, _dueto: true };
+      }),
+    }));
   };
 
   // Handle key change - save to history when a song is saved
@@ -1111,11 +1139,16 @@ export const Ordenes = () => {
                   // song's default; the user can pick a valid director next.
                   // Efectivos = permanentes ∪ temporales vigentes.
                   const newBandMemberIds = getEffectiveBandMemberIds(bandId);
-                  const songsAfterBandSwap = formData.songs.map((s) => (
-                    s.directorId && !newBandMemberIds.has(s.directorId)
-                      ? { ...s, directorId: null, _suggestedDirector: false }
-                      : s
-                  ));
+                  const songsAfterBandSwap = formData.songs.map((s) => {
+                    let ns = s;
+                    if (s.directorId && !newBandMemberIds.has(s.directorId)) {
+                      ns = { ...ns, directorId: null, _suggestedDirector: false };
+                    }
+                    if (s.directorId2 && !newBandMemberIds.has(s.directorId2)) {
+                      ns = { ...ns, directorId2: null };
+                    }
+                    return ns;
+                  });
                   setFormData({
                     ...formData,
                     bandId,
@@ -1240,6 +1273,7 @@ export const Ordenes = () => {
                     const songRef = meta.songRef;
                     const song = getSongById(songRef.songId);
                     const rowId = songRef._localId || `${songRef.songId}-${index}`;
+                    const hasDueto = songRef._dueto || !!songRef.directorId2;
                     return (
                       <SortableSongRow key={rowId} id={rowId}>
                         <div className={`flex flex-wrap items-center gap-3 p-3 rounded-xl ${meta.isEnganchada ? 'bg-neutral-800/60 border-l-2 border-gold-500/50' : 'bg-neutral-800'}`}>
@@ -1256,32 +1290,63 @@ export const Ordenes = () => {
                         {meta.isEnganchada && <span className="shrink-0 text-[10px] font-semibold text-gold-300 uppercase tracking-wide">enganchada</span>}
                       </div>
                     </div>
-                    {/* Director selector - filtered to singers only */}
-                    <div className="relative shrink-0 w-44" title={songRef._suggestedDirector ? 'Director sugerido por historial' : undefined}>
-                      <SelectMenu
-                        value={songRef.directorId || ''}
-                        placeholder="Director"
-                        icon={User}
-                        options={[{ value: '', label: 'Sin director' }, ...singers.map((member) => ({ value: member.id, label: member.name }))]}
-                        onChange={(v) => {
-                          const newDirectorId = v || null;
-                          // Clear the "suggested" flag once the user makes a manual choice
-                          setFormData(prev => ({
-                            ...prev,
-                            songs: prev.songs.map((s, i) =>
-                              i === index ? { ...s, _suggestedDirector: false } : s
-                            )
-                          }));
-                          handleDirectorChange(index, newDirectorId, songRef.songId, songRef._localId);
-                        }}
-                      />
-                      {songRef._suggestedDirector && (
-                        <span
-                          className="absolute -top-1.5 -right-1.5 text-[9px] bg-gold-gradient text-black rounded-full px-1.5 py-0.5 leading-none pointer-events-none"
-                          aria-label="Sugerencia automática"
+                    {/* Director(es) de la canción — solo cantantes de la banda. "Dueto" = 2º director.
+                        Se apila el 2º debajo del 1º (sin crecer a lo ancho → prolijo en celular). */}
+                    <div className="relative shrink-0 w-44 flex flex-col gap-1.5">
+                      <div className="flex items-center gap-1">
+                        <div className="relative flex-1 min-w-0" title={songRef._suggestedDirector ? 'Director sugerido por historial' : undefined}>
+                          <SelectMenu
+                            value={songRef.directorId || ''}
+                            placeholder="Director"
+                            icon={User}
+                            options={[{ value: '', label: 'Sin director' }, ...singers.filter((m) => m.id !== songRef.directorId2).map((member) => ({ value: member.id, label: member.name }))]}
+                            onChange={(v) => {
+                              const newDirectorId = v || null;
+                              // Clear the "suggested" flag once the user makes a manual choice
+                              setFormData(prev => ({
+                                ...prev,
+                                songs: prev.songs.map((s, i) =>
+                                  i === index ? { ...s, _suggestedDirector: false } : s
+                                )
+                              }));
+                              handleDirectorChange(index, newDirectorId, songRef.songId, songRef._localId);
+                            }}
+                          />
+                          {songRef._suggestedDirector && (
+                            <span
+                              className="absolute -top-1.5 -right-1.5 text-[9px] bg-gold-gradient text-black rounded-full px-1.5 py-0.5 leading-none pointer-events-none"
+                              aria-label="Sugerencia automática"
+                            >
+                              ★
+                            </span>
+                          )}
+                        </div>
+                        {/* Toggle "Dueto": dos micrófonos. Suma/quita un 2º director. */}
+                        <button
+                          type="button"
+                          onClick={() => toggleDueto(index, songRef._localId)}
+                          title={hasDueto ? 'Quitar el 2º director' : 'Dueto · agregar un 2º director'}
+                          aria-label={hasDueto ? 'Quitar el 2º director' : 'Dueto · agregar un 2º director'}
+                          aria-pressed={hasDueto}
+                          className={`shrink-0 rounded-lg p-1.5 transition-colors ${hasDueto ? 'text-gold-300 bg-gold-500/15' : 'text-gray-400 hover:text-gold-300 hover:bg-neutral-700/60'}`}
                         >
-                          ★
-                        </span>
+                          <span className="relative inline-block" style={{ width: 17, height: 15 }} aria-hidden="true">
+                            <Mic size={12} className="absolute left-0 bottom-0" />
+                            <Mic size={12} className={`absolute right-0 top-0 ${hasDueto ? '' : 'opacity-55'}`} />
+                          </span>
+                        </button>
+                      </div>
+                      {/* 2º director (dueto) — mismo universo de cantantes, sin repetir al 1º. */}
+                      {hasDueto && (
+                        <div className="relative">
+                          <SelectMenu
+                            value={songRef.directorId2 || ''}
+                            placeholder="2º director"
+                            icon={User}
+                            options={[{ value: '', label: 'Sin 2º director' }, ...singers.filter((m) => m.id !== songRef.directorId).map((member) => ({ value: member.id, label: member.name }))]}
+                            onChange={(v) => handleDirector2Change(index, v || null, songRef._localId)}
+                          />
+                        </div>
                       )}
                     </div>
                     {/* Key selector with history lookup icon */}
@@ -1679,6 +1744,8 @@ export const Ordenes = () => {
                   const songRef = meta.songRef;
                   const song = getSongById(songRef.songId);
                   const director = getMemberById(songRef.directorId);
+                  const director2 = getMemberById(songRef.directorId2);
+                  const directorNames = [director, director2].filter(Boolean).map((d) => d.name).join(' y ');
                   return (
                     <div key={index} className={`flex items-center gap-4 p-3 rounded-xl ${meta.isEnganchada ? 'bg-neutral-800/40 border-l-2 border-gold-500/50 ml-3' : 'bg-neutral-800/50'}`}>
                       <span className="h-8 min-w-8 px-2 rounded-full bg-gold-500/15 text-gold-300 flex items-center justify-center font-medium shrink-0">
@@ -1693,9 +1760,9 @@ export const Ordenes = () => {
                           <Badge size="sm" variant="primary">Tono: {songRef.key}</Badge>
                           {meta.isEnganchada && <Badge size="sm" variant="secondary">Enganchada</Badge>}
                           {songRef.ministracion && <Badge size="sm" variant="warning">Ministración</Badge>}
-                          {director && (
+                          {directorNames && (
                             <span className="flex items-center gap-1">
-                              <User size={12} /> {director.name}
+                              <User size={12} /> {directorNames}
                             </span>
                           )}
                         </div>

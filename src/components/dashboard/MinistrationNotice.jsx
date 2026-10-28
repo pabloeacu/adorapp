@@ -53,12 +53,14 @@ export const MinistrationNotice = ({ member, role }) => {
           <ul className="mt-2 space-y-1">
             {songs.map((ref, i) => {
               const song = getSongById(ref.songId);
-              const director = ref.directorId ? getMemberById?.(ref.directorId) : null;
+              // Dueto: muestra ambos directores con "y" (igual que el detalle/PDF/Mi Ensayo).
+              const directorNames = [ref.directorId, ref.directorId2]
+                .map((id) => (id ? getMemberById?.(id) : null)).filter(Boolean).map((m) => m.name).join(' y ');
               return (
                 <li key={`${ref.songId}-${i}`} className="text-sm text-white">
                   <span className="font-semibold">{song?.title || 'Canción'}</span>
                   {ref.key ? <span className="text-gold-200"> en {ref.key}</span> : null}
-                  {director?.name ? <span className="text-neutral-400 text-xs"> · dirige {director.name}</span> : null}
+                  {directorNames ? <span className="text-neutral-400 text-xs"> · dirige {directorNames}</span> : null}
                 </li>
               );
             })}

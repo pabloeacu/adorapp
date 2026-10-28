@@ -37,7 +37,7 @@ const songRow = {
 };
 const orderRow = {
   id: 'o1', date: '2026-09-20', time: '19:00', band_id: 'b1', meeting_type: 'culto_general',
-  songs: [{ songId: 's1', key: 'D', directorId: 'm1', ministracion: true, enganchada: false, _localId: 'x', _pendingHistory: true, _suggestedDirector: 'zz' }],
+  songs: [{ songId: 's1', key: 'D', directorId: 'm1', directorId2: 'm2', ministracion: true, enganchada: false, _localId: 'x', _pendingHistory: true, _suggestedDirector: 'zz', _dueto: true }],
   feedback: 'buen servicio', status: 'scheduled',
   rehearsal_date: '2026-09-18', rehearsal_time: '20:00',
   lineup: { mode: 'custom', members: [{ memberId: 'm1', instruments: ['Piano'] }], definedBy: 'm1', definedAt: 't' },
@@ -138,9 +138,16 @@ describe('convertOrderToDB — round-trip + stripSongRefs + server-owned', () =>
     expect(db.lineup).toEqual({ mode: 'custom', members: [{ memberId: 'm1', instruments: ['Piano'] }], definedBy: 'm1', definedAt: 't' });
   });
 
-  it('stripSongRefs: quita _localId/_pendingHistory/_suggestedDirector pero CONSERVA songId/key/directorId/ministracion/enganchada', () => {
+  it('stripSongRefs: quita _localId/_pendingHistory/_suggestedDirector/_dueto pero CONSERVA songId/key/directorId/directorId2/ministracion/enganchada', () => {
     const db = convertOrderToDB(convertOrderFromDB(orderRow));
-    expect(db.songs).toEqual([{ songId: 's1', key: 'D', directorId: 'm1', ministracion: true, enganchada: false }]);
+    expect(db.songs).toEqual([{ songId: 's1', key: 'D', directorId: 'm1', directorId2: 'm2', ministracion: true, enganchada: false }]);
+  });
+
+  it('stripSongRefs: un 2º director vacío (null) se persiste como clave AUSENTE (no finge cambio de contenido)', () => {
+    const noDueto = { ...orderRow, songs: [{ songId: 's1', key: 'D', directorId: 'm1', directorId2: null }] };
+    const db = convertOrderToDB(convertOrderFromDB(noDueto));
+    expect(db.songs[0]).not.toHaveProperty('directorId2');
+    expect(db.songs[0]).toEqual({ songId: 's1', key: 'D', directorId: 'm1' });
   });
 
   it('los sellos y la suspensión del ensamble son server-owned: NUNCA en ToDB (landmines #9/#64/#78)', () => {

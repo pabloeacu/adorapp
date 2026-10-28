@@ -473,6 +473,8 @@ export const Practica = () => {
           if (!song) return null;
           const log = logs[songRef.songId] || emptyLog(orderId, songRef.songId);
           const director = getMemberById(songRef.directorId);
+          const director2 = getMemberById(songRef.directorId2);
+          const directorNames = [director, director2].filter(Boolean).map((d) => d.name).join(' y ');
           const done = milestonesOf(log, singer) === milestonesPerSong(singer);
 
           return (
@@ -497,8 +499,8 @@ export const Practica = () => {
                       {meta.isEnganchada && <Badge size="sm" variant="secondary">Enganchada</Badge>}
                       {songRef.ministracion && <Badge size="sm" variant="warning">Ministración</Badge>}
                       {song.bpm && <Badge size="sm" variant="secondary">BPM: {song.bpm}</Badge>}
-                      {director && (
-                        <span className="flex items-center gap-1"><User size={12} /> {director.name}</span>
+                      {directorNames && (
+                        <span className="flex items-center gap-1"><User size={12} /> {directorNames}</span>
                       )}
                     </div>
                   </div>

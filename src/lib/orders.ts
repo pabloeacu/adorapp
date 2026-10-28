@@ -22,7 +22,20 @@ export function dayKey(dateLike: string | number | Date | null | undefined): str
 export type OrderSongRef = {
   songId: string;
   directorId?: string | null;
+  // Dueto: segundo director/cantante OPCIONAL de la canción. Mismo universo que el
+  // primero (cantantes de la banda). Aditivo: ausente/null = una sola voz, como siempre.
+  directorId2?: string | null;
 };
+
+/**
+ * Director ids de una canción del orden (1 o 2), sin vacíos, en orden.
+ * Fuente única para mostrar "Director1 y Director2" y para guardar el tono de ambos.
+ */
+export function directorIdsFor(
+  ref: { directorId?: string | null; directorId2?: string | null } | null | undefined,
+): string[] {
+  return [ref?.directorId, ref?.directorId2].filter((x): x is string => !!x);
+}
 
 export type OrderForSuggestion = {
   bandId?: string | null;

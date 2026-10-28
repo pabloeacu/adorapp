@@ -103,6 +103,8 @@ export const generateOrderPdf = async (order, ctx) => {
 
     const song = ctx.getSongById(songRef.songId);
     const director = ctx.getMemberById(songRef.directorId);
+    const director2 = ctx.getMemberById(songRef.directorId2);
+    const directorNames = [director, director2].filter(Boolean).map((d) => d.name);
     const key = songRef.key || song?.originalKey || song?.key || 'C';
 
     // Number (inciso 2.a/2.b para enganchadas)
@@ -151,11 +153,18 @@ export const generateOrderPdf = async (order, ctx) => {
     doc.setFont('helvetica', 'bold');
     doc.text(key, 140, y + (song?.artist ? 3 : 0), { align: 'center' });
 
-    // Director
+    // Director(es) — con dueto, los dos nombres apilados (no pisan el tono).
     doc.setTextColor(...lightGray);
-    doc.setFontSize(10);
     doc.setFont('helvetica', 'normal');
-    doc.text(director?.name || '-', 190, y + (song?.artist ? 3 : 0), { align: 'right' });
+    const dBaseY = y + (song?.artist ? 3 : 0);
+    if (directorNames.length >= 2) {
+      doc.setFontSize(9);
+      doc.text(`${directorNames[0]} y`, 190, dBaseY - 2, { align: 'right' });
+      doc.text(directorNames[1], 190, dBaseY + 2.5, { align: 'right' });
+    } else {
+      doc.setFontSize(10);
+      doc.text(directorNames[0] || '-', 190, dBaseY, { align: 'right' });
+    }
 
     // Move to next row
     y += song?.artist ? 12 : 10;
@@ -244,6 +253,8 @@ export const generateSongsPdf = async (order, ctx) => {
 
     const song = ctx.getSongById(songRef.songId);
     const director = ctx.getMemberById(songRef.directorId);
+    const director2 = ctx.getMemberById(songRef.directorId2);
+    const directorNames = [director, director2].filter(Boolean).map((d) => d.name);
     const originalKey = song?.originalKey || song?.key || 'C';
     const key = songRef.key || originalKey;
 
@@ -275,7 +286,7 @@ export const generateSongsPdf = async (order, ctx) => {
     const metaLines = [
       `Orden: ${ctx.formatDate(order.date)}`,
       `Banda: ${band?.name || 'N/A'}`,
-      `Director: ${director?.name || '-'}`,
+      `${directorNames.length >= 2 ? 'Directores' : 'Director'}: ${directorNames.join(' y ') || '-'}`,
       `Tono: ${key}${key !== originalKey ? ` (Original: ${originalKey})` : ''}`
     ];
     metaLines.forEach((line, i) => {

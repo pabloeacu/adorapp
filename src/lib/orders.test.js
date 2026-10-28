@@ -1,5 +1,16 @@
 import { describe, it, expect } from 'vitest';
-import { dayKey, suggestDirectorForSong } from './orders';
+import { dayKey, suggestDirectorForSong, directorIdsFor } from './orders';
+
+describe('directorIdsFor (dueto)', () => {
+  it('devuelve 1 o 2 directores, sin vacíos', () => {
+    expect(directorIdsFor({ directorId: 'a', directorId2: 'b' })).toEqual(['a', 'b']);
+    expect(directorIdsFor({ directorId: 'a' })).toEqual(['a']);
+    expect(directorIdsFor({ directorId: 'a', directorId2: null })).toEqual(['a']);
+    expect(directorIdsFor({ directorId2: 'b' })).toEqual(['b']);
+    expect(directorIdsFor({})).toEqual([]);
+    expect(directorIdsFor(null)).toEqual([]);
+  });
+});
 
 describe('dayKey', () => {
   it('passes YYYY-MM-DD strings through unchanged', () => {

@@ -55,7 +55,8 @@ export const LineupEditor = ({ bandId, songs = [], orderDate = null, excludeOrde
   }, [songs, membersById]);
   const directorCount = useMemo(() => {
     const c = new Map();
-    for (const s of songs || []) if (s?.directorId) c.set(s.directorId, (c.get(s.directorId) || 0) + 1);
+    // Cuenta ambos directores (dueto): quien dirige como 2º también "dirige" la canción.
+    for (const s of songs || []) for (const id of [s?.directorId, s?.directorId2]) if (id) c.set(id, (c.get(id) || 0) + 1);
     return c;
   }, [songs]);
 
