@@ -12,7 +12,6 @@ import {
 import {
   CalendarDots,
   CalendarBlank,
-  MusicNotes as MusicNotesDuo,
   UsersThree,
 } from '@phosphor-icons/react';
 // jspdf is loaded on demand inside generateOrderPDF / generateSongsPDF
@@ -37,6 +36,7 @@ import { SchemaBuilderModal } from '../components/schema/SchemaBuilderModal';
 import { TemplateManagerModal } from '../components/schema/TemplateManagerModal';
 import { suggestDirectorForSong } from '../lib/orders';
 import { SelectMenu } from '../components/ui/SelectMenu';
+import { UnusedSongsPanel } from '../components/orders/UnusedSongsPanel';
 import { LineupEditor } from '../components/orders/LineupEditor';
 import { LineupSummary } from '../components/orders/LineupSummary';
 import { LineupModal } from '../components/orders/LineupModal';
@@ -118,7 +118,7 @@ const statusConfig = {
 
 export const Ordenes = () => {
   useDocumentTitle('Órdenes');
-  const { orders, bands, songs, members, bandTemporaryMembers, addOrder, updateOrder, deleteOrder, cloneOrder, getUnusedByBand, getSongById, getBandById, getMemberById, getBandMembers, getEffectiveBandMemberIds, getServiceSchema, getOrderParticipants } = useAppStore();
+  const { orders, bands, songs, members, bandTemporaryMembers, addOrder, updateOrder, deleteOrder, cloneOrder, getSongById, getBandById, getMemberById, getBandMembers, getEffectiveBandMemberIds, getServiceSchema, getOrderParticipants } = useAppStore();
   const userRole = useCurrentRole();
   const isPastor = userRole === 'pastor';
   const isLeader = userRole === 'leader';
@@ -136,7 +136,6 @@ export const Ordenes = () => {
   const [filterStatus, setFilterStatus] = useState('scheduled');
   const [filterBand, setFilterBand] = useState('all');
   const [showUnused, setShowUnused] = useState(false);
-  const [selectedBandForUnused, setSelectedBandForUnused] = useState(null);
 
   // Key history feature
   const [keyHistoryLoading, setKeyHistoryLoading] = useState(false);
@@ -272,8 +271,6 @@ export const Ordenes = () => {
     return [...list].sort(cmp);
   }, [orders, filterStatus, filterBand, sortBy, getBandById]);
 
-  const unusedSongs = selectedBandForUnused ? getUnusedByBand(selectedBandForUnused, 4) : [];
-
   // Filtered songs for dropdown search.
   // Defensive null-guards: any NULL on title/artist/key (legacy data) would
   // crash the whole Ordenes page with "Cannot read properties of null".
@@ -328,7 +325,6 @@ export const Ordenes = () => {
     setIsModalOpen(false);
     setEditingOrder(null);
     setShowUnused(false);
-    setSelectedBandForUnused(null);
     setKeyHistoryTooltip(null);
     setFormStep('form');
     setLineupSaving(false);
@@ -1155,7 +1151,6 @@ export const Ordenes = () => {
                     meetingType: band?.meetingType || 'culto_general',
                     songs: songsAfterBandSwap,
                   });
-                  setSelectedBandForUnused(bandId);
                   // Cambió la banda → la formación en borrador ya no aplica
                   // (sus integrantes son de la banda anterior). Se reinicia a
                   // "todos" para no guardar/mostrar una selección fantasma.
@@ -1225,37 +1220,10 @@ export const Ordenes = () => {
               </Button>
             </div>
 
-            {/* Unused Songs Suggestion */}
+            {/* Sugerencia de canciones sin usar — navegable: todas (con scroll), buscador,
+                filtro por clima y ordenadas por "la que hace más que no suena". */}
             {showUnused && formData.bandId && (
-              <div className="mb-4 p-4 bg-gold-500/[0.06] border border-gold-500/30 rounded-xl">
-                <div className="flex items-center gap-2 text-gold-300 text-sm mb-3">
-                  <Zap size={14} />
-                  Canciones sin usar en las últimas 4 semanas
-                </div>
-                <div className="flex flex-wrap gap-2">
-                  {unusedSongs.slice(0, 6).map(song => (
-                    <button
-                      key={song.id}
-                      onClick={() => addSongToOrder(song)}
-                      className="flex items-center gap-2 px-3 py-2 bg-neutral-800 hover:bg-neutral-700 rounded-lg text-sm transition-colors"
-                    >
-                      <Music size={14} />
-                      {song.title}
-                      <Badge size="sm" variant="primary">{song.key}</Badge>
-                      <span className="text-gold-300">+</span>
-                    </button>
-                  ))}
-                  {unusedSongs.length === 0 && (
-                    <EmptyState
-                      className="w-full !py-8"
-                      icon={MusicNotesDuo}
-                      title="Sin canciones para sugerir"
-                      subtitle="Esta banda usó todo su repertorio en las últimas 4 semanas."
-                      annotation="Buscala más abajo"
-                    />
-                  )}
-                </div>
-              </div>
+              <UnusedSongsPanel bandId={formData.bandId} onAdd={addSongToOrder} />
             )}
 
             {/* All Songs — drag the ⋮⋮ handle to reorder. */}

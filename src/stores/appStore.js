@@ -1085,13 +1085,18 @@ export const useAppStore = create((set, get) => ({
   getUnusedByBand: (bandId, weeks = 4) => {
     const state = get();
     const bandOrders = state.orders.filter(o => o.bandId === bandId);
+    // Umbral como string 'YYYY-MM-DD' en hora LOCAL y comparación lexicográfica
+    // (igual que bandLastUseMap). Evita el off-by-one de TZ de `new Date('YYYY-MM-DD')`
+    // —que se interpreta en UTC y en ART cae el día anterior (landmine #50)— y que la
+    // pertenencia a la ventana dependa de la hora a la que se abre el panel.
     const cutoff = new Date();
     cutoff.setDate(cutoff.getDate() - weeks * 7);
+    const cutoffStr = `${cutoff.getFullYear()}-${String(cutoff.getMonth() + 1).padStart(2, '0')}-${String(cutoff.getDate()).padStart(2, '0')}`;
 
     const recentlyUsedSongIds = new Set();
     bandOrders.forEach(order => {
-      if (new Date(order.date) >= cutoff) {
-        order.songs.forEach(s => recentlyUsedSongIds.add(s.songId));
+      if (order.date && String(order.date).slice(0, 10) >= cutoffStr) {
+        (order.songs || []).forEach(s => recentlyUsedSongIds.add(s.songId));
       }
     });
 
