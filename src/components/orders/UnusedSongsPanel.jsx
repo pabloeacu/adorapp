@@ -21,8 +21,10 @@ export function UnusedSongsPanel({ bandId, onAdd }) {
   const [query, setQuery] = useState('');
   const [category, setCategory] = useState(null);
 
-  // "ahora" estable mientras el panel está montado con esta banda/ventana.
-  const nowMs = useMemo(() => Date.now(), [bandId, weeks]);
+  // "ahora" se fija una sola vez al montar (inicializador perezoso de useState:
+  // no se puede llamar Date.now() durante el render — react-hooks/purity). Alcanza
+  // de sobra para las etiquetas gruesas de "hace X" (no necesita refrescar en vivo).
+  const [nowMs] = useState(() => Date.now());
 
   const unused = useMemo(
     () => (bandId ? getUnusedByBand(bandId, weeks) : []),
