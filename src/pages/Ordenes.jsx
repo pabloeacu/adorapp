@@ -37,6 +37,8 @@ import { TemplateManagerModal } from '../components/schema/TemplateManagerModal'
 import { suggestDirectorForSong } from '../lib/orders';
 import { SelectMenu } from '../components/ui/SelectMenu';
 import { UnusedSongsPanel } from '../components/orders/UnusedSongsPanel';
+import { OveruseWarningModal } from '../components/orders/OveruseWarningModal';
+import { countRecentUses, isOverused, OVERUSE_WINDOW_DAYS } from '../lib/songUsage';
 import { LineupEditor } from '../components/orders/LineupEditor';
 import { LineupSummary } from '../components/orders/LineupSummary';
 import { LineupModal } from '../components/orders/LineupModal';
@@ -136,6 +138,10 @@ export const Ordenes = () => {
   const [filterStatus, setFilterStatus] = useState('scheduled');
   const [filterBand, setFilterBand] = useState('all');
   const [showUnused, setShowUnused] = useState(false);
+  // Aviso de canción repetida ("lado B"): { song, uses } mientras el aviso está abierto.
+  const [overuseModal, setOveruseModal] = useState(null);
+  // Canciones para las que el líder ya decidió en ESTA sesión de armado (no re-avisar).
+  const warnedSongsRef = useRef(new Set());
 
   // Key history feature
   const [keyHistoryLoading, setKeyHistoryLoading] = useState(false);
@@ -318,6 +324,9 @@ export const Ordenes = () => {
     setFormStep('form');
     setLineupDraft({ mode: 'all', members: [] });
     setLineupSaving(false);
+    // Nueva sesión de armado → se reinicia el "ya avisé" del aviso de repetición.
+    warnedSongsRef.current = new Set();
+    setOveruseModal(null);
     setIsModalOpen(true);
   };
 
@@ -328,6 +337,7 @@ export const Ordenes = () => {
     setKeyHistoryTooltip(null);
     setFormStep('form');
     setLineupSaving(false);
+    setOveruseModal(null);
   };
 
   // Cerrar el modal de alta/edición. En el paso "Formación" el orden todavía NO
@@ -593,7 +603,10 @@ export const Ordenes = () => {
   };
 
 
-  const addSongToOrder = async (song) => {
+  // Agrega la canción al borrador del orden (el riel de siempre). Lo separamos de
+  // addSongToOrder para que el aviso de repetición pueda interponerse ANTES sin
+  // tocar esta lógica: "Agregarla igual" llama exactamente a esto.
+  const doAddSong = (song) => {
     const singerIds = new Set(singers.map((s) => s.id));
     const suggestedDirectorId = suggestDirectorForSong({
       singerIds,
@@ -634,6 +647,39 @@ export const Ordenes = () => {
         }
       }).catch(() => {});
     }
+  };
+
+  // Agregar una canción desde el buscador / el panel de sin usar. Si está MUY
+  // repetida (más de 5 veces en los últimos 120 días en toda la iglesia) y el líder
+  // aún no decidió en esta sesión, se interpone un aviso NO bloqueante; si no, se
+  // agrega directo. El conteo es global (excluye canceladas y la orden en edición).
+  const addSongToOrder = (song) => {
+    if (!song) return;
+    const uses = countRecentUses(orders, song.id, {
+      nowMs: Date.now(),
+      excludeOrderId: editingOrder?.id,
+    });
+    if (isOverused(uses) && !warnedSongsRef.current.has(song.id)) {
+      setOveruseModal({ song, uses });
+      return;
+    }
+    doAddSong(song);
+  };
+
+  // "Agregarla igual": el líder decide repetirla → se suma y no se vuelve a avisar.
+  const handleOveruseKeep = () => {
+    if (!overuseModal) return;
+    warnedSongsRef.current.add(overuseModal.song.id);
+    doAddSong(overuseModal.song);
+    setOveruseModal(null);
+  };
+
+  // "Ver canciones sin usar": no la agrega, abre el navegador para buscar otra.
+  const handleOveruseBrowse = () => {
+    if (!overuseModal) return;
+    warnedSongsRef.current.add(overuseModal.song.id);
+    setShowUnused(true);
+    setOveruseModal(null);
   };
 
   // Agrega una canción ENGANCHADA justo debajo de `afterIndex` (mismo trato que una
@@ -1801,6 +1847,17 @@ export const Ordenes = () => {
         onClose={() => setErrorModal(prev => ({ ...prev, isOpen: false }))}
         title={errorModal.title}
         message={errorModal.message}
+      />
+
+      {/* Aviso NO bloqueante de canción repetida ("lado B") al armar un orden. */}
+      <OveruseWarningModal
+        isOpen={!!overuseModal}
+        song={overuseModal?.song}
+        uses={overuseModal?.uses}
+        days={OVERUSE_WINDOW_DAYS}
+        onKeep={handleOveruseKeep}
+        onBrowse={handleOveruseBrowse}
+        onClose={() => setOveruseModal(null)}
       />
 
       {/* Formación: edición desde el detalle (líder/pastor). `viewingOrder` es una
