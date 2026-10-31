@@ -38,7 +38,8 @@ import { suggestDirectorForSong } from '../lib/orders';
 import { SelectMenu } from '../components/ui/SelectMenu';
 import { UnusedSongsPanel } from '../components/orders/UnusedSongsPanel';
 import { OveruseWarningModal } from '../components/orders/OveruseWarningModal';
-import { countRecentUses, isOverused, OVERUSE_WINDOW_DAYS } from '../lib/songUsage';
+import { RecentCollisionModal } from '../components/orders/RecentCollisionModal';
+import { countRecentUses, isOverused, OVERUSE_WINDOW_DAYS, findRecentCollisions } from '../lib/songUsage';
 import { LineupEditor } from '../components/orders/LineupEditor';
 import { LineupSummary } from '../components/orders/LineupSummary';
 import { LineupModal } from '../components/orders/LineupModal';
@@ -138,9 +139,12 @@ export const Ordenes = () => {
   const [filterStatus, setFilterStatus] = useState('scheduled');
   const [filterBand, setFilterBand] = useState('all');
   const [showUnused, setShowUnused] = useState(false);
-  // Aviso de canción repetida ("lado B"): { song, uses } mientras el aviso está abierto.
+  // Aviso de canción repetida por FRECUENCIA ("lado B"): { song, uses } mientras el aviso está abierto.
   const [overuseModal, setOveruseModal] = useState(null);
-  // Canciones para las que el líder ya decidió en ESTA sesión de armado (no re-avisar).
+  // Aviso de CHOQUE de agenda (otra banda ya la tiene en ±4 días): { song, collisions }.
+  const [recencyModal, setRecencyModal] = useState(null);
+  // Canciones para las que el líder ya fue avisado en ESTA sesión de armado (choque
+  // o frecuencia, lo que haya salido primero) → no re-avisar por la misma canción.
   const warnedSongsRef = useRef(new Set());
 
   // Key history feature
@@ -324,9 +328,10 @@ export const Ordenes = () => {
     setFormStep('form');
     setLineupDraft({ mode: 'all', members: [] });
     setLineupSaving(false);
-    // Nueva sesión de armado → se reinicia el "ya avisé" del aviso de repetición.
+    // Nueva sesión de armado → se reinicia el "ya avisé" de los avisos de repetición.
     warnedSongsRef.current = new Set();
     setOveruseModal(null);
+    setRecencyModal(null);
     setIsModalOpen(true);
   };
 
@@ -338,6 +343,7 @@ export const Ordenes = () => {
     setFormStep('form');
     setLineupSaving(false);
     setOveruseModal(null);
+    setRecencyModal(null);
   };
 
   // Cerrar el modal de alta/edición. En el paso "Formación" el orden todavía NO
@@ -649,23 +655,34 @@ export const Ordenes = () => {
     }
   };
 
-  // Agregar una canción desde el buscador / el panel de sin usar. Si está MUY
-  // repetida (más de 5 veces en los últimos 120 días en toda la iglesia) y el líder
-  // aún no decidió en esta sesión, se interpone un aviso NO bloqueante; si no, se
-  // agrega directo. El conteo es global (excluye canceladas y la orden en edición).
+  // Agregar una canción desde el buscador / el panel de sin usar. Dos avisos NO
+  // bloqueantes se pueden interponer (uno solo por canción por sesión de armado):
+  //   1º CHOQUE de agenda — otra banda ya la tiene en un orden de ±4 días (alerta
+  //      ámbar; cuida la relación entre líderes para que no se pisen).
+  //   2º FRECUENCIA — más de 5 veces en 120 días en toda la iglesia (aviso dorado;
+  //      cuida la monotonía para la congregación).
+  // Si ninguno aplica (o el líder ya fue avisado por esta canción), se agrega directo.
+  // Los helpers toman "ahora" internamente (Date.now() vive en songUsage.js, una lib
+  // pura, no en el render de este componente — react-hooks/purity).
   const addSongToOrder = (song) => {
     if (!song) return;
-    // countRecentUses toma "ahora" internamente (Date.now() vive en songUsage.js,
-    // una lib pura, no en el render de este componente — react-hooks/purity).
-    const uses = countRecentUses(orders, song.id, { excludeOrderId: editingOrder?.id });
-    if (isOverused(uses) && !warnedSongsRef.current.has(song.id)) {
-      setOveruseModal({ song, uses });
-      return;
+    if (!warnedSongsRef.current.has(song.id)) {
+      const collisions = findRecentCollisions(orders, song.id, { excludeOrderId: editingOrder?.id })
+        .map((c) => ({ ...c, bandName: (c.bandId && getBandById?.(c.bandId)?.name) || 'Otra banda' }));
+      if (collisions.length) {
+        setRecencyModal({ song, collisions });
+        return;
+      }
+      const uses = countRecentUses(orders, song.id, { excludeOrderId: editingOrder?.id });
+      if (isOverused(uses)) {
+        setOveruseModal({ song, uses });
+        return;
+      }
     }
     doAddSong(song);
   };
 
-  // "Agregarla igual": el líder decide repetirla → se suma y no se vuelve a avisar.
+  // "Agregarla igual" (frecuencia): el líder decide repetirla → se suma y no se vuelve a avisar.
   const handleOveruseKeep = () => {
     if (!overuseModal) return;
     warnedSongsRef.current.add(overuseModal.song.id);
@@ -679,6 +696,21 @@ export const Ordenes = () => {
     warnedSongsRef.current.add(overuseModal.song.id);
     setShowUnused(true);
     setOveruseModal(null);
+  };
+
+  // Choque de agenda — "Agregarla igual": la suma y no vuelve a avisar por esta canción.
+  const handleRecencyKeep = () => {
+    if (!recencyModal) return;
+    warnedSongsRef.current.add(recencyModal.song.id);
+    doAddSong(recencyModal.song);
+    setRecencyModal(null);
+  };
+
+  // Choque de agenda — "Elijo otra": no la agrega, cierra el cartel para elegir otra.
+  const handleRecencyDismiss = () => {
+    if (!recencyModal) return;
+    warnedSongsRef.current.add(recencyModal.song.id);
+    setRecencyModal(null);
   };
 
   // Agrega una canción ENGANCHADA justo debajo de `afterIndex` (mismo trato que una
@@ -1848,7 +1880,7 @@ export const Ordenes = () => {
         message={errorModal.message}
       />
 
-      {/* Aviso NO bloqueante de canción repetida ("lado B") al armar un orden. */}
+      {/* Aviso NO bloqueante por FRECUENCIA ("lado B") al armar un orden. */}
       <OveruseWarningModal
         isOpen={!!overuseModal}
         song={overuseModal?.song}
@@ -1857,6 +1889,16 @@ export const Ordenes = () => {
         onKeep={handleOveruseKeep}
         onBrowse={handleOveruseBrowse}
         onClose={() => setOveruseModal(null)}
+      />
+
+      {/* Alerta ÁMBAR de CHOQUE de agenda: la canción ya está en un orden de ±4 días. */}
+      <RecentCollisionModal
+        isOpen={!!recencyModal}
+        song={recencyModal?.song}
+        collisions={recencyModal?.collisions || []}
+        onKeep={handleRecencyKeep}
+        onDismiss={handleRecencyDismiss}
+        onClose={() => setRecencyModal(null)}
       />
 
       {/* Formación: edición desde el detalle (líder/pastor). `viewingOrder` es una
