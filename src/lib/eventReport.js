@@ -230,7 +230,7 @@ export async function buildEventPdfBlob(ev, regs, guestsByReg, opts = {}) {
   // latinos del texto LIBRE del usuario (si no, jsPDF los muestra como basura).
   // El xlsx no necesita esto (es Unicode nativo).
   const clip = (text, maxW) => {
-    let s = (text == null ? '' : String(text)).replace(/[^\u0000-ÿ–—…]/g, '');
+    let s = (text == null ? '' : String(text)).replace(/[^ -~¡-ÿ–—…]/g, '');
     if (doc.getTextWidth(s) <= maxW) return s;        // entra tal cual
     if (doc.getTextWidth('…') > maxW) return '';       // ni la elipsis entra
     while (s.length > 1 && doc.getTextWidth(s + '…') > maxW) s = s.slice(0, -1);
