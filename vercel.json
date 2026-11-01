@@ -4,6 +4,10 @@
   "devCommand": "npm run dev",
   "installCommand": "npm install",
   "regions": ["gru1"],
+  "redirects": [
+    { "source": "/thechosen", "destination": "/", "permanent": false },
+    { "source": "/thechosen/:path*", "destination": "/", "permanent": false }
+  ],
   "rewrites": [
     { "source": "/((?!robots.txt|sitemap.xml|manifest.json|sw.js|adorapp-logo.png|adoracion-caf-logo.png|adoracion-caf-logo-blackbg.png|logo.png|logo-caf.png|login-bg.jpg|AdorAPP-Instructivo.pdf|assets/.*|fonts/.*|api/.*).*)", "destination": "/index.html" }
   ],
