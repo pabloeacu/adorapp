@@ -2,13 +2,16 @@ import React, { useEffect, useMemo, useState, useCallback } from 'react';
 import {
   Ticket, Users, RefreshCw, Search, CheckCircle2, Clock,
   Mail, Download, Lock, Unlock, Send, Pencil, X, QrCode, ChevronDown, ChevronRight,
-  ScanLine, Copy, Power, Link2,
+  ScanLine, Copy, Power, Link2, FileText,
 } from 'lucide-react';
 import { useDocumentTitle } from '../hooks/useDocumentTitle';
 import { supabase } from '../lib/supabase';
 import { Card } from '../components/ui/Card';
 import { Button } from '../components/ui/Button';
 import { PageLoader } from '../components/ui/PageLoader';
+import { isChunkLoadError, recoverFromStaleChunk } from '../lib/chunkRecovery';
+import logoAvivamiento from '../assets/thechosen/logo-avivamiento.png';
+import logoCaf from '../assets/thechosen/logo-caf-white.png';
 
 const SLUG = 'thechosen';
 const TZ = 'America/Argentina/Buenos_Aires';
@@ -27,14 +30,6 @@ const EMAIL_CHIP = {
 };
 const EMAIL_LABEL = { sent: 'Enviado', pending: 'En cola', failed: 'Falló', bounced: 'Rebotó' };
 
-// Neutraliza inyección de fórmulas en CSV (un nombre que empiece con = + - @ o
-// un carácter de control podría ejecutarse como fórmula al abrir en Excel/Sheets).
-const csvCell = (v) => {
-  let s = v == null ? '' : String(v);
-  if (/^[=+\-@\t\r]/.test(s)) s = `'${s}`;
-  return `"${s.replace(/"/g, '""')}"`;
-};
-
 export function Eventos() {
   useDocumentTitle('Eventos');
   const [loading, setLoading] = useState(true);
@@ -50,6 +45,7 @@ export function Eventos() {
   const [staff, setStaff] = useState({ loading: true, hasKey: false, enabled: false, key: null });
   const [staffBusy, setStaffBusy] = useState(false);
   const [copied, setCopied] = useState(false);
+  const [exporting, setExporting] = useState(null); // 'pdf' | 'xlsx'
 
   const load = useCallback(async () => {
     const [{ data: evData }, { data: rows }] = await Promise.all([
@@ -160,32 +156,70 @@ export function Eventos() {
     flash(`Correo reencolado a ${data.email}.`);
   };
 
-  // Exporta UNA fila por persona: el titular y, debajo, cada acompañante marcado
-  // como "Dependiente" (así se aprovecha toda la información recolectada).
-  const exportCsv = () => {
-    const head = ['Tipo', 'Codigo reserva', 'Nombre', 'Email', 'Celular', 'Iglesia',
-      'Como se entero', 'Acompanantes', 'Personas en la reserva', 'Estado correo',
-      'Ingreso', 'Fecha reserva', 'Reserva cancelada'];
-    const rows = [];
-    regs.forEach((r) => {
-      const code = (r.ticket_token || '').slice(0, 6).toUpperCase();
-      const cancelada = r.status === 'cancelled' ? 'Sí' : 'No';
-      rows.push(['Titular (principal)', code, r.nombre, r.email, r.celular,
-        r.iglesia || '', r.como_se_entero || '', r.acompanantes || 0, 1 + (r.acompanantes || 0),
-        EMAIL_LABEL[r.email_status] || r.email_status, r.checked_in_at ? fmtDate(r.checked_in_at) : '',
-        fmtDate(r.created_at), cancelada]);
-      (guestsByReg[r.id] || []).forEach((g) => {
-        rows.push(['Dependiente (acompañante)', code, g.nombre || '', g.email || '', g.celular || '',
-          '', '', '', '', '', '', '', cancelada]);
-      });
+  // Prepara los logos (dataURL + proporción) para embeberlos en el PDF, achicándolos
+  // en un canvas para no inflar el archivo.
+  const prepareReportImages = async () => {
+    const toData = (src, maxW = 600) => new Promise((resolve) => {
+      const im = new Image();
+      im.onload = () => {
+        const ratio = im.naturalHeight / im.naturalWidth || 1;
+        const w = Math.min(maxW, im.naturalWidth || maxW);
+        const h = Math.max(1, Math.round(w * ratio));
+        const cv = document.createElement('canvas');
+        cv.width = w; cv.height = h;
+        try {
+          cv.getContext('2d').drawImage(im, 0, 0, w, h);
+          resolve({ dataUrl: cv.toDataURL('image/png'), ratio });
+        } catch { resolve(null); }
+      };
+      im.onerror = () => resolve(null);
+      im.src = src;
     });
-    const csv = [head, ...rows].map((row) => row.map(csvCell).join(',')).join('\n');
-    const blob = new Blob(['﻿' + csv], { type: 'text/csv;charset=utf-8' });
+    const [joven, caf] = await Promise.all([toData(logoAvivamiento), toData(logoCaf)]);
+    return { joven, caf };
+  };
+
+  const downloadBlob = (blob, name) => {
     const a = document.createElement('a');
     a.href = URL.createObjectURL(blob);
-    a.download = `inscriptos-thechosen-${new Date().toISOString().slice(0, 10)}.csv`;
+    a.download = name;
     a.click();
-    URL.revokeObjectURL(a.href);
+    setTimeout(() => URL.revokeObjectURL(a.href), 4000);
+  };
+
+  // PDF "con la onda del evento": tapa + tablero con gráficos + listado completo.
+  const exportPdf = async () => {
+    if (exporting) return;
+    setExporting('pdf');
+    try {
+      const [{ buildEventPdfBlob }, images] = await Promise.all([
+        import('../lib/eventReport'),
+        prepareReportImages(),
+      ]);
+      const blob = await buildEventPdfBlob(ev, regs, guestsByReg, { images });
+      downloadBlob(blob, 'Reporte-The-Chosen-T6.pdf');
+    } catch (err) {
+      if (isChunkLoadError(err) && recoverFromStaleChunk()) return;
+      flash('No se pudo generar el PDF. Probá de nuevo.');
+    } finally {
+      setExporting(null);
+    }
+  };
+
+  // Planilla Excel: una fila por persona (titular + cada acompañante).
+  const exportXlsx = async () => {
+    if (exporting) return;
+    setExporting('xlsx');
+    try {
+      const { buildEventXlsxBlob } = await import('../lib/eventReport');
+      const blob = await buildEventXlsxBlob(regs, guestsByReg);
+      downloadBlob(blob, 'Inscriptos-The-Chosen-T6.xlsx');
+    } catch (err) {
+      if (isChunkLoadError(err) && recoverFromStaleChunk()) return;
+      flash('No se pudo generar el Excel. Probá de nuevo.');
+    } finally {
+      setExporting(null);
+    }
   };
 
   if (loading) return <PageLoader />;
@@ -231,7 +265,12 @@ export function Eventos() {
           {ev?.registration_open ? 'Cerrar inscripciones' : 'Abrir inscripciones'}
         </Button>
         <Button variant="secondary" onClick={load}><RefreshCw className="h-4 w-4 mr-1" />Actualizar</Button>
-        <Button variant="secondary" onClick={exportCsv}><Download className="h-4 w-4 mr-1" />Exportar todo</Button>
+        <Button variant="secondary" onClick={exportPdf} disabled={!!exporting}>
+          <FileText className="h-4 w-4 mr-1" />{exporting === 'pdf' ? 'Generando…' : 'PDF del evento'}
+        </Button>
+        <Button variant="secondary" onClick={exportXlsx} disabled={!!exporting}>
+          <Download className="h-4 w-4 mr-1" />{exporting === 'xlsx' ? 'Generando…' : 'Excel'}
+        </Button>
       </div>
 
       {/* Control de acceso en la puerta (enlace para el equipo de puerta) */}
