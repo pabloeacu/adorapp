@@ -42,6 +42,13 @@ const PER_RECIPIENT_FLOOR_MIN = 5;
 const GLOBAL_FLOOR_SECONDS = 10;
 const FAST_LANE_MAX_PRIORITY = 1;
 const CANDIDATE_LIMIT = 10;
+// Carril EXPRÉS: avisos de culto EN VIVO (hoy solo la ministración, encolada con
+// prioridad 0 por add_ministration_songs). Estos salen TODOS en el mismo latido del
+// cron, a la vez, SIN goteo global y SIN el piso por-destinatario de 5 min: un aviso
+// tardío no sirve en vivo. Son pocos (formación ∪ pastores ∪ Multimedia/Sonido) y
+// 4x/semana → no afecta la reputación. El resto del correo sigue el ritmo normal.
+const EXPRESS_MAX_PRIORITY = 0;
+const EXPRESS_BATCH_MAX = 40;
 
 const admin = createClient(SUPABASE_URL, SERVICE_KEY, {
   auth: { persistSession: false },
@@ -258,6 +265,106 @@ function json(body: unknown, status = 200): Response {
   return new Response(JSON.stringify(body), { status, headers: { "content-type": "application/json" } });
 }
 
+// --- Envío de un job (compartido por el carril normal y el exprés) ----------
+// Un ÚNICO camino de plantilla+render+MIME+envío+log, para que las dos vías no
+// puedan divergir nunca.
+async function fetchTemplate(slug: string, cache?: Map<string, EmailTemplate | null>): Promise<EmailTemplate> {
+  if (cache?.has(slug)) {
+    const c = cache.get(slug);
+    if (!c) throw new Error(`plantilla inexistente/inactiva: ${slug}`);
+    return c;
+  }
+  const { data: tpl, error: tErr } = await admin
+    .from("email_templates").select("*").eq("slug", slug).eq("activo", true).maybeSingle();
+  if (tErr) throw tErr;
+  if (!tpl) { cache?.set(slug, null); throw new Error(`plantilla inexistente/inactiva: ${slug}`); }
+  cache?.set(slug, tpl as EmailTemplate);
+  return tpl as EmailTemplate;
+}
+
+// Renderiza, arma el MIME, envía por Gmail y marca enviado + log. Lanza si el envío
+// falla (el caller decide backoff/failed). NO toca el throttle global (eso es del
+// carril normal). Idéntico a lo que hacía el handler inline antes del refactor.
+async function sendQueuedJob(job: QueueJob, tpl: EmailTemplate, accessToken: string, config: EmailConfig): Promise<string> {
+  const vars = job.variables || {};
+  const subject = renderVars(tpl.asunto, vars, false);
+  const html = tpl.body_html ? renderVars(tpl.body_html, vars, false) : buildHtml(tpl, vars);
+  const text = buildText(tpl, vars);
+  const replyTo = tpl.reply_to || config.email_from;
+  const mime = buildMime({
+    fromName: config.email_from_name || "AdorAPP", fromEmail: config.email_from,
+    to: job.to_email, toName: job.to_nombre, replyTo, subject, html, text,
+  });
+  const providerMsgId = await gmailSend(accessToken, mime);
+  await admin.from("email_queue").update({
+    status: "sent", enviado_at: new Date().toISOString(), intento: job.intento + 1, ultimo_error: null,
+  }).eq("id", job.id);
+  await admin.from("sent_emails").insert({
+    to_email: job.to_email, from_email: config.email_from, reply_to: replyTo,
+    asunto: subject, template_slug: job.template_slug, estado: "sent", provider_msg_id: providerMsgId,
+  });
+  return providerMsgId;
+}
+
+// Backoff exponencial o 'failed' al agotar intentos (handoff §5.7). Idéntico al
+// handler inline previo; compartido por ambas vías.
+async function handleJobFailure(job: QueueJob, err: unknown): Promise<{ failed: boolean; retry_in_min?: number; error: string }> {
+  const intento = job.intento + 1;
+  const msg = String((err as Error)?.message ?? err).slice(0, 2000);
+  if (intento < job.max_intentos) {
+    const backoffMin = Math.min(Math.pow(2, intento), 60);
+    await admin.from("email_queue").update({
+      status: "pending", intento, ultimo_error: msg,
+      programado_para: new Date(Date.now() + backoffMin * 60_000).toISOString(),
+    }).eq("id", job.id);
+    return { failed: false, retry_in_min: backoffMin, error: msg };
+  }
+  await admin.from("email_queue").update({
+    status: "failed", enviado_at: new Date().toISOString(), intento, ultimo_error: msg,
+  }).eq("id", job.id);
+  return { failed: true, error: msg };
+}
+
+// --- Carril EXPRÉS ----------------------------------------------------------
+// Drena TODOS los pendientes de prioridad <= EXPRESS_MAX_PRIORITY (0) en este mismo
+// latido, a la vez, SIN piso por-destinatario y SIN goteo global. Hoy solo lo usa la
+// ministración (aviso de culto en vivo). Un solo token OAuth para toda la ráfaga.
+// Claim por-fila (≤1 en 'sending' ante una caída, igual que el carril normal).
+async function drainExpress(config: EmailConfig): Promise<{ sent: number; failed: number; found: number }> {
+  const { data: cands, error } = await admin
+    .from("email_queue")
+    .select("id, template_slug, to_email, to_nombre, variables, prioridad, intento, max_intentos")
+    .is("enviado_at", null)
+    .eq("status", "pending")
+    .lte("programado_para", new Date().toISOString())
+    .lte("prioridad", EXPRESS_MAX_PRIORITY)
+    .order("prioridad", { ascending: true })
+    .order("programado_para", { ascending: true })
+    .limit(EXPRESS_BATCH_MAX);
+  if (error) throw error;
+  if (!cands || cands.length === 0) return { sent: 0, failed: 0, found: 0 };
+
+  const accessToken = await getAccessToken(config.gmail_client_id, config.gmail_client_secret, config.gmail_refresh_token);
+  const tplCache = new Map<string, EmailTemplate | null>();
+  let sent = 0, failed = 0;
+  for (const cand of cands as QueueJob[]) {
+    // Claim atómico por fila: solo gana quien lo pasa de pending→sending.
+    const { data: claimed } = await admin
+      .from("email_queue").update({ status: "sending" })
+      .eq("id", cand.id).eq("status", "pending").is("enviado_at", null).select("id").maybeSingle();
+    if (!claimed) continue; // otro latido ya lo tomó
+    try {
+      const tpl = await fetchTemplate(cand.template_slug, tplCache);
+      await sendQueuedJob(cand, tpl, accessToken, config);
+      sent++;
+    } catch (e) {
+      const r = await handleJobFailure(cand, e);
+      if (r.failed) failed++;
+    }
+  }
+  return { sent, failed, found: cands.length };
+}
+
 // --- Handler ----------------------------------------------------------------
 Deno.serve(async (req: Request) => {
   // Config (credenciales Gmail + remitente + secreto interno) desde la RPC.
@@ -273,6 +380,22 @@ Deno.serve(async (req: Request) => {
   }
 
   try {
+    // 0) Carril EXPRÉS: los avisos de culto en vivo (ministración) salen TODOS de
+    //    una en este latido. NUNCA bloquea el correo normal: si falla, se registra
+    //    y se sigue con el ritmo de siempre.
+    try {
+      const exp = await drainExpress(config);
+      if (exp.sent > 0) return json({ ok: true, express: true, sent: exp.sent, failed: exp.failed });
+    } catch (expErr) {
+      try {
+        await admin.from("error_log").insert({
+          message: "send-emails: fallo en carril exprés",
+          severity: "warning",
+          context: { error: String((expErr as Error)?.message ?? expErr).slice(0, 500) },
+        });
+      } catch (_e) { /* best-effort: nunca romper el carril normal */ }
+    }
+
     // 1) Candidatos pendientes por prioridad.
     const { data: candidates, error: cErr } = await admin
       .from("email_queue")
@@ -313,58 +436,20 @@ Deno.serve(async (req: Request) => {
       .eq("id", job.id).eq("status", "pending").is("enviado_at", null).select("id").maybeSingle();
     if (!claimed) return json({ ok: true, sent: 0, reason: "already_claimed" });
 
-    // 5) Plantilla + render + envío.
+    // 5) Plantilla + render + envío (mismos helpers que el carril exprés).
     try {
-      const { data: tpl, error: tErr } = await admin
-        .from("email_templates").select("*").eq("slug", job.template_slug).eq("activo", true).maybeSingle();
-      if (tErr) throw tErr;
-      if (!tpl) throw new Error(`plantilla inexistente/inactiva: ${job.template_slug}`);
-
-      const vars = job.variables || {};
-      const subject = renderVars((tpl as EmailTemplate).asunto, vars, false);
-      const html = (tpl as EmailTemplate).body_html
-        ? renderVars((tpl as EmailTemplate).body_html!, vars, false)
-        : buildHtml(tpl as EmailTemplate, vars);
-      const text = buildText(tpl as EmailTemplate, vars);
-      const replyTo = (tpl as EmailTemplate).reply_to || config.email_from;
-
-      const mime = buildMime({
-        fromName: config.email_from_name || "AdorAPP", fromEmail: config.email_from,
-        to: job.to_email, toName: job.to_nombre, replyTo,
-        subject, html, text,
-      });
-
+      const tpl = await fetchTemplate(job.template_slug);
       const accessToken = await getAccessToken(config.gmail_client_id, config.gmail_client_secret, config.gmail_refresh_token);
-      const providerMsgId = await gmailSend(accessToken, mime);
-
-      // 6) Post-envío: marcar enviado + log + throttle.
-      await admin.from("email_queue").update({
-        status: "sent", enviado_at: new Date().toISOString(), intento: job.intento + 1, ultimo_error: null,
-      }).eq("id", job.id);
-      await admin.from("sent_emails").insert({
-        to_email: job.to_email, from_email: config.email_from, reply_to: replyTo,
-        asunto: subject, template_slug: job.template_slug, estado: "sent", provider_msg_id: providerMsgId,
-      });
+      const providerMsgId = await sendQueuedJob(job, tpl, accessToken, config);
+      // 6) Ritmo global: SOLO el carril normal mueve el reloj (el exprés es fuera de banda).
       await admin.from("email_throttle").update({ last_sent_at: new Date().toISOString() }).eq("key", "global");
-
       return json({ ok: true, sent: 1, id: job.id, provider_msg_id: providerMsgId });
     } catch (sendErr) {
       // 7) Fallo: backoff exponencial o 'failed' al agotar (handoff §5.7).
-      const intento = job.intento + 1;
-      const msg = String((sendErr as Error)?.message ?? sendErr).slice(0, 2000);
-      if (intento < job.max_intentos) {
-        const backoffMin = Math.min(Math.pow(2, intento), 60);
-        await admin.from("email_queue").update({
-          status: "pending", intento, ultimo_error: msg,
-          programado_para: new Date(Date.now() + backoffMin * 60_000).toISOString(),
-        }).eq("id", job.id);
-        return json({ ok: false, retry_in_min: backoffMin, error: msg }, 200);
-      } else {
-        await admin.from("email_queue").update({
-          status: "failed", enviado_at: new Date().toISOString(), intento, ultimo_error: msg,
-        }).eq("id", job.id);
-        return json({ ok: false, failed: true, error: msg }, 200);
-      }
+      const r = await handleJobFailure(job, sendErr);
+      return r.failed
+        ? json({ ok: false, failed: true, error: r.error }, 200)
+        : json({ ok: false, retry_in_min: r.retry_in_min, error: r.error }, 200);
     }
   } catch (e) {
     return json({ error: String((e as Error)?.message ?? e) }, 500);
