@@ -49,6 +49,17 @@ const CANDIDATE_LIMIT = 10;
 // 4x/semana → no afecta la reputación. El resto del correo sigue el ritmo normal.
 const EXPRESS_MAX_PRIORITY = 0;
 const EXPRESS_BATCH_MAX = 40;
+// Reaper: una fila reclamada (status='sending') que no llega a estado terminal (el
+// isolate murió por wall-clock/OOM/redeploy en la ventana claim→envío) quedaría varada
+// — ningún carril la re-toma. Al inicio de cada latido la devolvemos a 'pending' si fue
+// reclamada hace más de STUCK_CLAIM_MINUTES (un envío real dura <1s; ese margen garantiza
+// que el isolate murió). El re-claim es idempotente (CAS on 'pending') y deja la entrega
+// at-least-once (en un aviso EN VIVO es preferible un correo repetido a uno perdido).
+const STUCK_CLAIM_MINUTES = 5;
+// Timeout de red para OAuth/Gmail: un fetch colgado (conexión abierta, sin respuesta)
+// consumiría el wall-clock del isolate hasta matarlo (y varar la fila reclamada). Con
+// timeout, el cuelgue se vuelve un fallo rápido → backoff, sin matar el isolate.
+const FETCH_TIMEOUT_MS = 15000;
 
 const admin = createClient(SUPABASE_URL, SERVICE_KEY, {
   auth: { persistSession: false },
@@ -221,8 +232,20 @@ function buildMime(opts: {
 }
 
 // --- OAuth + Gmail API (handoff §6.4) --------------------------------------
+// fetch con timeout (AbortController): un endpoint que abre la conexión y no responde
+// no debe colgar el isolate hasta el wall-clock (eso vararía la fila reclamada en
+// 'sending'). Compartido por getAccessToken y gmailSend (ambos carriles).
+async function fetchWithTimeout(url: string, init: RequestInit): Promise<Response> {
+  const ac = new AbortController();
+  const t = setTimeout(() => ac.abort(), FETCH_TIMEOUT_MS);
+  try {
+    return await fetch(url, { ...init, signal: ac.signal });
+  } finally {
+    clearTimeout(t);
+  }
+}
 async function getAccessToken(clientId: string, clientSecret: string, refreshToken: string): Promise<string> {
-  const r = await fetch("https://oauth2.googleapis.com/token", {
+  const r = await fetchWithTimeout("https://oauth2.googleapis.com/token", {
     method: "POST",
     headers: { "Content-Type": "application/x-www-form-urlencoded" },
     body: new URLSearchParams({
@@ -238,7 +261,7 @@ async function getAccessToken(clientId: string, clientSecret: string, refreshTok
 }
 async function gmailSend(accessToken: string, mime: string): Promise<string> {
   const raw = b64urlRaw(new TextEncoder().encode(mime));
-  const r = await fetch("https://gmail.googleapis.com/gmail/v1/users/me/messages/send", {
+  const r = await fetchWithTimeout("https://gmail.googleapis.com/gmail/v1/users/me/messages/send", {
     method: "POST",
     headers: { Authorization: `Bearer ${accessToken}`, "Content-Type": "application/json" },
     body: JSON.stringify({ raw }),
@@ -350,7 +373,7 @@ async function drainExpress(config: EmailConfig): Promise<{ sent: number; failed
   for (const cand of cands as QueueJob[]) {
     // Claim atómico por fila: solo gana quien lo pasa de pending→sending.
     const { data: claimed } = await admin
-      .from("email_queue").update({ status: "sending" })
+      .from("email_queue").update({ status: "sending", claimed_at: new Date().toISOString() })
       .eq("id", cand.id).eq("status", "pending").is("enviado_at", null).select("id").maybeSingle();
     if (!claimed) continue; // otro latido ya lo tomó
     try {
@@ -380,6 +403,16 @@ Deno.serve(async (req: Request) => {
   }
 
   try {
+    // -1) Reaper: recuperar filas varadas en 'sending' (isolate muerto entre el claim
+    //     y el estado terminal). Best-effort: jamás rompe el latido. El re-claim es
+    //     idempotente (CAS on 'pending'); claimed_at evita re-penear una fila en vuelo.
+    try {
+      await admin.from("email_queue")
+        .update({ status: "pending", claimed_at: null })
+        .eq("status", "sending").is("enviado_at", null)
+        .lt("claimed_at", new Date(Date.now() - STUCK_CLAIM_MINUTES * 60_000).toISOString());
+    } catch (_e) { /* best-effort: nunca romper el latido */ }
+
     // 0) Carril EXPRÉS: los avisos de culto en vivo (ministración) salen TODOS de
     //    una en este latido. NUNCA bloquea el correo normal: si falla, se registra
     //    y se sigue con el ritmo de siempre.
@@ -432,7 +465,7 @@ Deno.serve(async (req: Request) => {
 
     // 4) Claim atómico: pasar a 'sending' solo si sigue pending (evita doble envío).
     const { data: claimed } = await admin
-      .from("email_queue").update({ status: "sending" })
+      .from("email_queue").update({ status: "sending", claimed_at: new Date().toISOString() })
       .eq("id", job.id).eq("status", "pending").is("enviado_at", null).select("id").maybeSingle();
     if (!claimed) return json({ ok: true, sent: 0, reason: "already_claimed" });
 
