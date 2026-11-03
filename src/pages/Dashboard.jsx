@@ -275,8 +275,11 @@ export const Dashboard = () => {
           </div>
           <div className="relative space-y-3">
             {recentSongs.map((song) => (
-              <div
+              // Cada canción reciente abre su vista en el Repertorio (deep-link ?song=<id>);
+              // mismo aspecto (ya tenía hover), navegable para todos los roles.
+              <Link
                 key={song.id}
+                to={`/repertorio?song=${song.id}`}
                 className="hover-relief flex items-center justify-between p-3 rounded-lg bg-neutral-800/50 hover:bg-neutral-800 transition-colors"
               >
                 <div className="flex items-center gap-3">
@@ -289,7 +292,7 @@ export const Dashboard = () => {
                   </div>
                 </div>
                 <Badge variant="primary" size="sm">Tono: {song.key}</Badge>
-              </div>
+              </Link>
             ))}
           </div>
           <GoldWave className="absolute -bottom-2 left-0 w-full h-16" opacity={0.18} />
@@ -316,9 +319,12 @@ export const Dashboard = () => {
                   ? { variant: 'gold', text: myInstruments.length ? `Tocás: ${myInstruments.join(' y ')}` : 'Participás' }
                   : { variant: 'default', text: 'No estás en la formación' };
               return (
-                <div
+                // Cada próximo servicio abre su detalle (deep-link ?order=<id>, el mismo que
+                // usa el card "Hoy tenés ensamble"); se agrega hover (el reposo no cambia).
+                <Link
                   key={order.id}
-                  className="flex items-center gap-4 p-3 rounded-lg bg-neutral-800/50"
+                  to={`/ordenes?order=${order.id}`}
+                  className="flex items-center gap-4 p-3 rounded-lg bg-neutral-800/50 hover:bg-neutral-800 transition-colors"
                 >
                   <div className="w-12 h-12 rounded-xl bg-gold-gradient-soft ring-1 ring-gold-500/40 flex items-center justify-center">
                     <CalendarDots size={24} weight="duotone" className="text-gold-100" />
@@ -333,7 +339,7 @@ export const Dashboard = () => {
                     )}
                   </div>
                   <Badge variant="primary" size="sm">{order.songs.length} canciones</Badge>
-                </div>
+                </Link>
               );
             })}
             {upcomingOrders.length === 0 && (
@@ -379,12 +385,14 @@ export const Dashboard = () => {
           <div className="space-y-2 max-h-64 overflow-y-auto pr-2">
             {members.filter(m => m.active).map((member) => {
               const InstrumentIcon = member.instruments[0] ? getInstrumentIcon(member.instruments[0]) : User;
-              return (
-                <div
-                  key={member.id}
-                  className="hover-relief flex items-center gap-3 px-3 py-2.5 bg-neutral-800/50 rounded-xl hover:bg-neutral-800 transition-colors cursor-pointer"
-                  title={`${member.instruments.join(', ')}`}
-                >
+              // Solo el pastor va a /miembros (los demás serían redirigidos): para pastor la
+              // fila es un enlace (conserva la "manito"); para el resto, fila plana SIN
+              // cursor-pointer (no prometer un clic que no lleva a ningún lado).
+              // Para no-pastor la fila es plana DE VERDAD (sin hover-lift ni cambio de fondo):
+              // el hover y la "manito" quedan solo en la fila del pastor, que sí es enlace.
+              const rowClass = `flex items-center gap-3 px-3 py-2.5 bg-neutral-800/50 rounded-xl${role === 'pastor' ? ' hover-relief hover:bg-neutral-800 transition-colors cursor-pointer' : ''}`;
+              const rowInner = (
+                <>
                   <Avatar name={member.name} size="md" />
                   <div className="flex-1 min-w-0">
                     <p className="font-medium text-sm truncate">{member.name}</p>
@@ -399,6 +407,15 @@ export const Dashboard = () => {
                       {member.role === 'pastor' ? 'Pastor' : member.role === 'leader' ? 'Líder' : 'Miembro'}
                     </Badge>
                   </div>
+                </>
+              );
+              return role === 'pastor' ? (
+                <Link key={member.id} to="/miembros" className={rowClass} title={`${member.instruments.join(', ')}`}>
+                  {rowInner}
+                </Link>
+              ) : (
+                <div key={member.id} className={rowClass} title={`${member.instruments.join(', ')}`}>
+                  {rowInner}
                 </div>
               );
             })}
