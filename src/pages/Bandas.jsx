@@ -8,6 +8,8 @@ import {
 import { MicrophoneStage, UsersThree } from '@phosphor-icons/react';
 import { useAppStore, MEETING_TYPES } from '../stores/appStore';
 import { useCurrentRole, useCurrentMember } from '../hooks/useCurrentMember';
+import { useToday } from '../hooks/useToday';
+import { isMemberSelectable, isGuest, guestDaysUntil, formatGuestUntil } from '../lib/guests';
 import { Card } from '../components/ui/Card';
 import { Button } from '../components/ui/Button';
 import { Badge } from '../components/ui/Badge';
@@ -33,6 +35,7 @@ export const Bandas = () => {
   const currentMember = useCurrentMember();
   const isPastor = userRole === 'pastor';
   const isLeader = userRole === 'leader';
+  const today = useToday(); // hoy ART, para invitados vencidos
 
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingBand, setEditingBand] = useState(null);
@@ -251,7 +254,14 @@ export const Bandas = () => {
     }));
   };
 
-  const availableMembers = members.filter(m => m.active);
+  // Picker de integrantes PERMANENTES del formulario de banda: NUNCA invitados (un
+  // invitado es temporal por naturaleza; como permanente quedaría en bands.members
+  // sin vencimiento y seguiría contando tras expirar).
+  const availableMembers = members.filter(m => m.active && !isGuest(m));
+
+  // El candidato seleccionado en el modal "Agregar miembro" (para forzar temporal si es invitado).
+  const addSelectedMember = members.find(m => m.id === addForm.memberId) || null;
+  const addSelectedIsGuest = isGuest(addSelectedMember);
 
   return (
     <div className="space-y-6 animate-fade-in">
@@ -576,7 +586,9 @@ export const Bandas = () => {
             <label className="text-xs text-gray-400 font-medium uppercase tracking-wide block mb-2">Persona</label>
             {(() => {
               const effective = addModal.band ? getEffectiveBandMemberIds(addModal.band.id) : new Set();
-              const allCandidates = members.filter(m => m.active && !effective.has(m.id));
+              // Elegibles = seleccionables hoy (activos y, si invitados, vigentes) que no
+              // integran ya la banda. Un invitado vencido no aparece.
+              const allCandidates = members.filter(m => isMemberSelectable(m, today) && !effective.has(m.id));
               if (allCandidates.length === 0) {
                 return <p className="text-sm text-gray-500">Todos los miembros activos ya integran esta banda.</p>;
               }
@@ -602,7 +614,17 @@ export const Bandas = () => {
                     <button
                       key={m.id}
                       type="button"
-                      onClick={() => setAddForm(prev => ({ ...prev, memberId: m.id }))}
+                      onClick={() => {
+                        // Un invitado solo puede sumarse como TEMPORAL (hasta su guest_until).
+                        const g = isGuest(m);
+                        const gd = g ? guestDaysUntil(m.guestUntil, today) : null;
+                        setAddForm(prev => ({
+                          ...prev,
+                          memberId: m.id,
+                          isTemporary: g ? true : prev.isTemporary,
+                          days: g ? (gd || prev.days) : prev.days,
+                        }));
+                      }}
                       className={`flex items-center gap-3 p-3 rounded-xl text-left transition-all border-2 ${addForm.memberId === m.id ? 'border-gold-500/60 bg-gold-500/10' : 'border-neutral-800 hover:border-neutral-700'}`}
                     >
                       <Avatar name={m.name} size="sm" />
@@ -624,38 +646,51 @@ export const Bandas = () => {
             })()}
           </div>
 
-          {/* Tipo: permanente (default) / temporal — switch inmune a iOS (landmine #23) */}
-          <div className="flex items-center justify-between gap-3">
-            <div className="min-w-0 flex-1">
-              <p className="text-sm font-medium">Temporal</p>
-              <p className="text-xs text-gray-500">Se suma por unos días y después deja de contar solo, sin aviso.</p>
+          {/* Un INVITADO se suma solo como temporal, hasta su fecha de invitación (no hay
+              opción de permanente ni de elegir días). */}
+          {addSelectedIsGuest ? (
+            <div className="rounded-xl border border-gold-500/30 bg-gold-500/10 p-3">
+              <p className="text-sm font-medium text-gold-200">Invitado</p>
+              <p className="text-xs text-gray-400 mt-0.5">
+                Se suma como temporal{addSelectedMember?.guestUntil ? ` hasta el ${formatGuestUntil(addSelectedMember.guestUntil)}` : ''} (lo que dura su invitación). Después deja de contar solo, sin aviso.
+              </p>
             </div>
-            <label className="relative inline-flex shrink-0 cursor-pointer items-center">
-              <input
-                type="checkbox"
-                className="sr-only peer"
-                checked={addForm.isTemporary}
-                onChange={(e) => setAddForm(prev => ({ ...prev, isTemporary: e.target.checked }))}
-              />
-              <span className="block w-[52px] h-8 rounded-full bg-neutral-700 transition-colors peer-checked:bg-gold-500 peer-focus-visible:ring-2 peer-focus-visible:ring-gold-500/50" />
-              <span className="pointer-events-none absolute top-[2px] left-[2px] h-7 w-7 rounded-full bg-white shadow transition-transform peer-checked:translate-x-5" />
-            </label>
-          </div>
+          ) : (
+            <>
+              {/* Tipo: permanente (default) / temporal — switch inmune a iOS (landmine #23) */}
+              <div className="flex items-center justify-between gap-3">
+                <div className="min-w-0 flex-1">
+                  <p className="text-sm font-medium">Temporal</p>
+                  <p className="text-xs text-gray-500">Se suma por unos días y después deja de contar solo, sin aviso.</p>
+                </div>
+                <label className="relative inline-flex shrink-0 cursor-pointer items-center">
+                  <input
+                    type="checkbox"
+                    className="sr-only peer"
+                    checked={addForm.isTemporary}
+                    onChange={(e) => setAddForm(prev => ({ ...prev, isTemporary: e.target.checked }))}
+                  />
+                  <span className="block w-[52px] h-8 rounded-full bg-neutral-700 transition-colors peer-checked:bg-gold-500 peer-focus-visible:ring-2 peer-focus-visible:ring-gold-500/50" />
+                  <span className="pointer-events-none absolute top-[2px] left-[2px] h-7 w-7 rounded-full bg-white shadow transition-transform peer-checked:translate-x-5" />
+                </label>
+              </div>
 
-          {/* Días (solo temporal) */}
-          {addForm.isTemporary && (
-            <div>
-              <label className="text-xs text-gray-400 font-medium uppercase tracking-wide block mb-1.5">¿Por cuántos días? (1 a 90)</label>
-              <input
-                type="number"
-                min="1"
-                max="90"
-                className="w-full"
-                value={addForm.days}
-                onChange={(e) => setAddForm(prev => ({ ...prev, days: e.target.value }))}
-              />
-              <p className="text-xs text-gray-500 mt-1.5">Cuenta como integrante pleno (puede dirigir) hasta que venza. Después desaparece sin aviso.</p>
-            </div>
+              {/* Días (solo temporal) */}
+              {addForm.isTemporary && (
+                <div>
+                  <label className="text-xs text-gray-400 font-medium uppercase tracking-wide block mb-1.5">¿Por cuántos días? (1 a 90)</label>
+                  <input
+                    type="number"
+                    min="1"
+                    max="90"
+                    className="w-full"
+                    value={addForm.days}
+                    onChange={(e) => setAddForm(prev => ({ ...prev, days: e.target.value }))}
+                  />
+                  <p className="text-xs text-gray-500 mt-1.5">Cuenta como integrante pleno (puede dirigir) hasta que venza. Después desaparece sin aviso.</p>
+                </div>
+              )}
+            </>
           )}
         </div>
       </Modal>

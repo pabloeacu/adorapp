@@ -13,6 +13,9 @@ import { useAppStore, MEMBER_ROLES, INSTRUMENTS } from '../stores/appStore';
 import { SELECTABLE_AREAS, areaLabels } from '../lib/areas';
 import { useAuthStore } from '../stores/authStore';
 import { useCurrentRole } from '../hooks/useCurrentMember';
+import { useToday } from '../hooks/useToday';
+import { isGuest, isMemberSelectable } from '../lib/guests';
+import { GuestModal } from '../components/members/GuestModal';
 import { Card } from '../components/ui/Card';
 import { Button } from '../components/ui/Button';
 import { Badge } from '../components/ui/Badge';
@@ -61,12 +64,16 @@ export const Miembros = () => {
   // route guard in App.jsx and never get here.
   const role = useCurrentRole();
   const isPastor = role === 'pastor';
+  const today = useToday(); // hoy ART, para badge/filtro de invitados
 
   const [searchTerm, setSearchTerm] = useState('');
   const [filterRole, setFilterRole] = useState('all');
   const [filterActive, setFilterActive] = useState('all'); // 'all', 'true', 'false'
+  const [filterGuest, setFilterGuest] = useState('all'); // 'all' | 'guests' | 'noguests'
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingMember, setEditingMember] = useState(null);
+  // Modal de invitado (crear/editar) — independiente del form de miembro normal.
+  const [guestModal, setGuestModal] = useState({ isOpen: false, editing: null });
   const [showFilters, setShowFilters] = useState(false);
   const [selectedInstruments, setSelectedInstruments] = useState([]);
   const [sortBy, setSortBy] = useState('name_asc');
@@ -152,7 +159,12 @@ export const Miembros = () => {
       const matchesInstrument = selectedInstruments.length === 0 ||
         selectedInstruments.some(i => member.instruments?.includes(i));
 
-      return matchesSearch && matchesRole && matchesActive && matchesInstrument;
+      const matchesGuest =
+        filterGuest === 'all' ? true :
+        filterGuest === 'guests' ? isGuest(member) :
+        !isGuest(member); // 'noguests'
+
+      return matchesSearch && matchesRole && matchesActive && matchesInstrument && matchesGuest;
     });
     const byName = (a, b) => (a.name || '').localeCompare(b.name || '', 'es');
     const byRole = (a, b) => (a.role || '').localeCompare(b.role || '', 'es') || byName(a, b);
@@ -163,9 +175,15 @@ export const Miembros = () => {
       sortBy === 'active' ? byActive :
       byName;
     return [...list].sort(cmp);
-  }, [members, searchTerm, filterRole, filterActive, selectedInstruments, sortBy]);
+  }, [members, searchTerm, filterRole, filterActive, filterGuest, selectedInstruments, sortBy, isPastor]);
 
   const handleOpenModal = (member = null) => {
+    // Los invitados se editan con su modal propio (campos reducidos), no con el
+    // formulario de miembro normal.
+    if (member && isGuest(member)) {
+      setGuestModal({ isOpen: true, editing: member });
+      return;
+    }
     if (member) {
       setEditingMember(member);
       setFormData({
@@ -459,11 +477,11 @@ export const Miembros = () => {
   // Dependencias que la tarjeta de miembro (MemberCard, extraída a components/members)
   // necesita: helpers de rol/actividad, el flag isPastor y los handlers de este componente.
   const memberCardCtx = {
-    roleConfig, fmtLastSeen, activityMap, isPastor,
+    roleConfig, fmtLastSeen, activityMap, isPastor, today,
     handleResetPassword, handleOpenModal, handlePermanentlyDelete, handleToggleActive,
   };
   // Dependencias de la fila de la vista de tabla (MemberRow).
-  const memberRowCtx = { roleConfig, isPastor, handleToggleActive, handleOpenModal, handleDelete };
+  const memberRowCtx = { roleConfig, isPastor, today, handleToggleActive, handleOpenModal, handleDelete };
 
   return (
     <div className="space-y-6 animate-fade-in">
@@ -474,7 +492,7 @@ export const Miembros = () => {
           <div>
             <h2 className="text-2xl font-bold">Miembros del Ministerio</h2>
             <p className="text-sm text-gray-400 mt-1">
-              {filteredMembers.filter(m => m.active).length} miembros activos
+              {filteredMembers.filter(m => isMemberSelectable(m, today)).length} miembros activos
               {filterRole !== 'all' && ` · Filtrado: ${roleConfig[filterRole]?.label}`}
             </p>
           </div>
@@ -520,6 +538,16 @@ export const Miembros = () => {
               }}
             >
               Exportar CSV
+            </Button>
+          )}
+          {/* Crear invitado (miembro temporal sin login) — solo pastor */}
+          {isPastor && (
+            <Button
+              variant="secondary"
+              icon={UserPlus}
+              onClick={() => setGuestModal({ isOpen: true, editing: null })}
+            >
+              Crear invitado
             </Button>
           )}
           {/* Only show Add Member button for pastors - NEVER for members */}
@@ -662,6 +690,31 @@ export const Miembros = () => {
                       }`}
                     >
                       {inst}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              <div>
+                <label className="text-xs text-gray-400 font-medium uppercase tracking-wide block mb-3">
+                  Invitados
+                </label>
+                <div className="flex gap-2">
+                  {[
+                    { id: 'all', label: 'Todos' },
+                    { id: 'guests', label: 'Solo invitados' },
+                    { id: 'noguests', label: 'Sin invitados' },
+                  ].map(opt => (
+                    <button
+                      key={opt.id}
+                      onClick={() => setFilterGuest(opt.id)}
+                      className={`px-3 py-1.5 rounded-lg text-sm transition-all ${
+                        filterGuest === opt.id
+                          ? 'bg-gold-gradient text-black'
+                          : 'bg-neutral-800 hover:bg-neutral-700'
+                      }`}
+                    >
+                      {opt.label}
                     </button>
                   ))}
                 </div>
@@ -1078,6 +1131,22 @@ export const Miembros = () => {
         onClose={() => setErrorModal(prev => ({ ...prev, isOpen: false }))}
         title={errorModal.title}
         message={errorModal.message}
+      />
+
+      {/* Crear / editar invitado (miembro temporal sin login) */}
+      <GuestModal
+        isOpen={guestModal.isOpen}
+        editingGuest={guestModal.editing}
+        onClose={() => setGuestModal({ isOpen: false, editing: null })}
+        onDone={({ name, isNew }) => {
+          setSuccessModal({
+            isOpen: true,
+            title: isNew ? 'Invitado creado' : 'Invitado actualizado',
+            message: isNew
+              ? `${name} ya aparece en los combos y lo podés sumar a una banda como integrante temporal.`
+              : `Se guardaron los cambios de ${name}.`,
+          });
+        }}
       />
     </div>
   );

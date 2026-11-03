@@ -57,13 +57,18 @@ Deno.serve(async (req: Request) => {
   let body: any;
   try { body = await req.json(); } catch { return json({ error: "Invalid JSON" }, 400); }
 
-  const { name, email, password, phone, pastor_area, leader_of, birthdate, role, editor, instruments, areas, active } = body || {};
+  const { name, email, password, phone, pastor_area, leader_of, birthdate, role, editor, instruments, areas, active, guest_until } = body || {};
   if (!name || typeof name !== "string") return json({ error: "name required" }, 400);
   if (email && typeof email !== "string") return json({ error: "invalid email" }, 400);
   if (email && (!password || typeof password !== "string" || password.length < 6)) {
     return json({ error: "password required when email is present (min 6 chars)" }, 400);
   }
   if (role && !["pastor", "leader", "member"].includes(role)) return json({ error: "invalid role" }, 400);
+  // Invitado: fecha YYYY-MM-DD válida (sin login → no lleva email/password). Toda la
+  // EF es pastor-only (requirePastor) → setear guest_until acá es seguro.
+  if (guest_until != null && (typeof guest_until !== "string" || !/^\d{4}-\d{2}-\d{2}$/.test(guest_until) || Number.isNaN(Date.parse(guest_until)))) {
+    return json({ error: "invalid guest_until" }, 400);
+  }
 
   let userId: string | null = null;
   if (email && password) {
@@ -94,6 +99,7 @@ Deno.serve(async (req: Request) => {
     active: active !== false,
     user_id: userId,
     onboarded: false,
+    guest_until: guest_until || null, // invitado: vence por fecha (NULL = miembro normal)
   };
   if (userId) memberInsert.id = userId;
 

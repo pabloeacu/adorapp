@@ -1,12 +1,14 @@
 import { Avatar } from '../ui/Avatar';
 import { Check, X, Edit, Trash2 } from 'lucide-react';
 import { areaLabels } from '../../lib/areas';
+import { guestBadge } from '../../lib/guests';
 
 // Fila de la vista de TABLA de /miembros (extraída VERBATIM de Miembros.jsx sin
 // cambios de comportamiento). `ctx` trae roleConfig, el flag isPastor y los handlers
 // de este componente; el cuerpo JSX es byte-idéntico. areaLabels se importa directo.
 export function MemberRow({ member, ctx }) {
-  const { roleConfig, isPastor, handleToggleActive, handleOpenModal, handleDelete } = ctx;
+  const { roleConfig, isPastor, today, handleToggleActive, handleOpenModal, handleDelete } = ctx;
+  const gBadge = guestBadge(member, today);
 
   return (
                   <tr
@@ -16,9 +18,14 @@ export function MemberRow({ member, ctx }) {
                     }`}
                   >
                     <td className="px-4 py-3">
-                      <div className="flex items-center gap-3">
+                      <div className="flex items-center gap-2">
                         <Avatar name={member.name} size="sm" src={member.avatar_url || member.avatarUrl} />
                         <span className="font-medium">{member.name}</span>
+                        {gBadge && (
+                          <span className={`px-2 py-0.5 rounded text-[11px] border whitespace-nowrap ${gBadge.expired ? 'bg-neutral-800 text-gray-400 border-neutral-700' : 'bg-gold-500/10 text-gold-200 border-gold-500/30'}`}>
+                            {gBadge.label}
+                          </span>
+                        )}
                       </div>
                     </td>
                     {isPastor && (

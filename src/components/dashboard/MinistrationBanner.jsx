@@ -4,6 +4,8 @@ import { useAppStore, MUSICAL_KEYS } from '../../stores/appStore';
 import { supabase } from '../../lib/supabase';
 import { resolveMinistrationOrder, ministrationWindow, isMinistrationSong } from '../../lib/ministration';
 import { suggestDirectorForSong } from '../../lib/orders';
+import { useToday } from '../../hooks/useToday';
+import { isMemberSelectable } from '../../lib/guests';
 import { Modal } from '../ui/Modal';
 import { Button } from '../ui/Button';
 import { SelectMenu } from '../ui/SelectMenu';
@@ -68,13 +70,15 @@ export const MinistrationBanner = ({ member, role }) => {
   const [error, setError] = useState('');
   const [result, setResult] = useState(null); // { added, notified }
 
+  const today = useToday();
   const band = order ? getBandById(order.bandId) : null;
   // Directores elegibles = integrantes EFECTIVOS activos con 'Voz' (misma regla que el editor de órdenes).
+  // isMemberSelectable: un invitado vencido deja de ser elegible.
   const singers = useMemo(() => {
     if (!order?.bandId) return [];
     const ids = getEffectiveBandMemberIds(order.bandId);
-    return members.filter((m) => m.active && ids.has(m.id) && m.instruments?.includes('Voz'));
-  }, [order?.bandId, members, bands, bandTemporaryMembers, getEffectiveBandMemberIds]);
+    return members.filter((m) => isMemberSelectable(m, today) && ids.has(m.id) && m.instruments?.includes('Voz'));
+  }, [order?.bandId, members, bands, bandTemporaryMembers, getEffectiveBandMemberIds, today]);
   const singerIds = useMemo(() => new Set(singers.map((s) => s.id)), [singers]);
 
   // Opciones del selector: todo el repertorio menos lo ya elegido (el buscador vive en la hoja).

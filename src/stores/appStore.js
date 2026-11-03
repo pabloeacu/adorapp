@@ -7,6 +7,8 @@ import { v4 as uuidv4 } from 'uuid';
 // para los consumidores que lo importaban desde este módulo (Repertorio, Órdenes,
 // Practica, IniciarServicio).
 import { transposeSongStructure } from '../lib/transpose';
+// Invitados: filtro de "miembro elegible hoy" (activo y, si es invitado, vigente).
+import { isMemberSelectable, todayARTDateString } from '../lib/guests';
 // Converters de datos: extraídos a src/lib/converters.js (sin cambios). El store los
 // usa en todas sus acciones; normalizeName/stripSongRefs quedaron internos de ese módulo.
 import {
@@ -175,6 +177,35 @@ export const useAppStore = create((set, get) => ({
       return { ...newMember, generatedPassword: data.generatedPassword || member.password };
     } catch (err) {
       console.error('Error adding member:', err);
+      set({ error: err.message });
+      return null;
+    }
+  },
+
+  // Crear un INVITADO: miembro TEMPORAL sin credenciales (sin email/password → la EF
+  // no crea usuario de auth; user_id queda null) que vence por fecha (guest_until).
+  // El nombre ya viene con el sufijo " -invitado-" (lo arma la UI). Reusa la EF
+  // admin-create-member (pastor-only) + guest_until. NO abre el modal de contraseña
+  // (no hay credenciales que mostrar). Devuelve el miembro creado o null.
+  addGuestMember: async ({ name, instruments, guestUntil, areas }) => {
+    try {
+      const { data, error } = await callAdminFunction('admin-create-member', {
+        name,
+        instruments: instruments || [],
+        areas: areas || ['adoracion'],
+        guest_until: guestUntil,
+        active: true,
+      });
+      if (error) {
+        console.error('Error adding guest member:', error);
+        set({ error });
+        return null;
+      }
+      const newMember = data.member;
+      set((state) => ({ members: [...state.members, convertMemberFromDB(newMember)] }));
+      return newMember;
+    } catch (err) {
+      console.error('Error adding guest member:', err);
       set({ error: err.message });
       return null;
     }
@@ -1009,6 +1040,7 @@ export const useAppStore = create((set, get) => ({
     if (!band) return [];
     const permanentIds = new Set(band.members || []);
     const now = Date.now();
+    const today = todayARTDateString(); // un invitado vencido deja de ser elegible hoy
     // memberId -> expiresAt más lejano entre sus temporales vigentes (no permanentes)
     const tempExpiry = new Map();
     for (const t of get().bandTemporaryMembers) {
@@ -1022,7 +1054,9 @@ export const useAppStore = create((set, get) => ({
     }
     const result = [];
     for (const m of get().members) {
-      if (!m.active) continue;
+      // Activo Y, si es invitado, vigente: un invitado vencido no es seleccionable
+      // aunque su temporal de banda siguiera vigente (combos de director/formación).
+      if (!isMemberSelectable(m, today)) continue;
       if (permanentIds.has(m.id)) result.push(m);
       else if (tempExpiry.has(m.id)) result.push({ ...m, temporary: true, expiresAt: tempExpiry.get(m.id) });
     }

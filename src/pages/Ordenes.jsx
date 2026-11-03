@@ -18,6 +18,8 @@ import {
 // (~140 KB; no need at first paint).
 import { useAppStore, MEETING_TYPES, MUSICAL_KEYS, transposeSongStructure } from '../stores/appStore';
 import { useCurrentRole, useCurrentMember } from '../hooks/useCurrentMember';
+import { useToday } from '../hooks/useToday';
+import { isMemberSelectable } from '../lib/guests';
 import { memberAreas } from '../lib/areas';
 import { ChannelPlanModal } from '../components/orders/ChannelPlanModal';
 import { supabase } from '../lib/supabase';
@@ -127,6 +129,7 @@ export const Ordenes = () => {
   const isLeader = userRole === 'leader';
   const currentMember = useCurrentMember();
   const isSonido = memberAreas(currentMember).includes('sonido');
+  const today = useToday(); // hoy ART, para filtrar invitados vencidos de los combos
 
   const [schemaModal, setSchemaModal] = useState({ isOpen: false, order: null });
   const [channelPlanOrder, setChannelPlanOrder] = useState(null);
@@ -227,13 +230,15 @@ export const Ordenes = () => {
     if (!formData.bandId) return [];
     // Elegibles = miembros EFECTIVOS (permanentes ∪ temporales vigentes) activos
     // con 'Voz'. Un temporal vigente cuenta como director/voz (decisión de producto).
+    // isMemberSelectable: un invitado vencido deja de ser elegible (aunque su temporal
+    // siguiera vigente) → desaparece del combo de directores.
     const bandMemberIds = getEffectiveBandMemberIds(formData.bandId);
     return members.filter(m =>
-      m.active &&
+      isMemberSelectable(m, today) &&
       bandMemberIds.has(m.id) &&
       m.instruments?.includes('Voz')
     );
-  }, [members, bands, bandTemporaryMembers, formData.bandId, getEffectiveBandMemberIds]);
+  }, [members, bands, bandTemporaryMembers, formData.bandId, getEffectiveBandMemberIds, today]);
 
   // Confirmation modals
   const [confirmModal, setConfirmModal] = useState({
