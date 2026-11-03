@@ -616,13 +616,17 @@ export const Bandas = () => {
                       type="button"
                       onClick={() => {
                         // Un invitado solo puede sumarse como TEMPORAL (hasta su guest_until).
+                        // La ventana se acota al rango válido del temporal [1, 90] días:
+                        // - gd null (vence hoy) → 1 día (mínimo del CHECK), evita el fallback de 7.
+                        // - gd > 90 → 90 (tope del CHECK), evita el callejón "Días inválidos" sin campo.
+                        // Pasado guest_until igual desaparece de todos los combos (isMemberSelectable).
                         const g = isGuest(m);
                         const gd = g ? guestDaysUntil(m.guestUntil, today) : null;
                         setAddForm(prev => ({
                           ...prev,
                           memberId: m.id,
                           isTemporary: g ? true : prev.isTemporary,
-                          days: g ? (gd || prev.days) : prev.days,
+                          days: g ? Math.min(gd || 1, 90) : prev.days,
                         }));
                       }}
                       className={`flex items-center gap-3 p-3 rounded-xl text-left transition-all border-2 ${addForm.memberId === m.id ? 'border-gold-500/60 bg-gold-500/10' : 'border-neutral-800 hover:border-neutral-700'}`}

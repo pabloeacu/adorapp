@@ -1078,10 +1078,17 @@ export const useAppStore = create((set, get) => ({
   },
 
   // Objetos miembro (activos) que participan del orden, ordenados por nombre.
+  // Formación CUSTOM = lista cerrada/histórica → se filtra solo por `active` para
+  // CONSERVAR el nombre de un invitado vencido que participó (contrato: el histórico
+  // se preserva). Formación DINÁMICA (all/NULL) = banda efectiva en vivo → se filtra
+  // por isMemberSelectable para que un invitado vencido NO figure como participante
+  // actual de un orden futuro.
   getOrderParticipants: (order) => {
     const ids = get().getOrderParticipantIds(order);
+    const isCustom = order?.lineup?.mode === 'custom';
+    const today = todayARTDateString();
     return get().members
-      .filter((m) => m.active && ids.has(m.id))
+      .filter((m) => ids.has(m.id) && (isCustom ? m.active : isMemberSelectable(m, today)))
       .sort((a, b) => (a.name || '').localeCompare(b.name || '', 'es'));
   },
 

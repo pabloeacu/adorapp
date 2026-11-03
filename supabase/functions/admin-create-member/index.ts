@@ -69,6 +69,12 @@ Deno.serve(async (req: Request) => {
   if (guest_until != null && (typeof guest_until !== "string" || !/^\d{4}-\d{2}-\d{2}$/.test(guest_until) || Number.isNaN(Date.parse(guest_until)))) {
     return json({ error: "invalid guest_until" }, 400);
   }
+  // Defensa en profundidad: al CREAR, no se invita para una fecha ya pasada (el cliente
+  // ya lo bloquea; acá se espeja en la frontera). La extensión/baja va por updateMember.
+  if (guest_until != null) {
+    const todayART = new Date().toLocaleDateString("en-CA", { timeZone: "America/Argentina/Buenos_Aires" });
+    if (guest_until < todayART) return json({ error: "guest_until cannot be in the past" }, 400);
+  }
 
   let userId: string | null = null;
   if (email && password) {

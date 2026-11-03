@@ -3,8 +3,9 @@ import { Sparkle } from '@phosphor-icons/react';
 import { Modal } from '../ui/Modal';
 import { Button } from '../ui/Button';
 import { useAppStore, INSTRUMENTS } from '../../stores/appStore';
+import { useToday } from '../../hooks/useToday';
 import {
-  withGuestSuffix, stripGuestSuffix, todayARTDateString, formatGuestUntil,
+  withGuestSuffix, stripGuestSuffix, formatGuestUntil,
 } from '../../lib/guests';
 
 // Modal para CREAR o EDITAR un invitado (miembro temporal sin login).
@@ -42,7 +43,7 @@ export function GuestModal({ isOpen, onClose, editingGuest, onDone }) {
     }
   }, [isOpen, editingGuest]);
 
-  const today = todayARTDateString();
+  const today = useToday();
 
   const toggleInstrument = (inst) => {
     setInstruments((prev) => (prev.includes(inst) ? prev.filter((i) => i !== inst) : [...prev, inst]));

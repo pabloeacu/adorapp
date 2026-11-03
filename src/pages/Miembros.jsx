@@ -399,10 +399,16 @@ export const Miembros = () => {
 
   // Handler for permanent delete (pastor only)
   const handlePermanentlyDelete = (memberId, memberName) => {
+    // Para un INVITADO, borrar es innecesario (vence solo) y además borra su nombre de
+    // los órdenes donde dirigió. Avisamos distinto para cuidar el histórico (contrato:
+    // la ficha no se borra al vencer; los órdenes históricos conservan nombre y tono).
+    const isGuestTarget = isGuest(members.find(m => m.id === memberId));
     setConfirmModal({
       isOpen: true,
-      title: 'Eliminar Miembro Permanentemente',
-      message: `¿Estás seguro de ELIMINAR PERMANENTEMENTE a ${memberName}? Esta acción no se puede deshacer y eliminará toda la información del miembro.`,
+      title: isGuestTarget ? 'Eliminar invitado' : 'Eliminar Miembro Permanentemente',
+      message: isGuestTarget
+        ? `No hace falta eliminar a ${memberName}: al vencer su invitación desaparece solo de todos los combos y su registro queda para el historial. Si lo ELIMINÁS, los órdenes donde dirigió pierden su nombre. ¿Eliminar de todos modos?`
+        : `¿Estás seguro de ELIMINAR PERMANENTEMENTE a ${memberName}? Esta acción no se puede deshacer y eliminará toda la información del miembro.`,
       type: 'danger',
       confirmText: 'Eliminar Definitivamente',
       cancelText: 'Cancelar',
