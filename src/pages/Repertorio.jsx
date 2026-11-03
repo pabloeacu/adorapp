@@ -381,6 +381,26 @@ export const Repertorio = () => {
     setIsViewerOpen(true);
   };
 
+  // Deep link desde "Canciones Recientes" del Inicio: /repertorio?song=<id> abre el visor
+  // de esa canción. Espera a que carguen las canciones; limpia el parámetro al consumirlo
+  // (igual que ?sinUsar=). Un id inexistente no abre nada pero igual limpia el parámetro.
+  useEffect(() => {
+    const songId = searchParams.get('song');
+    if (!songId) return;
+    if (songs.length === 0) return; // aún cargando: reintenta cuando llegue `songs`
+    const target = songs.find((s) => s.id === songId);
+    if (target) {
+      // Syncing an external URL param into local viewer state — legitimate effect.
+      /* eslint-disable react-hooks/set-state-in-effect */
+      setViewingSong(target);
+      setViewingKey(target.originalKey || target.key);
+      setIsViewerOpen(true);
+      /* eslint-enable react-hooks/set-state-in-effect */
+    }
+    searchParams.delete('song');
+    setSearchParams(searchParams, { replace: true });
+  }, [searchParams, songs, setSearchParams]);
+
   // Helper to get default label for a section type
   const getDefaultSectionLabel = (type, existingSections, currentIndex = -1) => {
     const labels = {
