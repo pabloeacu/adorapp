@@ -14,13 +14,19 @@ export const Avatar = ({
     xl: 'w-16 h-16 text-lg',
   };
 
-  // Iniciales sin foto: degradé dorado intenso con letras blancas (identidad premium).
-  // El text-shadow mantiene las letras legibles sobre el oro brillante.
+  // "Moneda" del perfil: SIEMPRE idéntica en tamaño y forma, tenga foto o solo
+  // iniciales. `shrink-0` evita que se ovale (se comprima de ancho) al lado de un
+  // nombre largo en una fila flex; `rounded-full` + `overflow-hidden` garantizan el
+  // círculo; el MISMO `ring` dorado va para foto e iniciales (sin él, la foto quedaba
+  // 1px más chica/sin marco que las iniciales). Con foto: la imagen llena la moneda.
+  // Sin foto: degradé dorado + iniciales blancas (identidad premium del reskin, el
+  // text-shadow las mantiene legibles sobre el oro).
   return (
     <div
       className={`
-        ${sizes[size]} rounded-full flex items-center justify-center
-        font-bold text-white ${src ? 'bg-neutral-800' : 'bg-gold-gradient [text-shadow:0_1px_2px_rgba(0,0,0,0.4)] ring-1 ring-gold-300/40'}
+        ${sizes[size]} shrink-0 rounded-full overflow-hidden flex items-center justify-center
+        font-bold text-white ring-1 ring-gold-300/40
+        ${src ? 'bg-neutral-800' : 'bg-gold-gradient [text-shadow:0_1px_2px_rgba(0,0,0,0.4)]'}
         ${className}
       `}
     >

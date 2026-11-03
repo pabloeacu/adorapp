@@ -498,11 +498,9 @@ export const Header = () => {
                 {displayRole === 'pastor' ? 'Pastor' : displayRole === 'leader' ? 'Líder' : 'Miembro'}
               </p>
             </div>
-            {userPhoto ? (
-              <img src={userPhoto} alt="Perfil" className="w-10 h-10 rounded-full object-cover" />
-            ) : (
-              <Avatar name={displayName} size="md" />
-            )}
+            {/* Moneda del perfil: SIEMPRE la misma (foto o iniciales), vía <Avatar>
+                → mismo tamaño/forma/aro que el resto de las monedas. */}
+            <Avatar name={displayName} src={userPhoto || undefined} size="md" />
           </div>
         </div>
       </header>
