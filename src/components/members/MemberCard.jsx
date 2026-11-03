@@ -3,6 +3,7 @@ import { Badge } from '../ui/Badge';
 import { Avatar } from '../ui/Avatar';
 import { Key, Edit, Trash2, Mail, Phone, Cross, Users2, Calendar, Clock, Smartphone, Bell, BellOff, Check, X } from 'lucide-react';
 import { areaLabels } from '../../lib/areas';
+import { guestBadge } from '../../lib/guests';
 import { formatDateLocalShort as formatDateLocal } from '../../lib/dates';
 
 // Tarjeta de un miembro en la grilla de /miembros (extraída VERBATIM de Miembros.jsx
@@ -12,9 +13,11 @@ import { formatDateLocalShort as formatDateLocal } from '../../lib/dates';
 // eran imports de librería en Miembros).
 export function MemberCard({ member, ctx }) {
   const {
-    roleConfig, fmtLastSeen, activityMap, isPastor,
+    roleConfig, fmtLastSeen, activityMap, isPastor, today,
     handleResetPassword, handleOpenModal, handlePermanentlyDelete, handleToggleActive,
   } = ctx;
+
+  const gBadge = guestBadge(member, today);
 
   return (
             <Card
@@ -27,10 +30,13 @@ export function MemberCard({ member, ctx }) {
                 <div className="flex items-center gap-3">
                   <Avatar name={member.name} size="lg" src={member.avatar_url || member.avatarUrl} />
                   <div>
-                    <div className="flex items-center gap-2">
+                    <div className="flex flex-wrap items-center gap-2">
                       <h3 className="font-semibold">{member.name}</h3>
                       {!member.active && (
                         <Badge variant="danger" size="sm">Inactivo</Badge>
+                      )}
+                      {gBadge && (
+                        <Badge variant={gBadge.expired ? 'default' : 'primary'} size="sm">{gBadge.label}</Badge>
                       )}
                     </div>
                     <span className={`text-xs font-medium ${roleConfig[member.role]?.color}`}>

@@ -19,6 +19,11 @@ export const convertMemberFromDB = (m) => ({
   editor: m.editor || false, // Editor permission for songs
   instruments: m.instruments || [],
   areas: m.areas || [], // Áreas de ministerio (adoracion/multimedia/sonido). Solo el pastor las cambia (freeze en la base). DEBE estar en AMBOS converters (regla #8, landmine #58).
+  // Invitado: fecha (inclusive) hasta la que el miembro-invitado aparece en los
+  // combos. NULL = no es invitado. Solo el pastor la cambia (freeze). Server-owned
+  // en la práctica, pero round-trip fiel en AMBOS converters (regla #8/#73): un
+  // self-edit de un miembro normal reenvía null→null y el freeze pasa.
+  guestUntil: m.guest_until ?? null,
   active: m.active,
   onboarded: m.onboarded !== false, // default true so existing rows skip the wizard
   userId: m.user_id,
@@ -218,6 +223,10 @@ export const convertMemberToDB = (m) => {
     editor: m.editor || false, // Editor permission for songs
     instruments: m.instruments || [],
     areas: m.areas || [], // round-trip fiel: el self-edit reenvía el mismo valor → el freeze de la base pasa (NEW=OLD). Solo el pastor (vía EF) puede cambiarlas.
+    // Invitado: round-trip fiel (regla #8). En un miembro normal es null→null (el
+    // freeze pasa). El pastor extiende/edita la invitación por updateMember directo
+    // (is_pastor() exime el freeze). La creación va por la EF admin-create-member.
+    guest_until: m.guestUntil || null,
     active: m.active ?? true,
     user_id: m.userId || null,
     avatar_url: m.avatarUrl || null,

@@ -22,6 +22,8 @@ import {
 } from '@phosphor-icons/react';
 import { useAppStore } from '../stores/appStore';
 import { useCurrentRole, useCurrentMember } from '../hooks/useCurrentMember';
+import { useToday } from '../hooks/useToday';
+import { isMemberSelectable } from '../lib/guests';
 import { useAuthStore } from '../stores/authStore';
 import { Card } from '../components/ui/Card';
 import { Badge } from '../components/ui/Badge';
@@ -63,8 +65,10 @@ export const Dashboard = () => {
   const role = useCurrentRole();
   const member = useCurrentMember();
   const profile = useAuthStore((s) => s.profile);
+  const today = useToday(); // hoy ART, para no contar/mostrar invitados vencidos
 
-  const activeMembers = members.filter(m => m.active).length;
+  // "Activos" = activos y, si son invitados, vigentes (un invitado vencido no cuenta).
+  const activeMembers = members.filter(m => isMemberSelectable(m, today)).length;
   const upcomingOrders = orders.filter(o => o.status === 'scheduled');
   const unusedSongs = getUnusedSongs(4);
   const recentSongs = songs.slice(0, 4);
@@ -383,7 +387,7 @@ export const Dashboard = () => {
             <Badge variant="primary" size="sm">{activeMembers} miembros</Badge>
           </div>
           <div className="space-y-2 max-h-64 overflow-y-auto pr-2">
-            {members.filter(m => m.active).map((member) => {
+            {members.filter(m => isMemberSelectable(m, today)).map((member) => {
               const InstrumentIcon = member.instruments[0] ? getInstrumentIcon(member.instruments[0]) : User;
               // Solo el pastor va a /miembros (los demás serían redirigidos): para pastor la
               // fila es un enlace (conserva la "manito"); para el resto, fila plana SIN
@@ -419,7 +423,7 @@ export const Dashboard = () => {
                 </div>
               );
             })}
-            {members.filter(m => m.active).length === 0 && (
+            {members.filter(m => isMemberSelectable(m, today)).length === 0 && (
               <p className="text-gray-400 text-sm text-center py-4">No hay miembros activos</p>
             )}
           </div>

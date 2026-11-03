@@ -10,6 +10,8 @@ import { commandFilter } from '../lib/searchText';
 import { useNavigate } from 'react-router-dom';
 import { Command } from 'cmdk';
 import { useCurrentRole } from '../hooks/useCurrentMember';
+import { useToday } from '../hooks/useToday';
+import { isMemberSelectable } from '../lib/guests';
 import {
   Search,
   LayoutDashboard,
@@ -43,6 +45,7 @@ export function CommandPalette() {
   const role = useCurrentRole();
   const isPastor = role === 'pastor';
   const canSeeMembers = role === 'pastor' || role === 'leader';
+  const today = useToday(); // hoy ART, para no listar invitados vencidos
 
   // Open on Cmd/Ctrl+K from anywhere (desktop), or on a custom event dispatched
   // by mobile UI (where there's no keyboard) so the palette is reachable from
@@ -162,7 +165,7 @@ export function CommandPalette() {
                   search results too avoids a confusing dead-end. */}
               {canSeeMembers && members.length > 0 && (
                 <Command.Group heading="Miembros" className="text-xs uppercase tracking-wider text-gold-300/60 px-2 pt-2 pb-1">
-                  {members.filter((m) => m.active !== false).slice(0, 50).map((m) => (
+                  {members.filter((m) => isMemberSelectable(m, today)).slice(0, 50).map((m) => (
                     <Command.Item
                       key={`member-${m.id}`}
                       value={`miembro ${m.name} ${isPastor ? (m.email || '') : ''}`}

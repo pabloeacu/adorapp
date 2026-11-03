@@ -21,6 +21,7 @@ const memberRow = {
   pastor_area: 'Zona Norte', leader_of: 'Lider X', birthdate: '1990-01-15',
   role: 'leader', editor: true, instruments: ['Piano', 'Voz'], areas: ['adoracion'],
   active: true, onboarded: true, user_id: 'u1', avatar_url: 'http://a/x.png',
+  guest_until: null,
   created_at: '2020-01-01T00:00:00Z', updated_at: '2020-02-02T00:00:00Z',
 };
 const bandRow = {
@@ -94,6 +95,14 @@ describe('convertMemberToDB — round-trip fiel (freeze de columnas privilegiada
     expect(db.pastor_area).toBe('Zona Norte');
     expect(db.leader_of).toBe('Lider X');
     expect(db.birthdate).toBe('1990-01-15');
+    expect(db.guest_until).toBe(null); // round-trip fiel (miembro normal: null→null → el freeze pasa)
+  });
+
+  it('invitado: guest_until viaja en ambos sentidos (FromDB→camelCase, ToDB→snake_case)', () => {
+    const fromDb = convertMemberFromDB({ ...memberRow, guest_until: '2026-11-09' });
+    expect(fromDb.guestUntil).toBe('2026-11-09');
+    const db = convertMemberToDB(fromDb);
+    expect(db.guest_until).toBe('2026-11-09');
   });
 
   it('baja el email a minúscula (match usuario↔ficha con auth.users, siempre minúscula)', () => {
