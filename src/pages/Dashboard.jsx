@@ -388,7 +388,9 @@ export const Dashboard = () => {
               // Solo el pastor va a /miembros (los demás serían redirigidos): para pastor la
               // fila es un enlace (conserva la "manito"); para el resto, fila plana SIN
               // cursor-pointer (no prometer un clic que no lleva a ningún lado).
-              const rowClass = `hover-relief flex items-center gap-3 px-3 py-2.5 bg-neutral-800/50 rounded-xl hover:bg-neutral-800 transition-colors${role === 'pastor' ? ' cursor-pointer' : ''}`;
+              // Para no-pastor la fila es plana DE VERDAD (sin hover-lift ni cambio de fondo):
+              // el hover y la "manito" quedan solo en la fila del pastor, que sí es enlace.
+              const rowClass = `flex items-center gap-3 px-3 py-2.5 bg-neutral-800/50 rounded-xl${role === 'pastor' ? ' hover-relief hover:bg-neutral-800 transition-colors cursor-pointer' : ''}`;
               const rowInner = (
                 <>
                   <Avatar name={member.name} size="md" />
