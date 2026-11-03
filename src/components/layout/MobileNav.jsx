@@ -41,6 +41,7 @@ import { formatDateLocal } from '../../lib/dates';
 import { PhotoCropper } from '../profile/PhotoCropper';
 import { Modal } from '../ui/Modal';
 import { Button } from '../ui/Button';
+import { Avatar } from '../ui/Avatar';
 import { NotifIconBadge } from '../../lib/notificationVisual';
 import { usePasswordChange } from '../../hooks/usePasswordChange';
 
@@ -457,17 +458,10 @@ export const MobileNav = () => {
             }}
             className="flex items-center gap-2 p-1 rounded-full hover:bg-neutral-800 transition-colors"
           >
-            {displayPhoto ? (
-              <img
-                src={displayPhoto}
-                alt={displayName}
-                className="w-8 h-8 rounded-full object-cover border-2 border-neutral-700"
-              />
-            ) : (
-              <div className="w-8 h-8 rounded-full bg-neutral-800 flex items-center justify-center">
-                <UserCircle size={20} className="text-neutral-400" />
-              </div>
-            )}
+            {/* Moneda del perfil: SIEMPRE la misma (foto o iniciales), vía <Avatar>
+                → mismo tamaño/forma/aro que el resto. Sin foto muestra iniciales
+                (antes un ícono genérico, inconsistente con las demás monedas). */}
+            <Avatar name={displayName} src={displayPhoto || undefined} size="sm" />
           </button>
         </div>
       </div>
@@ -949,17 +943,8 @@ export const MobileNav = () => {
           >
             <div className="flex items-center justify-between px-5 mb-6">
               <div className="flex items-center gap-3">
-                {displayPhoto ? (
-                  <img
-                    src={displayPhoto}
-                    alt={displayName}
-                    className="w-10 h-10 rounded-full object-cover"
-                  />
-                ) : (
-                  <div className="w-10 h-10 rounded-full bg-neutral-800 flex items-center justify-center">
-                    <UserCircle size={20} className="text-neutral-500" />
-                  </div>
-                )}
+                {/* Moneda del perfil (foto o iniciales), vía <Avatar> → consistente. */}
+                <Avatar name={displayName} src={displayPhoto || undefined} size="md" />
                 <div>
                   <p className="text-white font-medium">{displayName}</p>
                   <p className="text-neutral-500 text-sm capitalize">
