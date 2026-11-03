@@ -1,4 +1,5 @@
 import React, { useState, useMemo, useRef, useEffect } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import { useDocumentTitle } from '../hooks/useDocumentTitle';
 // jspdf is loaded on demand inside generateSongPDF (~140 KB; no need at first paint).
 import {
@@ -107,6 +108,18 @@ export const Repertorio = () => {
   }, [searchScope]);
   const [filterCategories, setFilterCategories] = useState([]); // Multiselect
   const [showUnused, setShowUnused] = useState(false);
+  // Deep link desde el "Resumen Rápido" del Inicio: /repertorio?sinUsar=1 abre el
+  // repertorio con el filtro "Sin usar" (getUnusedSongs(4)) encendido. Se limpia el parámetro.
+  const [searchParams, setSearchParams] = useSearchParams();
+  useEffect(() => {
+    const flag = searchParams.get('sinUsar');
+    if (flag !== '1' && flag !== 'true') return;
+    // Syncing an external URL param into local filter state — legitimate effect.
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    setShowUnused(true);
+    searchParams.delete('sinUsar');
+    setSearchParams(searchParams, { replace: true });
+  }, [searchParams, setSearchParams]);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [isViewerOpen, setIsViewerOpen] = useState(false);
   const [viewingSong, setViewingSong] = useState(null);

@@ -388,6 +388,20 @@ export const Ordenes = () => {
     setSearchParams(searchParams, { replace: true });
   }, [searchParams, orders, setSearchParams]);
 
+  // Deep link desde el "Resumen Rápido" del Inicio: /ordenes?status=completed abre la
+  // lista ya filtrada por ese estado (mismo patrón que ?order=; se limpia el parámetro).
+  useEffect(() => {
+    const status = searchParams.get('status');
+    if (!status) return;
+    if (['all', 'scheduled', 'completed', 'cancelled'].includes(status)) {
+      // Syncing an external URL param into local filter state — legitimate effect.
+      // eslint-disable-next-line react-hooks/set-state-in-effect
+      setFilterStatus(status);
+    }
+    searchParams.delete('status');
+    setSearchParams(searchParams, { replace: true });
+  }, [searchParams, setSearchParams]);
+
   const handleSubmit = async (e) => {
     e?.preventDefault?.();
     if (!formData.date || !formData.bandId) return;

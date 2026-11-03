@@ -353,16 +353,20 @@ export const Dashboard = () => {
             <h3 className="font-semibold">Resumen Rápido</h3>
           </div>
           <div className="grid grid-cols-2 gap-4">
-            <div className="text-center p-4 rounded-xl bg-neutral-800/50">
+            {/* Cada tarjeta es un ATAJO a la info que resume (apariencia intacta: las mismas
+                clases pasan al <Link>, que es sólo el envoltorio navegable). "Servicios
+                completados" → Órdenes filtrado a Completados; "Canciones sin usar" →
+                Repertorio con el filtro "Sin usar" encendido (mismo getUnusedSongs(4)). */}
+            <Link to="/ordenes?status=completed" className="block text-center p-4 rounded-xl bg-neutral-800/50">
               <TrendUp size={30} weight="duotone" className="mx-auto text-gold-100 mb-2" />
               <p className="text-2xl font-bold">{orders.filter(o => o.status === 'completed').length}</p>
               <p className="text-xs text-gray-400">Servicios completados</p>
-            </div>
-            <div className="text-center p-4 rounded-xl bg-neutral-800/50">
+            </Link>
+            <Link to="/repertorio?sinUsar=1" className="block text-center p-4 rounded-xl bg-neutral-800/50">
               <Lightning size={30} weight="duotone" className="mx-auto text-gold-100 mb-2" />
               <p className="text-2xl font-bold">{unusedSongs.length}</p>
               <p className="text-xs text-gray-400">Canciones sin usar 4+ sem</p>
-            </div>
+            </Link>
           </div>
         </Card>
 
