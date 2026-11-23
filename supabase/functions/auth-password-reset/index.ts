@@ -5,7 +5,7 @@
 //
 //   POST { action: "request",  email }
 //     → compuerta anti-abuso + lookup de ficha elegible (RPC `password_reset_gate`,
-//       service_role-only) → `auth.admin.generateLink({type:'recovery'})` (token hasheado,
+//       solo servidor: guarda interna por rol del JWT) → `auth.admin.generateLink({type:'recovery'})` (token hasheado,
 //       un solo uso, vence por otp_expiry de Supabase Auth) → correo `recuperar-contrasena`
 //       por NUESTRO pipeline (encolar_email, prioridad 0 = carril exprés) + latido inmediato
 //       del worker. Responde SIEMPRE { ok:true } con tiempo de respuesta parejo: nunca
@@ -122,10 +122,11 @@ function nowART(): { fecha: string; hora: string } {
 
 const admin = createClient(SUPABASE_URL, SERVICE_KEY, { auth: { persistSession: false, autoRefreshToken: false } });
 
-async function markRequest(id: unknown, patch: Record<string, unknown>) {
+// Auditoría (tabla private.password_reset_requests, fuera de la API): solo por RPC.
+async function markRequest(id: unknown, stage: "sent" | "failed", reason: string | null = null) {
   if (id === null || id === undefined) return;
   try {
-    await admin.from("password_reset_requests").update({ ...patch, updated_at: new Date().toISOString() }).eq("id", id);
+    await admin.rpc("password_reset_mark", { p_id: id, p_stage: stage, p_reason: reason });
   } catch (_) { /* best-effort: la auditoría nunca rompe el flujo */ }
 }
 
@@ -186,9 +187,9 @@ async function handleRequest(body: any, req: Request): Promise<Response> {
       minutos: String(LINK_MINUTES),
       enlace,
     });
-    await markRequest(gateId, { stage: "sent" });
+    await markRequest(gateId, "sent");
   } catch (e) {
-    await markRequest(gateId, { stage: "failed", reason: String((e as Error)?.message ?? e).slice(0, 200) });
+    await markRequest(gateId, "failed", String((e as Error)?.message ?? e).slice(0, 200));
     await logWarning("auth-password-reset: no se pudo generar/enviar el enlace", { error: String((e as Error)?.message ?? e).slice(0, 300) });
   }
   return await generic();
@@ -251,12 +252,7 @@ async function handleComplete(body: any, req: Request): Promise<Response> {
   }
 
   // Auditoría: el último pedido enviado de esta cuenta pasa a 'completed'.
-  try {
-    const { data: last } = await admin.from("password_reset_requests")
-      .select("id").eq("user_id", user.id).eq("stage", "sent")
-      .order("created_at", { ascending: false }).limit(1).maybeSingle();
-    if (last?.id) await markRequest(last.id, { stage: "completed" });
-  } catch (_) { /* best-effort */ }
+  try { await admin.rpc("password_reset_complete", { p_user_id: user.id }); } catch (_) { /* best-effort */ }
 
   return json({
     ok: true,

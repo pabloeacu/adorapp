@@ -7,20 +7,24 @@
 --   2) /restablecer?th=<token_hash> → EF action=complete → verifyOtp + updateUser
 --                    → cierra las otras sesiones → correo `contrasena-actualizada`
 --
--- Lo que vive acá:
---   * `password_reset_requests`: auditoría + freno anti-abuso (server-only).
---   * `password_reset_gate(email, ip, ua)`: compuerta atómica (advisory lock por correo)
---     que aplica los límites y devuelve la ficha elegible SOLO al servidor.
+-- Lo que vive acá (APLICADA a prod el 2026-11-23 vía execute_sql):
+--   * `private.password_reset_requests`: auditoría + freno anti-abuso. Vive en `private`
+--     (esquema NO expuesto por la API: anon/authenticated/service_role no tienen USAGE),
+--     así no necesita RLS ni REVOKE para estar fuera del alcance del cliente.
+--   * `private.is_server_call()`: true solo sin JWT (SQL directo/cron) o con rol service_role.
+--   * RPCs en public (SECURITY DEFINER) con esa guarda ADENTRO del cuerpo → aunque tengan
+--     el EXECUTE por defecto para anon/authenticated, un cliente recibe 42501:
+--     `password_reset_gate` (frenos + lookup de ficha elegible), `password_reset_mark`,
+--     `password_reset_complete`.
 --   * Dos plantillas de correo (editables por los pastores como las demás).
---   * `purge_technical_logs` poda la tabla nueva (>90 días).
+-- La migración hermana `20261123_recuperar_contrasena_hardening.sql` suma el REVOKE
+-- explícito de las RPCs y la poda (defensa en profundidad; la guarda interna ya alcanza).
 --
--- Seguridad: la tabla y la RPC son service_role-only (REVOKE de anon/authenticated,
--- FORCE RLS sin policies). El token de recuperación lo genera/valida Supabase Auth
--- (hasheado, un solo uso, vence por otp_expiry); acá NUNCA se guarda.
+-- Seguridad: el token de recuperación lo genera/valida Supabase Auth (hasheado, un solo
+-- uso, vence por otp_expiry); acá NUNCA se guarda.
 -- =============================================================================
 
--- 1) Auditoría + freno ---------------------------------------------------------
-CREATE TABLE IF NOT EXISTS public.password_reset_requests (
+CREATE TABLE IF NOT EXISTS private.password_reset_requests (
   id          bigint GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
   email       text NOT NULL,                       -- normalizado (lower/trim)
   ip          text,
@@ -32,31 +36,29 @@ CREATE TABLE IF NOT EXISTS public.password_reset_requests (
   created_at  timestamptz NOT NULL DEFAULT now(),
   updated_at  timestamptz NOT NULL DEFAULT now()
 );
+CREATE INDEX IF NOT EXISTS idx_prr_email_created ON private.password_reset_requests (email, created_at DESC);
+CREATE INDEX IF NOT EXISTS idx_prr_ip_created    ON private.password_reset_requests (ip, created_at DESC);
+CREATE INDEX IF NOT EXISTS idx_prr_created       ON private.password_reset_requests (created_at);
+CREATE INDEX IF NOT EXISTS idx_prr_user_id       ON private.password_reset_requests (user_id);
+COMMENT ON TABLE private.password_reset_requests IS
+  'Pedidos de recuperación de contraseña (autoservicio). Fuera de la API; la escribe la EF auth-password-reset vía RPCs password_reset_gate/_mark/_complete. Freno anti-abuso + auditoría.';
 
-CREATE INDEX IF NOT EXISTS idx_prr_email_created ON public.password_reset_requests (email, created_at DESC);
-CREATE INDEX IF NOT EXISTS idx_prr_ip_created    ON public.password_reset_requests (ip, created_at DESC);
-CREATE INDEX IF NOT EXISTS idx_prr_created       ON public.password_reset_requests (created_at);
-CREATE INDEX IF NOT EXISTS idx_prr_user_id       ON public.password_reset_requests (user_id);
+-- ¿La llamada viene del servidor? (service_role por PostgREST, o SQL directo/cron sin JWT)
+CREATE OR REPLACE FUNCTION private.is_server_call()
+RETURNS boolean
+LANGUAGE sql
+STABLE
+SET search_path TO 'pg_temp'
+AS $function$
+  SELECT COALESCE(NULLIF(current_setting('request.jwt.claims', true), ''), '{}')::jsonb->>'role' IS NULL
+      OR (COALESCE(NULLIF(current_setting('request.jwt.claims', true), ''), '{}')::jsonb->>'role') = 'service_role';
+$function$;
 
-ALTER TABLE public.password_reset_requests ENABLE ROW LEVEL SECURITY;
-ALTER TABLE public.password_reset_requests FORCE ROW LEVEL SECURITY;
-REVOKE ALL ON public.password_reset_requests FROM PUBLIC, anon, authenticated;
-GRANT SELECT, INSERT, UPDATE, DELETE ON public.password_reset_requests TO service_role;
-GRANT USAGE, SELECT ON SEQUENCE public.password_reset_requests_id_seq TO service_role;
-
-COMMENT ON TABLE public.password_reset_requests IS
-  'Pedidos de recuperación de contraseña (autoservicio). Server-only: lo escribe la EF auth-password-reset vía password_reset_gate. Sirve de freno anti-abuso y de auditoría. Podada a 90 días por purge_technical_logs.';
-
--- 2) Compuerta atómica ---------------------------------------------------------
--- Devuelve jsonb: { ok, id, reason, member: {id, name, user_id, auth_email} | null }
+-- Compuerta atómica. Devuelve jsonb: { ok, id, reason, member: {id, name, user_id, auth_email} | null }
 --   ok=false → la EF responde igual que si hubiera enviado (anti-enumeración) y NO manda nada.
 --   ok=true y member=null → correo no registrado / ficha inactiva / sin cuenta → tampoco manda.
--- Límites (todos server-side; el cliente no se puede confiar):
---   * mismo correo: 3 pedidos atendidos cada 15 min y 6 cada 24 h (solo cuentan los que
---     pasaron la compuerta: requested/sent/completed/failed; los 'limited' no extienden el
---     bloqueo, así un atacante no puede dejar a la víctima sin poder pedir para siempre).
---   * misma IP: 10 pedidos (de cualquier tipo) cada 15 min.
---   * global: 120 pedidos por hora (backstop ante un enjambre).
+-- Límites (server-side): mismo correo 3 atendidos / 15 min y 6 / 24 h (los 'limited' no
+-- extienden el bloqueo); misma IP 10 / 15 min; global 120 / hora.
 CREATE OR REPLACE FUNCTION public.password_reset_gate(p_email text, p_ip text DEFAULT NULL, p_user_agent text DEFAULT NULL)
 RETURNS jsonb
 LANGUAGE plpgsql
@@ -75,6 +77,9 @@ DECLARE
   v_reason  text := NULL;
   v_member  jsonb := NULL;
 BEGIN
+  IF NOT COALESCE(private.is_server_call(), false) THEN
+    RAISE EXCEPTION 'password_reset_gate: solo servidor' USING ERRCODE = '42501';
+  END IF;
   IF v_email = '' OR v_email !~ '^[^@[:space:]]+@[^@[:space:]]+\.[^@[:space:]]+$' THEN
     RETURN jsonb_build_object('ok', false, 'id', NULL, 'reason', 'email_invalido', 'member', NULL);
   END IF;
@@ -82,15 +87,15 @@ BEGIN
   -- Serializa pedidos simultáneos del mismo correo (doble tap / ráfaga).
   PERFORM pg_advisory_xact_lock(hashtext('password_reset_gate:' || v_email)::bigint);
 
-  SELECT count(*) INTO v_n_15 FROM public.password_reset_requests
+  SELECT count(*) INTO v_n_15 FROM private.password_reset_requests
     WHERE email = v_email AND stage IN ('requested','sent','completed','failed')
       AND created_at > now() - interval '15 minutes';
-  SELECT count(*) INTO v_n_24h FROM public.password_reset_requests
+  SELECT count(*) INTO v_n_24h FROM private.password_reset_requests
     WHERE email = v_email AND stage IN ('requested','sent','completed','failed')
       AND created_at > now() - interval '24 hours';
-  SELECT count(*) INTO v_n_ip FROM public.password_reset_requests
+  SELECT count(*) INTO v_n_ip FROM private.password_reset_requests
     WHERE v_ip <> '' AND ip = v_ip AND created_at > now() - interval '15 minutes';
-  SELECT count(*) INTO v_n_glob FROM public.password_reset_requests
+  SELECT count(*) INTO v_n_glob FROM private.password_reset_requests
     WHERE created_at > now() - interval '1 hour';
 
   IF v_n_glob >= 120 THEN v_reason := 'global_limited';
@@ -99,14 +104,13 @@ BEGIN
   END IF;
 
   IF v_reason IS NOT NULL THEN
-    INSERT INTO public.password_reset_requests (email, ip, user_agent, stage, reason)
+    INSERT INTO private.password_reset_requests (email, ip, user_agent, stage, reason)
     VALUES (v_email, NULLIF(v_ip, ''), NULLIF(v_ua, ''), 'limited', v_reason)
     RETURNING id INTO v_id;
     RETURN jsonb_build_object('ok', false, 'id', v_id, 'reason', v_reason, 'member', NULL);
   END IF;
 
   -- Ficha elegible: ACTIVA, con cuenta de auth vinculada, no baneada y con el mismo correo.
-  -- Se lee auth.users como owner (postgres): la EF nunca ve nada de otros correos.
   SELECT jsonb_build_object('id', m.id, 'name', m.name, 'user_id', m.user_id, 'auth_email', u.email)
     INTO v_member
   FROM public.members m
@@ -119,7 +123,7 @@ BEGIN
   ORDER BY m.updated_at DESC
   LIMIT 1;
 
-  INSERT INTO public.password_reset_requests (email, ip, user_agent, stage, reason, user_id)
+  INSERT INTO private.password_reset_requests (email, ip, user_agent, stage, reason, user_id)
   VALUES (
     v_email, NULLIF(v_ip, ''), NULLIF(v_ua, ''),
     CASE WHEN v_member IS NULL THEN 'skipped' ELSE 'requested' END,
@@ -131,12 +135,51 @@ BEGIN
   RETURN jsonb_build_object('ok', true, 'id', v_id, 'reason', NULL, 'member', v_member);
 END;
 $function$;
-
-REVOKE EXECUTE ON FUNCTION public.password_reset_gate(text, text, text) FROM PUBLIC, anon, authenticated;
-GRANT  EXECUTE ON FUNCTION public.password_reset_gate(text, text, text) TO service_role;
-
 COMMENT ON FUNCTION public.password_reset_gate(text, text, text) IS
-  'Compuerta anti-abuso + lookup de ficha elegible para la recuperación de contraseña. Service_role-only (la llama la EF auth-password-reset). Inserta la fila de auditoría.';
+  'Compuerta anti-abuso + lookup de ficha elegible para la recuperación de contraseña. Solo servidor (guarda interna; la llama la EF auth-password-reset). Inserta la fila de auditoría.';
+
+-- Marca una fila de auditoría (sent / failed / completed).
+CREATE OR REPLACE FUNCTION public.password_reset_mark(p_id bigint, p_stage text, p_reason text DEFAULT NULL)
+RETURNS boolean
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path TO 'public', 'pg_temp'
+AS $function$
+DECLARE v_n int;
+BEGIN
+  IF NOT COALESCE(private.is_server_call(), false) THEN
+    RAISE EXCEPTION 'password_reset_mark: solo servidor' USING ERRCODE = '42501';
+  END IF;
+  IF p_id IS NULL OR p_stage NOT IN ('sent','failed','completed') THEN RETURN false; END IF;
+  UPDATE private.password_reset_requests
+     SET stage = p_stage, reason = COALESCE(left(p_reason, 200), reason), updated_at = now()
+   WHERE id = p_id;
+  GET DIAGNOSTICS v_n = ROW_COUNT;
+  RETURN v_n > 0;
+END;
+$function$;
+
+-- Al completar: el último pedido 'sent' de esa cuenta pasa a 'completed'.
+CREATE OR REPLACE FUNCTION public.password_reset_complete(p_user_id uuid)
+RETURNS boolean
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path TO 'public', 'pg_temp'
+AS $function$
+DECLARE v_id bigint;
+BEGIN
+  IF NOT COALESCE(private.is_server_call(), false) THEN
+    RAISE EXCEPTION 'password_reset_complete: solo servidor' USING ERRCODE = '42501';
+  END IF;
+  IF p_user_id IS NULL THEN RETURN false; END IF;
+  SELECT id INTO v_id FROM private.password_reset_requests
+   WHERE user_id = p_user_id AND stage = 'sent'
+   ORDER BY created_at DESC LIMIT 1;
+  IF v_id IS NULL THEN RETURN false; END IF;
+  UPDATE private.password_reset_requests SET stage = 'completed', updated_at = now() WHERE id = v_id;
+  RETURN true;
+END;
+$function$;
 
 -- 3) Plantillas de correo ------------------------------------------------------
 -- Heredan from_label/color/logo de `registro-aprobado` para que se vean como el resto.
@@ -187,30 +230,3 @@ SELECT
 FROM public.email_templates t WHERE t.slug = 'registro-aprobado'
 ON CONFLICT (slug) DO NOTHING;
 
--- 4) Poda (retención 90 días, igual que el resto de los logs técnicos) -----------
--- Mismo cuerpo que la versión vigente + la tabla nueva. Se re-asertan los grants
--- (landmine #39): ACL objetivo {postgres, service_role}.
-CREATE OR REPLACE FUNCTION public.purge_technical_logs()
-RETURNS void
-LANGUAGE plpgsql
-SECURITY DEFINER
-SET search_path TO 'public', 'pg_temp'
-AS $function$
-BEGIN
-  DELETE FROM public.health_checks WHERE checked_at < now() - interval '90 days';
-  DELETE FROM public.email_queue WHERE status IN ('sent','failed') AND created_at < now() - interval '90 days';
-  DELETE FROM public.sent_emails WHERE created_at < now() - interval '90 days';
-  DELETE FROM public.error_log WHERE occurred_at < now() - interval '90 days';
-  DELETE FROM public.admin_action_events WHERE at < now() - interval '1 day';
-  DELETE FROM public.event_staff_hits WHERE at < now() - interval '30 days';
-  DELETE FROM public.password_reset_requests WHERE created_at < now() - interval '90 days';
-EXCEPTION WHEN OTHERS THEN
-  BEGIN
-    INSERT INTO public.error_log (message, severity, context)
-    VALUES ('purge_technical_logs: fallo', 'error', jsonb_build_object('error', SQLERRM));
-  EXCEPTION WHEN OTHERS THEN NULL; END;
-END;
-$function$;
-
-REVOKE EXECUTE ON FUNCTION public.purge_technical_logs() FROM PUBLIC, anon, authenticated;
-GRANT  EXECUTE ON FUNCTION public.purge_technical_logs() TO service_role;

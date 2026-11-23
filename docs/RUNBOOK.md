@@ -125,7 +125,7 @@ Si hay urgencia y CI no funciona: el deploy de Vercel NO depende de GitHub Actio
 ## Un miembro no puede entrar ("Invalid login credentials")
 
 1. Es casi siempre contraseña olvidada. Desde 2026-11-23 la persona lo resuelve sola: en el ingreso toca **"¿Olvidaste tu contraseña?"**, recibe el correo "Restablecé tu contraseña" (vale 60 min, un solo uso) y crea una nueva.
-2. Si no le llega el correo: revisar Spam/Promociones; en la base, `select stage, reason, created_at from password_reset_requests where email = '<correo>' order by created_at desc limit 5` (`skipped` = correo no registrado o ficha inactiva; `limited` = frenado por abuso; `sent` = encolado → mirar `email_queue`/`sent_emails`).
+2. Si no le llega el correo: revisar Spam/Promociones; en la base, `select stage, reason, created_at from private.password_reset_requests where email = '<correo>' order by created_at desc limit 5` (`skipped` = correo no registrado o ficha inactiva; `limited` = frenado por abuso; `sent` = encolado → mirar `email_queue`/`sent_emails`).
 3. Plan B (sigue vigente): un pastor la resetea desde **Miembros → Resetear contraseña** y se la pasa.
 4. Nunca diagnosticar "cuenta rota" sin mirar `auth.users` (`banned_until`, `email_confirmed_at`) y los `auth_logs` (`error_code`): `invalid_credentials` es contraseña incorrecta, no un problema nuestro.
 
