@@ -2,11 +2,25 @@ import React, { useState, useEffect } from 'react';
 import { useDocumentTitle } from '../hooks/useDocumentTitle';
 import { Mail, Lock, Eye, EyeOff, Loader2, UserPlus, CheckCircle } from 'lucide-react';
 import { useAuthStore } from '../stores/authStore';
-import { useNavigate, Navigate } from 'react-router-dom';
+import { useNavigate, Navigate, Link } from 'react-router-dom';
 import { Modal } from '../components/ui/Modal';
 import { Button } from '../components/ui/Button';
 import { INSTRUMENTS } from '../stores/appStore';
 import { SELECTABLE_AREAS } from '../lib/areas';
+
+// Los errores de Supabase Auth llegan en inglés; se traducen para la persona.
+export const loginErrorMessage = (raw) => {
+  const m = String(raw || '').toLowerCase();
+  if (!m) return '';
+  if (m.includes('invalid login credentials') || m.includes('invalid_credentials')) {
+    return 'El correo o la contraseña no son correctos. Revisá que estén bien escritos.';
+  }
+  if (m.includes('email not confirmed')) return 'Tu correo todavía no está confirmado. Hablá con un pastor.';
+  if (m.includes('banned') || m.includes('user_banned')) return 'Tu cuenta está desactivada. Si creés que es un error, hablá con un pastor.';
+  if (m.includes('rate limit') || m.includes('too many')) return 'Demasiados intentos seguidos. Esperá un minuto y probá de nuevo.';
+  if (m.includes('fetch') || m.includes('network')) return 'No pudimos conectar con el servidor. Revisá tu conexión e intentá de nuevo.';
+  return 'No pudimos iniciar sesión. Probá de nuevo en unos segundos.';
+};
 
 export const Login = () => {
   useDocumentTitle('Iniciar sesión');
@@ -207,7 +221,7 @@ export const Login = () => {
             </div>
 
             {error && (
-              <p className="text-sm text-red-400 text-center">{error}</p>
+              <p className="text-sm text-red-400 text-center" data-testid="login-error">{loginErrorMessage(error)}</p>
             )}
 
             <button
@@ -219,6 +233,16 @@ export const Login = () => {
               {loading ? 'Iniciando sesión...' : 'Entrar'}
             </button>
           </form>
+
+          <div className="mt-4 text-center">
+            <Link
+              to={email.trim() ? `/recuperar?email=${encodeURIComponent(email.trim())}` : '/recuperar'}
+              className="text-sm text-gray-400 hover:text-gold-200 transition-colors underline-offset-4 hover:underline"
+              data-testid="login-forgot"
+            >
+              ¿Olvidaste tu contraseña?
+            </Link>
+          </div>
 
           <div className="mt-6 pt-6 border-t border-neutral-800">
             <p className="text-xs text-gray-500 text-center">

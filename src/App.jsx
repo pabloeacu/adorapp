@@ -29,6 +29,8 @@ const lazyPage = (importer, name) =>
 const EventApp = lazyPage(() => import('./pages/thechosen/EventApp'), 'EventApp');
 
 const Login = lazyPage(() => import('./pages/Login'), 'Login');
+const RecuperarContrasena = lazyPage(() => import('./pages/RecuperarContrasena'), 'RecuperarContrasena');
+const RestablecerContrasena = lazyPage(() => import('./pages/RestablecerContrasena'), 'RestablecerContrasena');
 const Dashboard = lazyPage(() => import('./pages/Dashboard'), 'Dashboard');
 const Ordenes = lazyPage(() => import('./pages/Ordenes'), 'Ordenes');
 const Repertorio = lazyPage(() => import('./pages/Repertorio'), 'Repertorio');
@@ -172,6 +174,10 @@ function AppMain() {
         <Suspense fallback={<RouteFallback />}>
           <Routes>
             <Route path="/login" element={<Login />} />
+            {/* Recuperación de contraseña (autoservicio), SIN sesión y fuera del Layout:
+                /recuperar pide el enlace, /restablecer?th=… fija la contraseña nueva. */}
+            <Route path="/recuperar" element={<RecuperarContrasena />} />
+            <Route path="/restablecer" element={<RestablecerContrasena />} />
             {/* Presentador "Iniciar servicio": pantalla completa, FUERA del Layout
                 (sin barra lateral/header). Trae su propia guarda de sesión. */}
             <Route path="/servicio/:orderId" element={<IniciarServicio />} />
