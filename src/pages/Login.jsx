@@ -119,13 +119,13 @@ export const Login = () => {
   };
 
   return (
-    <div className="relative min-h-screen bg-black flex items-center justify-center p-4 overflow-hidden">
+    <div className="relative h-screen overflow-y-auto bg-black flex flex-col items-center p-4">
       {/* Halo dorado sutil detrás del card — premium, decorativo */}
       <div
         className="gold-radial-glow pointer-events-none absolute left-1/2 top-1/3 h-[32rem] w-[32rem] -translate-x-1/2 -translate-y-1/2 rounded-full"
         aria-hidden="true"
       />
-      <div className="relative w-full max-w-md">
+      <div className="relative w-full max-w-md my-auto">
         {/* Header con logos */}
         <div className="text-center mb-8">
           {/* Logo ADORACIÓN CAF */}

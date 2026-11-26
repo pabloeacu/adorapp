@@ -21,7 +21,7 @@ export function Tutorial() {
 
   return (
     <div
-      className="min-h-screen bg-black text-white flex flex-col items-center"
+      className="h-screen overflow-y-auto bg-black text-white flex flex-col items-center"
       style={{
         paddingTop: 'calc(2rem + env(safe-area-inset-top, 0px))',
         paddingBottom: 'calc(2rem + env(safe-area-inset-bottom, 0px))',
@@ -29,7 +29,7 @@ export function Tutorial() {
           'radial-gradient(60% 40% at 50% 0%, rgba(212,175,55,0.14), transparent 70%)',
       }}
     >
-      <div className="w-full max-w-md px-6 flex flex-col items-center text-center">
+      <div className="w-full max-w-md px-6 flex flex-col items-center text-center my-auto">
         {/* Marca */}
         <img
           src="/adorapp-logo.png"
