@@ -281,6 +281,29 @@ button:disabled {
   height: env(safe-area-inset-bottom);
 }
 
+/* Video en PANTALLA COMPLETA (fullscreen de escritorio): forzar object-fit: contain.
+   El video del tutorial es vertical (9:16). En la vista normal usa object-cover
+   (marco 9:16 == video 9:16, sin recorte), pero al MAXIMIZARLO en una pantalla
+   ancha (16:9) con cover el navegador DEFORMA/estira el contenido vertical → se
+   pierde claridad. En fullscreen lo mostramos "contain": vertical, completo y
+   centrado, con bandas negras a los costados (sin deformar ni recortar). El móvil
+   usa el reproductor nativo del sistema y ya lo maneja bien.
+   Especificidad: `video:fullscreen` (0,1,1) le gana a la clase `.object-cover`
+   (0,1,0) → esta regla manda al maximizar. Reglas SEPARADAS por prefijo: si un
+   navegador no entiende un selector, descarta solo esa regla, no la otra. */
+video:fullscreen {
+  object-fit: contain;
+  width: 100%;
+  height: 100%;
+  background: #000;
+}
+video:-webkit-full-screen {
+  object-fit: contain;
+  width: 100%;
+  height: 100%;
+  background: #000;
+}
+
 /* iOS specific fixes */
 @supports (-webkit-touch-callout: none) {
   .min-h-screen {
