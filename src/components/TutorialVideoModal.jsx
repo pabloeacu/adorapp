@@ -88,12 +88,18 @@ export const TutorialVideoModal = ({ member }) => {
   const startPlay = () => {
     const v = videoRef.current;
     if (!v) return;
-    v.play()
-      .then(() => setPlaying(true))
-      .catch(() => {
-        /* algún navegador bloqueó: quedan los controles nativos para darle play */
-        setPlaying(true);
-      });
+    // Mostramos los controles nativos pase lo que pase (fallback para darle play).
+    setPlaying(true);
+    // iOS WebKit puede tirar InvalidStateError de forma SÍNCRONA si el media no
+    // está listo → el try atrapa el throw sincrónico; el .catch, el rechazo async.
+    // Nunca debe propagar un error no capturado (se registraría como error serio).
+    let p = null;
+    try {
+      p = v.play();
+    } catch {
+      /* noop: controles nativos quedan disponibles */
+    }
+    if (p && typeof p.catch === 'function') p.catch(() => {});
   };
 
   return (

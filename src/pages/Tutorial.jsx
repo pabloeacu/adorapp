@@ -16,7 +16,17 @@ export function Tutorial() {
   const startPlay = () => {
     const v = videoRef.current;
     if (!v) return;
-    v.play().then(() => setPlaying(true)).catch(() => setPlaying(true));
+    // Mostramos los controles nativos pase lo que pase (fallback).
+    setPlaying(true);
+    // iOS WebKit puede tirar InvalidStateError SÍNCRONO si el media no está listo:
+    // el try atrapa el throw; el .catch, el rechazo async. Nunca propaga sin capturar.
+    let p = null;
+    try {
+      p = v.play();
+    } catch {
+      /* noop */
+    }
+    if (p && typeof p.catch === 'function') p.catch(() => {});
   };
 
   return (
