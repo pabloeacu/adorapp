@@ -31,15 +31,23 @@ export function Tutorial() {
 
   return (
     <div
-      className="h-screen overflow-x-hidden overflow-y-auto bg-black text-white flex flex-col items-center"
+      className="h-[100dvh] overflow-y-auto overflow-x-hidden bg-black text-white"
       style={{
-        paddingTop: 'calc(2rem + env(safe-area-inset-top, 0px))',
-        paddingBottom: 'calc(2rem + env(safe-area-inset-bottom, 0px))',
         backgroundImage:
           'radial-gradient(60% 40% at 50% 0%, rgba(212,175,55,0.14), transparent 70%)',
       }}
     >
-      <div className="w-full max-w-md px-6 flex flex-col items-center text-center my-auto">
+      {/* Centra cuando entra y CRECE sin recortar el tope cuando no entra
+          (min-h-full + justify-center en vez de my-auto). 100dvh respeta la barra
+          del navegador móvil; aire real abajo con safe-area. */}
+      <div
+        className="min-h-full w-full flex flex-col items-center justify-center text-center px-6"
+        style={{
+          paddingTop: 'calc(2rem + env(safe-area-inset-top, 0px))',
+          paddingBottom: 'calc(3rem + env(safe-area-inset-bottom, 0px))',
+        }}
+      >
+        <div className="w-full max-w-md flex flex-col items-center text-center">
         {/* Marca */}
         <img
           src="/adorapp-logo.png"
@@ -94,6 +102,7 @@ export function Tutorial() {
           Entrar a AdorAPP
           <ArrowRight size={16} className="group-hover:translate-x-0.5 transition-transform" />
         </a>
+        </div>
       </div>
     </div>
   );

@@ -119,13 +119,25 @@ export const Login = () => {
   };
 
   return (
-    <div className="relative h-screen overflow-x-hidden overflow-y-auto bg-black flex flex-col items-center p-4">
-      {/* Halo dorado sutil detrás del card — premium, decorativo */}
+    <div className="relative h-[100dvh] overflow-y-auto overflow-x-hidden bg-black">
+      {/* Halo dorado sutil detrás del card — decorativo; en una capa CLIPEADA
+          (inset-0 overflow-hidden) para que el glow (512px) NUNCA genere scroll
+          horizontal ni "wobble" en el celular. */}
+      <div className="pointer-events-none absolute inset-0 overflow-hidden" aria-hidden="true">
+        <div className="gold-radial-glow absolute left-1/2 top-1/3 h-[32rem] w-[32rem] -translate-x-1/2 -translate-y-1/2 rounded-full" />
+      </div>
+      {/* Centra cuando el contenido entra y CRECE (scrollea todo, sin recortar el tope)
+          cuando no entra — min-h-full + justify-center, en vez del viejo my-auto que
+          dejaba el tope inalcanzable ("scrollea una vez y se trunca"). 100dvh descuenta
+          la barra del navegador móvil → el pie no queda tapado ni pegado al borde. */}
       <div
-        className="gold-radial-glow pointer-events-none absolute left-1/2 top-1/3 h-[32rem] w-[32rem] -translate-x-1/2 -translate-y-1/2 rounded-full"
-        aria-hidden="true"
-      />
-      <div className="relative w-full max-w-md my-auto">
+        className="relative min-h-full flex flex-col items-center justify-center px-4"
+        style={{
+          paddingTop: 'calc(1.5rem + env(safe-area-inset-top, 0px))',
+          paddingBottom: 'calc(2.5rem + env(safe-area-inset-bottom, 0px))',
+        }}
+      >
+        <div className="relative w-full max-w-md">
         {/* Header con logos */}
         <div className="text-center mb-8">
           {/* Logo ADORACIÓN CAF */}
@@ -274,6 +286,7 @@ export const Login = () => {
         <p className="text-xs text-gray-400 text-center mt-6">
           © 2026 Centro de Avivamiento Familiar
         </p>
+        </div>
       </div>
 
       {/* Registration Modal */}
