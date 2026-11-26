@@ -16,12 +16,22 @@ export function Tutorial() {
   const startPlay = () => {
     const v = videoRef.current;
     if (!v) return;
-    v.play().then(() => setPlaying(true)).catch(() => setPlaying(true));
+    // Mostramos los controles nativos pase lo que pase (fallback).
+    setPlaying(true);
+    // iOS WebKit puede tirar InvalidStateError SÍNCRONO si el media no está listo:
+    // el try atrapa el throw; el .catch, el rechazo async. Nunca propaga sin capturar.
+    let p = null;
+    try {
+      p = v.play();
+    } catch {
+      /* noop */
+    }
+    if (p && typeof p.catch === 'function') p.catch(() => {});
   };
 
   return (
     <div
-      className="min-h-screen bg-black text-white flex flex-col items-center"
+      className="h-screen overflow-x-hidden overflow-y-auto bg-black text-white flex flex-col items-center"
       style={{
         paddingTop: 'calc(2rem + env(safe-area-inset-top, 0px))',
         paddingBottom: 'calc(2rem + env(safe-area-inset-bottom, 0px))',
@@ -29,7 +39,7 @@ export function Tutorial() {
           'radial-gradient(60% 40% at 50% 0%, rgba(212,175,55,0.14), transparent 70%)',
       }}
     >
-      <div className="w-full max-w-md px-6 flex flex-col items-center text-center">
+      <div className="w-full max-w-md px-6 flex flex-col items-center text-center my-auto">
         {/* Marca */}
         <img
           src="/adorapp-logo.png"
@@ -50,7 +60,7 @@ export function Tutorial() {
         </p>
 
         {/* Marco de celular con el video (9:16, encaja exacto) */}
-        <div className="relative w-full max-w-[300px] aspect-[9/16] mt-7 rounded-[2.2rem] border-[7px] border-neutral-800 bg-black overflow-hidden shadow-2xl ring-1 ring-gold-500/30">
+        <div className="relative w-full max-w-[300px] max-h-[62dvh] aspect-[9/16] mt-7 rounded-[2.2rem] border-[7px] border-neutral-800 bg-black overflow-hidden shadow-2xl ring-1 ring-gold-500/30">
           <video
             ref={videoRef}
             className="absolute inset-0 w-full h-full object-cover bg-black"

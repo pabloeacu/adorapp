@@ -119,13 +119,13 @@ export const Login = () => {
   };
 
   return (
-    <div className="relative min-h-screen bg-black flex items-center justify-center p-4 overflow-hidden">
+    <div className="relative h-screen overflow-x-hidden overflow-y-auto bg-black flex flex-col items-center p-4">
       {/* Halo dorado sutil detrás del card — premium, decorativo */}
       <div
         className="gold-radial-glow pointer-events-none absolute left-1/2 top-1/3 h-[32rem] w-[32rem] -translate-x-1/2 -translate-y-1/2 rounded-full"
         aria-hidden="true"
       />
-      <div className="relative w-full max-w-md">
+      <div className="relative w-full max-w-md my-auto">
         {/* Header con logos */}
         <div className="text-center mb-8">
           {/* Logo ADORACIÓN CAF */}
@@ -264,9 +264,9 @@ export const Login = () => {
           {/* Invitación discreta al recorrido institucional (mini-página pública /tutorial) */}
           <a
             href="/tutorial"
-            className="group mt-5 flex items-center justify-center gap-2 text-xs text-gray-500 hover:text-gold-200 transition-colors"
+            className="group mt-5 inline-flex items-center justify-center gap-2 rounded-lg px-2 py-1 text-sm text-gold-300/85 hover:text-gold-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-gold-500/60 transition-colors"
           >
-            <span className="text-gold-500/70 group-hover:text-gold-300 transition-colors">▶</span>
+            <span aria-hidden="true" className="text-gold-400 group-hover:text-gold-200 transition-colors">▶</span>
             Conocé AdorAPP en 10 minutos
           </a>
         </div>
