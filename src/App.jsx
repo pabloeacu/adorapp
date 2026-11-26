@@ -41,6 +41,10 @@ const IniciarServicio = lazyPage(() => import('./pages/IniciarServicio'), 'Inici
 const SaludSistema = lazyPage(() => import('./pages/SaludSistema'), 'SaludSistema');
 const Eventos = lazyPage(() => import('./pages/Eventos'), 'Eventos');
 
+// Mini-página pública del video institucional (isla aislada, como The Chosen):
+// destino del botón del correo + link del login. No bootea la app autenticada.
+const Tutorial = lazyPage(() => import('./pages/Tutorial'), 'Tutorial');
+
 const RouteFallback = () => <PageLoader />;
 
 // Guards a route so plain members get redirected. Pastors and leaders pass through.
@@ -202,6 +206,13 @@ function App() {
     return (
       <Suspense fallback={<div style={{ minHeight: '100vh', background: '#0a0806' }} />}>
         <EventApp />
+      </Suspense>
+    );
+  }
+  if (typeof window !== 'undefined' && window.location.pathname.startsWith('/tutorial')) {
+    return (
+      <Suspense fallback={<div style={{ minHeight: '100vh', background: '#000000' }} />}>
+        <Tutorial />
       </Suspense>
     );
   }

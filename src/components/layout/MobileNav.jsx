@@ -19,6 +19,7 @@ import {
   FileText,
   Send,
   Bell,
+  Clapperboard,
   Search,
   Menu,
   Lock,
@@ -432,6 +433,19 @@ export const MobileNav = () => {
             aria-label="Buscar"
           >
             <Search size={22} className="text-neutral-400 hover:text-white transition-colors" />
+          </button>
+
+          {/* Tutorial institucional */}
+          <button
+            onClick={(e) => {
+              e.stopPropagation();
+              window.dispatchEvent(new CustomEvent('openTutorial'));
+            }}
+            className="p-2 rounded-full hover:bg-neutral-800 transition-colors"
+            title="Tutorial institucional"
+            aria-label="Tutorial institucional"
+          >
+            <Clapperboard size={22} className="text-gold-300 hover:text-gold-100 transition-colors" />
           </button>
 
           {/* Notification Bell - Left of profile */}

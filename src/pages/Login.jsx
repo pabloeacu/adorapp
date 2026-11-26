@@ -236,6 +236,15 @@ export const Login = () => {
               Quiero registrarme
             </button>
           </div>
+
+          {/* Invitación discreta al recorrido institucional (mini-página pública /tutorial) */}
+          <a
+            href="/tutorial"
+            className="group mt-5 flex items-center justify-center gap-2 text-xs text-gray-500 hover:text-gold-200 transition-colors"
+          >
+            <span className="text-gold-500/70 group-hover:text-gold-300 transition-colors">▶</span>
+            Conocé AdorAPP en 10 minutos
+          </a>
         </div>
 
         <p className="text-xs text-gray-400 text-center mt-6">
