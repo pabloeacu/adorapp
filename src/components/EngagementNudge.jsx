@@ -9,6 +9,7 @@ import { notificationPermission, isCurrentlySubscribed, subscribePush, isPushSup
 import {
   decideNudge, copyForNudge, readNudgeState, recordNudgeShown, isMobileDevice,
 } from '../lib/engagementNudge';
+import { claimStartupOverlay } from '../lib/startupOverlays';
 
 // Cartel recordatorio (cada 10 días, solo teléfono) que estimula a instalar la app
 // y activar notificaciones — de a una consigna por vez (instalar primero), con copy
@@ -63,6 +64,10 @@ export const EngagementNudge = ({ member }) => {
           lastShownAt, shownCount, now: Date.now(),
         });
         if (cancelled || !decision.show) return;
+        // Turnero compartido: si el pop-up del tutorial ya tomó el turno de esta
+        // apertura, cedemos SIN sellar el reloj de 10 días → reaparece en el próximo
+        // ingreso. Evita dos <Modal> oscuros apilados en la ventana del lanzamiento.
+        if (!claimStartupOverlay()) return;
         SHOWN_THIS_SESSION = true;
         recordNudgeShown(Date.now()); // sella el reloj de 10 días + avanza la rotación
         setNudge(decision);

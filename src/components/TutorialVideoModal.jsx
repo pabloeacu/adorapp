@@ -10,6 +10,7 @@ import {
   fetchTutorialSeen,
   recordTutorialSeen,
 } from '../lib/tutorial';
+import { claimStartupOverlay } from '../lib/startupOverlays';
 
 // Un solo auto-show por carga (aunque el member cambie o re-renderice) y
 // anti-encimado con el asistente de bienvenida (mismo patrón que landmine #107):
@@ -53,16 +54,20 @@ export const TutorialVideoModal = ({ member }) => {
     if (ONBOARDING_THIS_SESSION.has(member.id)) return;
     if (autoShownThisSession) return;
     if (hasSeenTutorialLocal()) return;
+    autoShownThisSession = true; // una sola evaluación por carga
+    // Turnero compartido con el recordatorio de instalar (EngagementNudge):
+    // reclamamos SÍNCRONO al montar para tener prioridad (el recordatorio decide
+    // recién tras un timer de 500ms). Si otro aviso ya tomó el turno, cedemos.
+    if (!claimStartupOverlay()) return;
 
     let cancelled = false;
     (async () => {
       const seen = await fetchTutorialSeen();
-      if (cancelled || autoShownThisSession) return;
+      if (cancelled) return;
       if (seen) {
         markTutorialSeenLocal(); // ya lo vio en otro dispositivo → no reaparece acá
         return;
       }
-      autoShownThisSession = true;
       setAnnounce(true);
       setPlaying(false);
       setOpen(true);
@@ -117,7 +122,7 @@ export const TutorialVideoModal = ({ member }) => {
         )}
 
         {/* Marco de celular: el video es 9:16, encaja exacto (sin recorte). */}
-        <div className="relative w-full max-w-[300px] aspect-[9/16] rounded-[2rem] border-[6px] border-neutral-800 bg-black overflow-hidden shadow-2xl ring-1 ring-gold-500/30">
+        <div className="relative w-full max-w-[300px] max-h-[58dvh] aspect-[9/16] rounded-[2rem] border-[6px] border-neutral-800 bg-black overflow-hidden shadow-2xl ring-1 ring-gold-500/30">
           <video
             ref={videoRef}
             className="absolute inset-0 w-full h-full object-cover bg-black"
