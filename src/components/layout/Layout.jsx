@@ -7,6 +7,7 @@ import { OnboardingWizard } from '../OnboardingWizard';
 import { UpdateBanner } from '../UpdateBanner';
 import { OfflineBanner } from '../OfflineBanner';
 import { EngagementNudge } from '../EngagementNudge';
+import { TutorialVideoModal } from '../TutorialVideoModal';
 import { Navigate, Outlet } from 'react-router-dom';
 import { useAuthStore } from '../../stores/authStore';
 import { useCurrentMember } from '../../hooks/useCurrentMember';
@@ -92,6 +93,10 @@ export const Layout = () => {
       {/* Recordatorio cada 10 días (solo teléfono): instalar app / activar notificaciones.
           Se auto-gatea (no toca a los nuevos, que ven el asistente). 100% cliente. */}
       <EngagementNudge member={currentMember} />
+
+      {/* Video institucional/tutorial: reproductor (claqueta) + pop-up de única
+          vez por persona. On-demand (no baja nada hasta el play). */}
+      <TutorialVideoModal member={currentMember} />
 
       {/* Mobile Navigation */}
       <MobileNav />

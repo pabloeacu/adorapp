@@ -5,7 +5,7 @@ import { PhotoCropper } from '../profile/PhotoCropper';
 import { NotifIconBadge } from '../../lib/notificationVisual';
 import { usePasswordChange } from '../../hooks/usePasswordChange';
 import { useLocation, useNavigate } from 'react-router-dom';
-import { Bell, Search, ChevronRight, User, Mail, Shield, Camera, X, Check, LogOut, Trash2, Phone, Cross, Users2, Calendar, Loader2, Lock, Eye, EyeOff, RefreshCw } from 'lucide-react';
+import { Bell, Clapperboard, Search, ChevronRight, User, Mail, Shield, Camera, X, Check, LogOut, Trash2, Phone, Cross, Users2, Calendar, Loader2, Lock, Eye, EyeOff, RefreshCw } from 'lucide-react';
 import { useAuthStore } from '../../stores/authStore';
 import { useAppStore } from '../../stores/appStore';
 import { supabase } from '../../lib/supabase';
@@ -472,6 +472,14 @@ export const Header = () => {
             }}
           >
             <RefreshCw size={20} className={`text-gray-400 hover:text-white transition-colors ${isSyncing ? 'animate-spin' : ''}`} />
+          </button>
+          <button
+            className="p-2 rounded-lg hover:bg-neutral-800 transition-colors relative group"
+            title="Tutorial institucional"
+            aria-label="Tutorial institucional"
+            onClick={() => window.dispatchEvent(new CustomEvent('openTutorial'))}
+          >
+            <Clapperboard size={20} className="text-gold-300 group-hover:text-gold-100 transition-colors" />
           </button>
           <button
             className="p-2.5 rounded-lg hover:bg-neutral-800 transition-colors relative bg-neutral-900 border border-neutral-700 group"
